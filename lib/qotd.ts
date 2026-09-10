@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { dbReady } from "@/lib/db";
 import { decryptSecret } from "@/lib/security";
 
 export const DEFAULT_TEMPLATE = "**Question of the Day — {date}**\n\n{question}";
@@ -42,7 +42,7 @@ export function validateTemplate(template: string) {
 type Mode = "scheduled" | "manual_random" | "manual_selected";
 
 export async function sendQuestion(questionId: string | null, mode: Mode, localDate?: string) {
-  const sql = db();
+  const sql = await dbReady();
   const claimed = await sql.begin(async (tx) => {
     const questions = questionId
       ? await tx`select id, question from questions where id = ${questionId} and status = 'approved' limit 1`

@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { clearSession, createSession, requireRole, verifyCredentials } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { dbReady } from "@/lib/db";
 import { encryptSecret, hashAddress, validateDiscordWebhook } from "@/lib/security";
 import { sendQuestion, validateTemplate } from "@/lib/qotd";
 
@@ -41,7 +41,7 @@ export async function submitQuestionAction(formData: FormData) {
   }
   if (note.length > 500) redirect(messageUrl("/contribute", "error", "Notes must be 500 characters or fewer."));
   const ipHash = await clientHash();
-  const sql = db();
+  const sql = await dbReady();
   const recent = Number((await sql`
     select count(*)::int as count from questions
     where submitter_ip_hash = ${ipHash} and created_at > now() - interval '1 hour'
@@ -59,7 +59,8 @@ export async function reviewQuestionAction(formData: FormData) {
   const intent = String(formData.get("intent") || "save");
   if (!id || question.length < 8 || question.length > 500) redirect(messageUrl("/admin", "error", "Check the question length and try again."));
   const status = intent === "approve" ? "approved" : intent === "reject" ? "rejected" : "pending";
-  await db()`update questions set question = ${question}, status = ${status}, updated_at = now() where id = ${id} and status <> 'sent'`;
+  const sql = await dbReady();
+  await sql`update questions set question = ${question}, status = ${status}, updated_at = now() where id = ${id} and status <> 'sent'`;
   revalidatePath("/admin");
   redirect(messageUrl("/admin", "ok", status === "approved" ? "Question approved." : status === "rejected" ? "Question rejected." : "Changes saved."));
 }
@@ -71,7 +72,7 @@ export async function saveSettingsAction(formData: FormData) {
   const templateError = validateTemplate(template);
   if (templateError) redirect(messageUrl("/admin", "error", templateError));
   if (webhook && !validateDiscordWebhook(webhook)) redirect(messageUrl("/admin", "error", "Enter a valid Discord webhook URL."));
-  const sql = db();
+  const sql = await dbReady();
   if (webhook) {
     await sql`update settings set message_template = ${template}, webhook_url_encrypted = ${encryptSecret(webhook)}, updated_at = now() where singleton = true`;
   } else {

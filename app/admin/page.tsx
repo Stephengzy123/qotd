@@ -1,6 +1,6 @@
 import { logoutAction, reviewQuestionAction, saveSettingsAction, sendQuestionAction } from "@/app/actions";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { dbReady } from "@/lib/db";
 import { DEFAULT_TEMPLATE } from "@/lib/qotd";
 import { Notice } from "@/components/notice";
 import { TemplateEditor } from "@/components/template-editor";
@@ -15,7 +15,7 @@ function relativeDate(date: Date) {
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
   const session = await requireRole("admin");
   const params = await searchParams;
-  const sql = db();
+  const sql = await dbReady();
   const [pending, approved, sent, settingsRows, dispatches] = await Promise.all([
     sql<Question[]>`select id, question, contributor_note, status, created_at from questions where status = 'pending' order by created_at asc`,
     sql<Question[]>`select id, question, contributor_note, status, created_at from questions where status = 'approved' order by created_at asc`,

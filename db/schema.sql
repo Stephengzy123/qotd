@@ -1,5 +1,10 @@
 create extension if not exists pgcrypto;
 
+create table if not exists qotd_schema_migrations (
+  version integer primary key,
+  applied_at timestamptz not null default now()
+);
+
 create table if not exists questions (
   id uuid primary key default gen_random_uuid(),
   question text not null check (char_length(question) between 8 and 500),

@@ -4,9 +4,10 @@ A Next.js app for collecting, reviewing, and delivering a daily Question of the 
 
 ## Set up Neon
 
-1. Create a Neon project and open its SQL Editor.
-2. Run the contents of `db/schema.sql`.
-3. Copy the pooled connection string into `DATABASE_URL`.
+1. Create a Neon project.
+2. Copy the pooled connection string into `DATABASE_URL`.
+
+The app automatically applies versioned schema changes when it first accesses the database. `db/schema.sql` is also included as a manual fallback.
 
 ## Configure credentials
 
