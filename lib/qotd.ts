@@ -4,10 +4,6 @@ import { decryptSecret } from "@/lib/security";
 export const DEFAULT_TEMPLATE = "**Question of the Day — {date}**\n\n{question}";
 export const ALLOWED_TOKENS = ["{date}", "{question}", "{number}", "{mention-role}"];
 
-export function normalizeTemplate(template: string) {
-  return template.replaceAll("\\r\\n", "\n").replaceAll("\\n", "\n");
-}
-
 export function pacificParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Los_Angeles",
@@ -29,7 +25,7 @@ export function formatMessage(template: string, question: string, number?: numbe
     month: "long",
     day: "numeric",
   }).format(date);
-  return normalizeTemplate(template)
+  return template
     .replaceAll("{date}", displayDate)
     .replaceAll("{question}", question)
     .replaceAll("{number}", number ? String(number) : "—")

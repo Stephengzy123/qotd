@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { clearSession, createSession, requireRole, verifyCredentials } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
 import { encryptSecret, hashAddress, validateDiscordWebhook } from "@/lib/security";
-import { normalizeTemplate, sendQuestion, validateTemplate } from "@/lib/qotd";
+import { sendQuestion, validateTemplate } from "@/lib/qotd";
 
 function messageUrl(path: string, kind: "ok" | "error", message: string) {
   return `${path}?${kind}=${encodeURIComponent(message)}`;
@@ -67,7 +67,7 @@ export async function reviewQuestionAction(formData: FormData) {
 
 export async function saveSettingsAction(formData: FormData) {
   await requireRole("admin");
-  const template = normalizeTemplate(String(formData.get("template") || "").trim());
+  const template = String(formData.get("template") || "").trim();
   const webhook = String(formData.get("webhook") || "").trim();
   const roleId = String(formData.get("roleId") || "").trim();
   const templateError = validateTemplate(template, roleId);

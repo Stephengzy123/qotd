@@ -2,26 +2,43 @@
 
 import { Fragment, useState, type ReactNode } from "react";
 
-function normalizeTemplate(template: string) {
-  return template.replaceAll("\\r\\n", "\n").replaceAll("\\n", "\n");
+const escapedCharacters: Record<string, string> = {
+  "\\": "\uE000",
+  "_": "\uE001",
+  "*": "\uE002",
+  "|": "\uE003",
+  "`": "\uE004",
+  "#": "\uE005",
+  "-": "\uE006",
+};
+
+function protectEscapes(text: string) {
+  return text.replace(/\\([\\_*|`#-])/g, (_, character: string) => escapedCharacters[character]);
+}
+
+function restoreEscapes(text: string) {
+  return Object.entries(escapedCharacters).reduce(
+    (result, [character, placeholder]) => result.replaceAll(placeholder, character),
+    text,
+  );
 }
 
 function renderInline(text: string): ReactNode[] {
   const tokenPattern = /(`[^`\n]+`|\|\|.+?\|\||\*\*.+?\*\*|__.+?__|\*[^*\n]+?\*|_[^_\n]+?_|<@&\d+>)/g;
   const parts = text.split(tokenPattern);
   return parts.map((part, index) => {
-    if (/^`[^`\n]+`$/.test(part)) return <code key={index}>{part.slice(1, -1)}</code>;
-    if (/^\|\|.+\|\|$/.test(part)) return <span className="spoiler" tabIndex={0} key={index}>{part.slice(2, -2)}</span>;
-    if (/^\*\*.+\*\*$/.test(part)) return <strong key={index}>{part.slice(2, -2)}</strong>;
-    if (/^__.+__$/.test(part)) return <u key={index}>{part.slice(2, -2)}</u>;
-    if (/^\*[^*]+\*$/.test(part) || /^_[^_]+_$/.test(part)) return <em key={index}>{part.slice(1, -1)}</em>;
+    if (/^`[^`\n]+`$/.test(part)) return <code key={index}>{restoreEscapes(part.slice(1, -1))}</code>;
+    if (/^\|\|.+\|\|$/.test(part)) return <span className="spoiler" tabIndex={0} key={index}>{restoreEscapes(part.slice(2, -2))}</span>;
+    if (/^\*\*.+\*\*$/.test(part)) return <strong key={index}>{restoreEscapes(part.slice(2, -2))}</strong>;
+    if (/^__.+__$/.test(part)) return <u key={index}>{restoreEscapes(part.slice(2, -2))}</u>;
+    if (/^\*[^*]+\*$/.test(part) || /^_[^_]+_$/.test(part)) return <em key={index}>{restoreEscapes(part.slice(1, -1))}</em>;
     if (/^<@&\d+>$/.test(part)) return <span className="role-mention" key={index}>@role</span>;
-    return <Fragment key={index}>{part}</Fragment>;
+    return <Fragment key={index}>{restoreEscapes(part)}</Fragment>;
   });
 }
 
 function DiscordMarkdown({ value }: { value: string }) {
-  const blocks = value.split(/(```(?:[^\n`]*)\n?[\s\S]*?```)/g);
+  const blocks = value.split(/((?<!\\)```(?:[^\n`]*)\n?[\s\S]*?(?<!\\)```)/g);
   return blocks.map((block, blockIndex) => {
     if (block.startsWith("```") && block.endsWith("```")) {
       const inner = block.slice(3, -3);
@@ -32,7 +49,8 @@ function DiscordMarkdown({ value }: { value: string }) {
       return <pre key={blockIndex}><code>{code}</code></pre>;
     }
 
-    return block.split("\n").map((line, lineIndex) => {
+    return block.split("\n").map((rawLine, lineIndex) => {
+      const line = protectEscapes(rawLine);
       const heading = line.match(/^(#{1,3})\s+(.+)$/);
       const subtext = line.match(/^-#\s+(.+)$/);
       const bullet = line.match(/^[-*]\s+(.+)$/);
@@ -49,7 +67,7 @@ function DiscordMarkdown({ value }: { value: string }) {
 }
 
 export function TemplateEditor({ initialValue, initialRoleId }: { initialValue: string; initialRoleId: string }) {
-  const [value, setValue] = useState(normalizeTemplate(initialValue));
+  const [value, setValue] = useState(initialValue);
   const [roleId, setRoleId] = useState(initialRoleId);
   const preview = value
     .replaceAll("{date}", "Tuesday, September 9, 2026")
@@ -74,6 +92,7 @@ export function TemplateEditor({ initialValue, initialRoleId }: { initialValue: 
             <summary>Discord formatting</summary>
             <p><code>#</code> heading · <code>##</code> smaller heading · <code>###</code> smallest heading · <code>-#</code> subtext</p>
             <p><code>**bold**</code> · <code>__underline__</code> · <code>*italic*</code> · <code>||spoiler||</code> · <code>`code`</code> · <code>```md code block ```</code></p>
+            <p>Use a backslash to cancel formatting: <code>{"\\_literal underscores\\_"}</code>. Press Enter for a newline; <code>{"\\n"}</code> stays literal.</p>
           </details>
         </div>
         <div>
