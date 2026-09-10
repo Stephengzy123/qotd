@@ -1,0 +1,91 @@
+"use server";
+
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { clearSession, createSession, requireRole, verifyCredentials } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { encryptSecret, hashAddress, validateDiscordWebhook } from "@/lib/security";
+import { sendQuestion, validateTemplate } from "@/lib/qotd";
+
+function messageUrl(path: string, kind: "ok" | "error", message: string) {
+  return `${path}?${kind}=${encodeURIComponent(message)}`;
+}
+
+async function clientHash() {
+  const h = await headers();
+  const address = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
+  return hashAddress(address);
+}
+
+export async function loginAction(formData: FormData) {
+  const username = String(formData.get("username") || "").trim();
+  const password = String(formData.get("password") || "");
+  const role = await verifyCredentials(username, password);
+  if (!role) redirect(messageUrl("/login", "error", "Those credentials weren’t recognized."));
+  await createSession(role, username);
+  redirect(role === "admin" ? "/admin" : "/contribute");
+}
+
+export async function logoutAction() {
+  await clearSession();
+  redirect("/login");
+}
+
+export async function submitQuestionAction(formData: FormData) {
+  await requireRole("contributor");
+  const question = String(formData.get("question") || "").trim();
+  const note = String(formData.get("note") || "").trim();
+  if (question.length < 8 || question.length > 500) {
+    redirect(messageUrl("/contribute", "error", "Questions must be between 8 and 500 characters."));
+  }
+  if (note.length > 500) redirect(messageUrl("/contribute", "error", "Notes must be 500 characters or fewer."));
+  const ipHash = await clientHash();
+  const sql = db();
+  const recent = Number((await sql`
+    select count(*)::int as count from questions
+    where submitter_ip_hash = ${ipHash} and created_at > now() - interval '1 hour'
+  `)[0].count);
+  if (recent >= 8) redirect(messageUrl("/contribute", "error", "You’ve submitted several questions recently. Please try again in a little while."));
+  await sql`insert into questions (question, contributor_note, submitter_ip_hash) values (${question}, ${note || null}, ${ipHash})`;
+  revalidatePath("/admin");
+  redirect(messageUrl("/contribute", "ok", "Thanks — your question is ready for review."));
+}
+
+export async function reviewQuestionAction(formData: FormData) {
+  await requireRole("admin");
+  const id = String(formData.get("id") || "");
+  const question = String(formData.get("question") || "").trim();
+  const intent = String(formData.get("intent") || "save");
+  if (!id || question.length < 8 || question.length > 500) redirect(messageUrl("/admin", "error", "Check the question length and try again."));
+  const status = intent === "approve" ? "approved" : intent === "reject" ? "rejected" : "pending";
+  await db()`update questions set question = ${question}, status = ${status}, updated_at = now() where id = ${id} and status <> 'sent'`;
+  revalidatePath("/admin");
+  redirect(messageUrl("/admin", "ok", status === "approved" ? "Question approved." : status === "rejected" ? "Question rejected." : "Changes saved."));
+}
+
+export async function saveSettingsAction(formData: FormData) {
+  await requireRole("admin");
+  const template = String(formData.get("template") || "").trim();
+  const webhook = String(formData.get("webhook") || "").trim();
+  const templateError = validateTemplate(template);
+  if (templateError) redirect(messageUrl("/admin", "error", templateError));
+  if (webhook && !validateDiscordWebhook(webhook)) redirect(messageUrl("/admin", "error", "Enter a valid Discord webhook URL."));
+  const sql = db();
+  if (webhook) {
+    await sql`update settings set message_template = ${template}, webhook_url_encrypted = ${encryptSecret(webhook)}, updated_at = now() where singleton = true`;
+  } else {
+    await sql`update settings set message_template = ${template}, updated_at = now() where singleton = true`;
+  }
+  revalidatePath("/admin");
+  redirect(messageUrl("/admin", "ok", "Delivery settings saved."));
+}
+
+export async function sendQuestionAction(formData: FormData) {
+  await requireRole("admin");
+  const id = String(formData.get("id") || "") || null;
+  const mode = id ? "manual_selected" : "manual_random";
+  const result = await sendQuestion(id, mode);
+  revalidatePath("/admin");
+  redirect(messageUrl("/admin", "error" in result ? "error" : "ok", "error" in result ? (result.error || "Send failed.") : "Question sent to Discord."));
+}
