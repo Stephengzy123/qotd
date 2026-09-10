@@ -52,22 +52,24 @@ export async function sendQuestion(questionId: string | null, mode: Mode, localD
       : await tx`select id, question from questions where status = 'approved' order by random() limit 1`;
     const question = questions[0];
     if (!question) return { error: "There are no approved questions ready to send." } as const;
-    const settings = (await tx`select webhook_url_encrypted, message_template, mention_role_id from settings where singleton = true`)[0];
+    const settings = (await tx`
+      select webhook_url_encrypted, message_template, mention_role_id, next_number
+      from settings where singleton = true
+      for update
+    `)[0];
     if (!settings?.webhook_url_encrypted) return { error: "Set a Discord webhook before sending." } as const;
-    const count = Number((await tx`select count(*)::int as count from dispatches where success = true`)[0].count) + 1;
+    const count = Number(settings.next_number) || 1;
     const roleId = settings.mention_role_id as string | null;
     const message = formatMessage(settings.message_template || DEFAULT_TEMPLATE, question.question, count, roleId);
-    try {
-      const rows = await tx`
-        insert into dispatches (question_id, local_date, mode, message, success)
-        values (${question.id}, ${localDate || null}, ${mode}, ${message}, false)
-        returning id
-      `;
-      return { dispatchId: rows[0].id as string, question, message, roleId, encryptedUrl: settings.webhook_url_encrypted as string } as const;
-    } catch (error: unknown) {
-      if ((error as { code?: string }).code === "23505") return { error: "Today’s scheduled question was already handled." } as const;
-      throw error;
-    }
+    const rows = await tx`
+      insert into dispatches (question_id, local_date, mode, message, success)
+      values (${question.id}, ${localDate || null}, ${mode}, ${message}, false)
+      on conflict do nothing
+      returning id
+    `;
+    if (!rows[0]) return { error: "Today’s scheduled question was already handled." } as const;
+    await tx`update settings set next_number = ${count + 1} where singleton = true`;
+    return { dispatchId: rows[0].id as string, question, message, number: count, roleId, encryptedUrl: settings.webhook_url_encrypted as string } as const;
   });
 
   if ("error" in claimed) return claimed;
@@ -90,7 +92,11 @@ export async function sendQuestion(questionId: string | null, mode: Mode, localD
   const success = !errorMessage;
   await sql.begin(async (tx) => {
     await tx`update dispatches set success = ${success}, response_status = ${responseStatus}, error = ${errorMessage} where id = ${claimed.dispatchId}`;
-    if (success) await tx`update questions set status = 'sent', sent_at = now(), updated_at = now() where id = ${claimed.question.id}`;
+    if (success) {
+      await tx`update questions set status = 'sent', sent_at = now(), updated_at = now() where id = ${claimed.question.id}`;
+    } else {
+      await tx`update settings set next_number = ${claimed.number} where singleton = true and next_number = ${claimed.number + 1}`;
+    }
   });
   return success ? { success: true, message: claimed.message } : { error: errorMessage || "Send failed." };
 }

@@ -66,13 +66,14 @@ function DiscordMarkdown({ value }: { value: string }) {
   });
 }
 
-export function TemplateEditor({ initialValue, initialRoleId }: { initialValue: string; initialRoleId: string }) {
+export function TemplateEditor({ initialValue, initialRoleId, initialNextNumber }: { initialValue: string; initialRoleId: string; initialNextNumber: number }) {
   const [value, setValue] = useState(initialValue);
   const [roleId, setRoleId] = useState(initialRoleId);
+  const [nextNumber, setNextNumber] = useState(String(initialNextNumber));
   const preview = value
     .replaceAll("{date}", "Tuesday, September 9, 2026")
     .replaceAll("{question}", "What small habit has made your life noticeably better?")
-    .replaceAll("{number}", "42")
+    .replaceAll("{number}", nextNumber || "—")
     .replaceAll("{mention-role}", roleId ? `<@&${roleId}>` : "@role");
 
   return (
@@ -80,6 +81,11 @@ export function TemplateEditor({ initialValue, initialRoleId }: { initialValue: 
       <div>
         <label htmlFor="roleId">Role ID for {"{mention-role}"}</label>
         <input id="roleId" name="roleId" inputMode="numeric" pattern="[0-9]{15,22}" value={roleId} onChange={(event) => setRoleId(event.target.value.replace(/\D/g, ""))} placeholder="123456789012345678" />
+      </div>
+      <div>
+        <label htmlFor="nextNumber">Next {"{number}"}</label>
+        <input id="nextNumber" name="nextNumber" type="number" min="1" max="2147483646" step="1" required value={nextNumber} onChange={(event) => setNextNumber(event.target.value)} />
+        <p className="hint">The next successful send uses this number, then it increases by one.</p>
       </div>
       <div className="template-grid">
         <div>

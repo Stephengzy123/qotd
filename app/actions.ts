@@ -105,14 +105,18 @@ export async function saveSettingsAction(formData: FormData) {
   const template = String(formData.get("template") || "").trim();
   const webhook = String(formData.get("webhook") || "").trim();
   const roleId = String(formData.get("roleId") || "").trim();
+  const nextNumber = Number(String(formData.get("nextNumber") || ""));
   const templateError = validateTemplate(template, roleId);
   if (templateError) redirect(messageUrl("/admin", "error", templateError));
+  if (!Number.isSafeInteger(nextNumber) || nextNumber < 1 || nextNumber > 2_147_483_646) {
+    redirect(messageUrl("/admin", "error", "Next number must be a whole number from 1 to 2,147,483,646."));
+  }
   if (webhook && !validateDiscordWebhook(webhook)) redirect(messageUrl("/admin", "error", "Enter a valid Discord webhook URL."));
   const sql = await dbReady();
   if (webhook) {
-    await sql`update settings set message_template = ${template}, mention_role_id = ${roleId || null}, webhook_url_encrypted = ${encryptSecret(webhook)}, updated_at = now() where singleton = true`;
+    await sql`update settings set message_template = ${template}, mention_role_id = ${roleId || null}, next_number = ${nextNumber}, webhook_url_encrypted = ${encryptSecret(webhook)}, updated_at = now() where singleton = true`;
   } else {
-    await sql`update settings set message_template = ${template}, mention_role_id = ${roleId || null}, updated_at = now() where singleton = true`;
+    await sql`update settings set message_template = ${template}, mention_role_id = ${roleId || null}, next_number = ${nextNumber}, updated_at = now() where singleton = true`;
   }
   revalidatePath("/admin");
   redirect(messageUrl("/admin", "ok", "Delivery settings saved."));

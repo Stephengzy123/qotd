@@ -23,6 +23,7 @@ create table if not exists settings (
   singleton boolean primary key default true check (singleton),
   webhook_url_encrypted text,
   mention_role_id text check (mention_role_id is null or mention_role_id ~ '^[0-9]{15,22}$'),
+  next_number integer not null default 1 check (next_number > 0),
   message_template text not null default '**Question of the Day — {date}**\n\n{question}',
   updated_at timestamptz not null default now()
 );

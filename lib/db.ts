@@ -26,6 +26,7 @@ const migrations = [
         singleton boolean primary key default true check (singleton),
         webhook_url_encrypted text,
         mention_role_id text check (mention_role_id is null or mention_role_id ~ '^[0-9]{15,22}$'),
+        next_number integer not null default 1 check (next_number > 0),
         message_template text not null default '**Question of the Day — {date}**\n\n{question}',
         updated_at timestamptz not null default now()
       )`,
@@ -53,6 +54,15 @@ const migrations = [
       `update settings
         set message_template = replace(message_template, chr(92) || 'n', chr(10))
         where position(chr(92) || 'n' in message_template) > 0`,
+    ],
+  },
+  {
+    version: 3,
+    statements: [
+      `alter table settings add column if not exists next_number integer not null default 1
+        check (next_number > 0)`,
+      `update settings
+        set next_number = greatest(1, (select count(*)::integer + 1 from dispatches where success = true))`,
     ],
   },
 ] as const;
