@@ -8,8 +8,7 @@ export async function GET(request: NextRequest) {
   if (!expected || request.headers.get("authorization") !== `Bearer ${expected}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const { localDate, hour } = pacificParts();
-  if (hour !== 5) return NextResponse.json({ skipped: true, reason: "Not 5 AM Pacific", localDate });
+  const { localDate } = pacificParts();
   const result = await sendQuestion(null, "scheduled", localDate);
   if ("error" in result) {
     const message = result.error || "Scheduled delivery failed.";

@@ -28,7 +28,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   return (
     <main className="app-shell">
       <header className="topbar"><strong>QoTD admin</strong><nav><a href="#inbox">Pending</a><a href="#approved">Approved</a><a href="#delivery">Settings</a></nav><div className="account"><span>{session.username}</span><form action={logoutAction}><button className="text-button">Sign out</button></form></div></header>
-      <section className="admin-heading"><div><h1>Questions</h1><p>Automatic send: 5:00 AM Pacific.</p></div></section>
+      <section className="admin-heading"><div><h1>Questions</h1><p>Automatic send: 5:00 AM PDT / 4:00 AM PST.</p></div></section>
       <Notice ok={params.ok} error={params.error} />
       <section className="stats" aria-label="Queue summary"><div><span>Awaiting review</span><strong>{pending.length}</strong></div><div><span>Ready to send</span><strong>{approved.length}</strong></div><div><span>Sent recently</span><strong>{sent.length}</strong></div></section>
 
