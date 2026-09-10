@@ -13,6 +13,8 @@ const migrations = [
       `create table if not exists questions (
         id uuid primary key default gen_random_uuid(),
         question text not null check (char_length(question) between 8 and 500),
+        question_type text not null default 'open' check (question_type in ('open', 'reaction')),
+        reactions text[] not null default '{}',
         contributor_note text check (contributor_note is null or char_length(contributor_note) <= 500),
         status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'sent')),
         submitter_ip_hash text not null,
@@ -25,8 +27,14 @@ const migrations = [
       `create table if not exists settings (
         singleton boolean primary key default true check (singleton),
         webhook_url_encrypted text,
+        bot_token_encrypted text,
+        bot_application_id text check (bot_application_id is null or bot_application_id ~ '^[0-9]{15,22}$'),
+        bot_channel_id text check (bot_channel_id is null or bot_channel_id ~ '^[0-9]{15,22}$'),
         mention_role_id text check (mention_role_id is null or mention_role_id ~ '^[0-9]{15,22}$'),
         next_number integer not null default 1 check (next_number > 0),
+        automatic_question_type text not null default 'both' check (automatic_question_type in ('both', 'open', 'reaction')),
+        open_message_template text not null default '**Question of the Day — {date}**\n\n{question}',
+        reaction_message_template text not null default '**Question of the Day — {date}**\n\n{question}',
         message_template text not null default '**Question of the Day — {date}**\n\n{question}',
         updated_at timestamptz not null default now()
       )`,
@@ -36,6 +44,7 @@ const migrations = [
         question_id uuid references questions(id) on delete set null,
         local_date date,
         mode text not null check (mode in ('scheduled', 'manual_random', 'manual_selected')),
+        transport text not null default 'webhook' check (transport in ('bot', 'webhook')),
         message text not null,
         success boolean not null,
         response_status integer,
@@ -63,6 +72,28 @@ const migrations = [
         check (next_number > 0)`,
       `update settings
         set next_number = greatest(1, (select count(*)::integer + 1 from dispatches where success = true))`,
+    ],
+  },
+  {
+    version: 4,
+    statements: [
+      `alter table questions add column if not exists question_type text not null default 'open'
+        check (question_type in ('open', 'reaction'))`,
+      `alter table questions add column if not exists reactions text[] not null default '{}'`,
+      `alter table settings add column if not exists bot_token_encrypted text`,
+      `alter table settings add column if not exists bot_application_id text
+        check (bot_application_id is null or bot_application_id ~ '^[0-9]{15,22}$')`,
+      `alter table settings add column if not exists bot_channel_id text
+        check (bot_channel_id is null or bot_channel_id ~ '^[0-9]{15,22}$')`,
+      `alter table settings add column if not exists automatic_question_type text not null default 'both'
+        check (automatic_question_type in ('both', 'open', 'reaction'))`,
+      `alter table settings add column if not exists open_message_template text not null
+        default '**Question of the Day — {date}**\n\n{question}'`,
+      `alter table settings add column if not exists reaction_message_template text not null
+        default '**Question of the Day — {date}**\n\n{question}'`,
+      `update settings set open_message_template = message_template, reaction_message_template = message_template`,
+      `alter table dispatches add column if not exists transport text not null default 'webhook'
+        check (transport in ('bot', 'webhook'))`,
     ],
   },
 ] as const;

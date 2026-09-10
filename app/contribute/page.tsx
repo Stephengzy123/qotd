@@ -1,6 +1,7 @@
 import { logoutAction, submitQuestionAction } from "@/app/actions";
 import { requireRole } from "@/lib/auth";
 import { Notice } from "@/components/notice";
+import { QuestionTypeFields } from "@/components/question-type-fields";
 
 export default async function ContributePage({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
   const session = await requireRole("contributor");
@@ -13,6 +14,7 @@ export default async function ContributePage({ searchParams }: { searchParams: P
       <form action={submitQuestionAction} className="panel contribution-form">
         <div className="field-heading"><label htmlFor="question">Your question</label><span>8–500 characters</span></div>
         <textarea id="question" name="question" rows={6} minLength={8} maxLength={500} required />
+        <QuestionTypeFields />
         <div><label htmlFor="note">Note <span className="muted">(optional)</span></label><textarea id="note" name="note" rows={3} maxLength={500} /></div>
         <div className="form-footer"><p>Up to 8 submissions per network per hour, independent of the shared login.</p><button type="submit" className="primary">Submit</button></div>
       </form>

@@ -66,15 +66,16 @@ function DiscordMarkdown({ value }: { value: string }) {
   });
 }
 
-export function TemplateEditor({ initialValue, initialRoleId, initialNextNumber }: { initialValue: string; initialRoleId: string; initialNextNumber: number }) {
-  const [value, setValue] = useState(initialValue);
+export function TemplateEditor({ initialOpenValue, initialReactionValue, initialRoleId, initialNextNumber }: { initialOpenValue: string; initialReactionValue: string; initialRoleId: string; initialNextNumber: number }) {
+  const [openValue, setOpenValue] = useState(initialOpenValue);
+  const [reactionValue, setReactionValue] = useState(initialReactionValue);
   const [roleId, setRoleId] = useState(initialRoleId);
   const [nextNumber, setNextNumber] = useState(String(initialNextNumber));
-  const preview = value
-    .replaceAll("{date}", "Tuesday, September 9, 2026")
-    .replaceAll("{question}", "What small habit has made your life noticeably better?")
-    .replaceAll("{number}", nextNumber || "—")
-    .replaceAll("{mention-role}", roleId ? `<@&${roleId}>` : "@role");
+  const preview = (value: string, question: string) => value
+      .replaceAll("{date}", "Tuesday, September 9, 2026")
+      .replaceAll("{question}", question)
+      .replaceAll("{number}", nextNumber || "—")
+      .replaceAll("{mention-role}", roleId ? `<@&${roleId}>` : "@role");
 
   return (
     <>
@@ -87,24 +88,42 @@ export function TemplateEditor({ initialValue, initialRoleId, initialNextNumber 
         <input id="nextNumber" name="nextNumber" type="number" min="1" max="2147483646" step="1" required value={nextNumber} onChange={(event) => setNextNumber(event.target.value)} />
         <p className="hint">The next successful send uses this number, then it increases by one.</p>
       </div>
-      <div className="template-grid">
-        <div>
-          <label htmlFor="template">Message format</label>
-          <textarea id="template" name="template" rows={10} maxLength={1800} required value={value} onChange={(event) => setValue(event.target.value)} />
-          <p className="hint token-help">
-            <code>{"{question}"}</code> question · <code>{"{date}"}</code> date · <code>{"{number}"}</code> next successful-send number · <code>{"{mention-role}"}</code> configured role
-          </p>
-          <details className="format-help">
-            <summary>Discord formatting</summary>
-            <p><code>#</code> heading · <code>##</code> smaller heading · <code>###</code> smallest heading · <code>-#</code> subtext</p>
-            <p><code>**bold**</code> · <code>__underline__</code> · <code>*italic*</code> · <code>||spoiler||</code> · <code>`code`</code> · <code>```md code block ```</code></p>
-            <p>Use a backslash to cancel formatting: <code>{"\\_literal underscores\\_"}</code>. Press Enter for a newline; <code>{"\\n"}</code> stays literal.</p>
-          </details>
+      <div className="template-block">
+        <h3>Open-answer message</h3>
+        <div className="template-grid">
+          <div>
+            <label htmlFor="openTemplate">Format</label>
+            <textarea id="openTemplate" name="openTemplate" rows={8} maxLength={1800} required value={openValue} onChange={(event) => setOpenValue(event.target.value)} />
+          </div>
+          <div>
+            <span className="label">Preview</span>
+            <div className="discord-preview"><DiscordMarkdown value={preview(openValue, "What small habit has made your life noticeably better?")} /></div>
+          </div>
         </div>
-        <div>
-          <span className="label">Preview</span>
-          <div className="discord-preview"><DiscordMarkdown value={preview} /></div>
+      </div>
+      <div className="template-block">
+        <h3>Reaction-based message</h3>
+        <div className="template-grid">
+          <div>
+            <label htmlFor="reactionTemplate">Format</label>
+            <textarea id="reactionTemplate" name="reactionTemplate" rows={8} maxLength={1800} required value={reactionValue} onChange={(event) => setReactionValue(event.target.value)} />
+          </div>
+          <div>
+            <span className="label">Preview</span>
+            <div className="discord-preview"><DiscordMarkdown value={preview(reactionValue, "Which option gets your vote?")} /></div>
+          </div>
         </div>
+      </div>
+      <div>
+        <p className="hint token-help">
+          <code>{"{question}"}</code> question · <code>{"{date}"}</code> Pacific date · <code>{"{number}"}</code> next successful-send number · <code>{"{mention-role}"}</code> configured role
+        </p>
+        <details className="format-help">
+          <summary>Discord formatting</summary>
+          <p><code>#</code> heading · <code>##</code> smaller heading · <code>###</code> smallest heading · <code>-#</code> subtext</p>
+          <p><code>**bold**</code> · <code>__underline__</code> · <code>*italic*</code> · <code>||spoiler||</code> · <code>`code`</code> · <code>```md code block ```</code></p>
+          <p>Use a backslash to cancel formatting: <code>{"\\_literal underscores\\_"}</code>. Press Enter for a newline; <code>{"\\n"}</code> stays literal.</p>
+        </details>
       </div>
     </>
   );

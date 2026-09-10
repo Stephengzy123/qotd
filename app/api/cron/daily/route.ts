@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { localDate } = pacificParts();
-  const result = await sendQuestion(null, "scheduled", localDate);
+  const result = await sendQuestion(null, "scheduled", localDate, "bot");
   if ("error" in result) {
     const message = result.error || "Scheduled delivery failed.";
     return NextResponse.json({ error: message }, { status: message.includes("already handled") ? 200 : 500 });
