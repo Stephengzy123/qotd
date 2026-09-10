@@ -1,9 +1,10 @@
-import { logoutAction, reviewQuestionAction, saveSettingsAction, sendQuestionAction } from "@/app/actions";
+import { addApprovedQuestionAction, logoutAction, reviewQuestionAction, saveSettingsAction, sendQuestionAction } from "@/app/actions";
 import { requireRole } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
 import { DEFAULT_TEMPLATE } from "@/lib/qotd";
 import { Notice } from "@/components/notice";
 import { TemplateEditor } from "@/components/template-editor";
+import { ApprovedQuestionActions } from "@/components/approved-question-actions";
 
 type Question = { id: string; question: string; contributor_note: string | null; status: string; created_at: Date };
 type Dispatch = { id: string; message: string; success: boolean; mode: string; created_at: Date; error: string | null };
@@ -37,7 +38,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       </section>
 
       <section id="approved" className="section-block"><div className="section-title"><h2>Approved</h2><form action={sendQuestionAction}><button className="secondary" disabled={!approved.length}>Send random</button></form></div>
-        {approved.length ? <div className="approved-list">{approved.map((item, index) => <article key={item.id} className="approved-row"><span className="queue-number">{String(index + 1).padStart(2, "0")}</span><p>{item.question}</p><form action={sendQuestionAction}><input type="hidden" name="id" value={item.id} /><button className="send-button" aria-label={`Send: ${item.question}`}>Send now →</button></form></article>)}</div> : <div className="empty-state compact"><p>Approve a question to add it to the daily queue.</p></div>}
+        <form action={addApprovedQuestionAction} className="panel quick-add-form"><label htmlFor="admin-question">Add an approved question</label><div><textarea id="admin-question" name="question" rows={2} minLength={8} maxLength={500} required /><button className="primary">Add</button></div></form>
+        {approved.length ? <div className="approved-list">{approved.map((item, index) => <article key={item.id} className="approved-row"><span className="queue-number">{String(index + 1).padStart(2, "0")}</span><p>{item.question}</p><ApprovedQuestionActions id={item.id} question={item.question} /></article>)}</div> : <div className="empty-state compact"><p>No approved questions.</p></div>}
       </section>
 
       <section id="delivery" className="section-block"><div className="section-title"><h2>Settings</h2><span className={`status ${settings.has_webhook ? "ready" : "pending"}`}>{settings.has_webhook ? "Webhook saved" : "Webhook needed"}</span></div>

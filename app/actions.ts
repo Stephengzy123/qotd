@@ -65,6 +65,41 @@ export async function reviewQuestionAction(formData: FormData) {
   redirect(messageUrl("/admin", "ok", status === "approved" ? "Question approved." : status === "rejected" ? "Question rejected." : "Changes saved."));
 }
 
+export async function addApprovedQuestionAction(formData: FormData) {
+  const session = await requireRole("admin");
+  const question = String(formData.get("question") || "").trim();
+  if (question.length < 8 || question.length > 500) {
+    redirect(messageUrl("/admin", "error", "Questions must be between 8 and 500 characters."));
+  }
+  const sql = await dbReady();
+  await sql`
+    insert into questions (question, status, submitter_ip_hash)
+    values (${question}, 'approved', ${hashAddress(`admin:${session.username}`)})
+  `;
+  revalidatePath("/admin");
+  redirect(messageUrl("/admin", "ok", "Question added to Approved."));
+}
+
+export async function unapproveQuestionAction(formData: FormData) {
+  await requireRole("admin");
+  const id = String(formData.get("id") || "");
+  if (!/^[0-9a-f-]{36}$/i.test(id)) redirect(messageUrl("/admin", "error", "Invalid question."));
+  const sql = await dbReady();
+  await sql`update questions set status = 'pending', updated_at = now() where id = ${id} and status = 'approved'`;
+  revalidatePath("/admin");
+  redirect(messageUrl("/admin", "ok", "Question moved back to Pending."));
+}
+
+export async function deleteApprovedQuestionAction(formData: FormData) {
+  await requireRole("admin");
+  const id = String(formData.get("id") || "");
+  if (!/^[0-9a-f-]{36}$/i.test(id)) redirect(messageUrl("/admin", "error", "Invalid question."));
+  const sql = await dbReady();
+  await sql`delete from questions where id = ${id} and status = 'approved'`;
+  revalidatePath("/admin");
+  redirect(messageUrl("/admin", "ok", "Question deleted."));
+}
+
 export async function saveSettingsAction(formData: FormData) {
   await requireRole("admin");
   const template = String(formData.get("template") || "").trim();
