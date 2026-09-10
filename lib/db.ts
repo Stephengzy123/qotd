@@ -70,12 +70,31 @@ async function migrateSchema() {
     )`);
     const appliedRows = await tx<{ version: number }[]>`select version from qotd_schema_migrations`;
     const applied = new Set(appliedRows.map((row) => Number(row.version)));
+    const coreState = (await tx<{ complete: boolean }[]>`
+      select
+        to_regclass('questions') is not null and
+        to_regclass('settings') is not null and
+        to_regclass('dispatches') is not null as complete
+    `)[0];
     for (const migration of migrations) {
-      if (applied.has(migration.version)) continue;
+      // Re-run the baseline's idempotent statements if a migration record and
+      // the actual schema ever drift apart.
+      if (applied.has(migration.version) && coreState?.complete) continue;
       for (const statement of migration.statements) await tx.unsafe(statement);
-      await tx`insert into qotd_schema_migrations (version) values (${migration.version})`;
+      await tx`insert into qotd_schema_migrations (version) values (${migration.version}) on conflict (version) do nothing`;
     }
   });
+}
+
+async function coreSchemaExists() {
+  const sql = db();
+  const rows = await sql<{ complete: boolean }[]>`
+    select
+      to_regclass('questions') is not null and
+      to_regclass('settings') is not null and
+      to_regclass('dispatches') is not null as complete
+  `;
+  return Boolean(rows[0]?.complete);
 }
 
 export async function ensureSchema() {
@@ -86,6 +105,16 @@ export async function ensureSchema() {
     });
   }
   await globalForDb.qotdSchemaPromise;
+  // Check every database-backed request. This also repairs drift after a
+  // manually dropped table or a preserved development hot-reload global.
+  if (!(await coreSchemaExists())) {
+    globalForDb.qotdSchemaPromise = migrateSchema().catch((error) => {
+      globalForDb.qotdSchemaPromise = undefined;
+      throw error;
+    });
+    await globalForDb.qotdSchemaPromise;
+    if (!(await coreSchemaExists())) throw new Error("Database schema initialization did not create the required tables");
+  }
 }
 
 export async function dbReady() {
