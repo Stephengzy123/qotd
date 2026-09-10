@@ -2,7 +2,11 @@ import { dbReady } from "@/lib/db";
 import { decryptSecret } from "@/lib/security";
 
 export const DEFAULT_TEMPLATE = "**Question of the Day — {date}**\n\n{question}";
-export const ALLOWED_TOKENS = ["{date}", "{question}", "{number}"];
+export const ALLOWED_TOKENS = ["{date}", "{question}", "{number}", "{mention-role}"];
+
+export function normalizeTemplate(template: string) {
+  return template.replaceAll("\\r\\n", "\n").replaceAll("\\n", "\n");
+}
 
 export function pacificParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -17,7 +21,7 @@ export function pacificParts(date = new Date()) {
   return { localDate: `${get("year")}-${get("month")}-${get("day")}`, hour: Number(get("hour")) };
 }
 
-export function formatMessage(template: string, question: string, number?: number, date = new Date()) {
+export function formatMessage(template: string, question: string, number?: number, roleId?: string | null, date = new Date()) {
   const displayDate = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Los_Angeles",
     weekday: "long",
@@ -25,16 +29,19 @@ export function formatMessage(template: string, question: string, number?: numbe
     month: "long",
     day: "numeric",
   }).format(date);
-  return template
+  return normalizeTemplate(template)
     .replaceAll("{date}", displayDate)
     .replaceAll("{question}", question)
     .replaceAll("{number}", number ? String(number) : "—")
+    .replaceAll("{mention-role}", roleId ? `<@&${roleId}>` : "")
     .slice(0, 2000);
 }
 
-export function validateTemplate(template: string) {
+export function validateTemplate(template: string, roleId?: string) {
   if (!template.includes("{question}")) return "The template must include {question}.";
   if (template.length > 1800) return "Keep the template under 1,800 characters.";
+  if (roleId && !/^\d{15,22}$/.test(roleId)) return "The Discord role ID must contain 15–22 digits.";
+  if (template.includes("{mention-role}") && !roleId) return "Set a role ID before using {mention-role}.";
   const unknown = template.match(/\{[^{}]+\}/g)?.filter((token) => !ALLOWED_TOKENS.includes(token));
   return unknown?.length ? `Unknown element: ${unknown[0]}` : null;
 }
@@ -49,17 +56,18 @@ export async function sendQuestion(questionId: string | null, mode: Mode, localD
       : await tx`select id, question from questions where status = 'approved' order by random() limit 1`;
     const question = questions[0];
     if (!question) return { error: "There are no approved questions ready to send." } as const;
-    const settings = (await tx`select webhook_url_encrypted, message_template from settings where singleton = true`)[0];
+    const settings = (await tx`select webhook_url_encrypted, message_template, mention_role_id from settings where singleton = true`)[0];
     if (!settings?.webhook_url_encrypted) return { error: "Set a Discord webhook before sending." } as const;
     const count = Number((await tx`select count(*)::int as count from dispatches where success = true`)[0].count) + 1;
-    const message = formatMessage(settings.message_template || DEFAULT_TEMPLATE, question.question, count);
+    const roleId = settings.mention_role_id as string | null;
+    const message = formatMessage(settings.message_template || DEFAULT_TEMPLATE, question.question, count, roleId);
     try {
       const rows = await tx`
         insert into dispatches (question_id, local_date, mode, message, success)
         values (${question.id}, ${localDate || null}, ${mode}, ${message}, false)
         returning id
       `;
-      return { dispatchId: rows[0].id as string, question, message, encryptedUrl: settings.webhook_url_encrypted as string } as const;
+      return { dispatchId: rows[0].id as string, question, message, roleId, encryptedUrl: settings.webhook_url_encrypted as string } as const;
     } catch (error: unknown) {
       if ((error as { code?: string }).code === "23505") return { error: "Today’s scheduled question was already handled." } as const;
       throw error;
@@ -73,7 +81,7 @@ export async function sendQuestion(questionId: string | null, mode: Mode, localD
     const response = await fetch(decryptSecret(claimed.encryptedUrl), {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ content: claimed.message, allowed_mentions: { parse: [] } }),
+      body: JSON.stringify({ content: claimed.message, allowed_mentions: { parse: [], roles: claimed.roleId ? [claimed.roleId] : [] } }),
       redirect: "manual",
       signal: AbortSignal.timeout(10_000),
     });

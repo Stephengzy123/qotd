@@ -22,6 +22,7 @@ create index if not exists questions_rate_limit_idx on questions(submitter_ip_ha
 create table if not exists settings (
   singleton boolean primary key default true check (singleton),
   webhook_url_encrypted text,
+  mention_role_id text check (mention_role_id is null or mention_role_id ~ '^[0-9]{15,22}$'),
   message_template text not null default '**Question of the Day — {date}**\n\n{question}',
   updated_at timestamptz not null default now()
 );

@@ -14,7 +14,7 @@ export default async function ContributePage({ searchParams }: { searchParams: P
         <div className="field-heading"><label htmlFor="question">Your question</label><span>8–500 characters</span></div>
         <textarea id="question" name="question" rows={6} minLength={8} maxLength={500} required />
         <div><label htmlFor="note">Note <span className="muted">(optional)</span></label><textarea id="note" name="note" rows={3} maxLength={500} /></div>
-        <div className="form-footer"><p>Up to 8 submissions per hour.</p><button type="submit" className="primary">Submit</button></div>
+        <div className="form-footer"><p>Up to 8 submissions per network per hour, independent of the shared login.</p><button type="submit" className="primary">Submit</button></div>
       </form>
     </main>
   );

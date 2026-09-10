@@ -20,10 +20,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     sql<Question[]>`select id, question, contributor_note, status, created_at from questions where status = 'pending' order by created_at asc`,
     sql<Question[]>`select id, question, contributor_note, status, created_at from questions where status = 'approved' order by created_at asc`,
     sql<Question[]>`select id, question, contributor_note, status, created_at from questions where status = 'sent' order by sent_at desc limit 8`,
-    sql`select message_template, webhook_url_encrypted is not null as has_webhook from settings where singleton = true`,
+    sql`select message_template, mention_role_id, webhook_url_encrypted is not null as has_webhook from settings where singleton = true`,
     sql<Dispatch[]>`select id, message, success, mode, created_at, error from dispatches order by created_at desc limit 8`,
   ]);
-  const settings = settingsRows[0] || { message_template: DEFAULT_TEMPLATE, has_webhook: false };
+  const settings = settingsRows[0] || { message_template: DEFAULT_TEMPLATE, mention_role_id: null, has_webhook: false };
 
   return (
     <main className="app-shell">
@@ -41,7 +41,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       </section>
 
       <section id="delivery" className="section-block"><div className="section-title"><h2>Settings</h2><span className={`status ${settings.has_webhook ? "ready" : "pending"}`}>{settings.has_webhook ? "Webhook saved" : "Webhook needed"}</span></div>
-        <form action={saveSettingsAction} className="panel settings-form"><div><label htmlFor="webhook">Discord webhook URL</label><input id="webhook" name="webhook" type="password" placeholder={settings.has_webhook ? "Saved securely — enter a new URL to replace it" : "https://discord.com/api/webhooks/…"} autoComplete="off" /><p className="hint">Encrypted before it is stored. Leave blank to keep the current webhook.</p></div><TemplateEditor initialValue={settings.message_template || DEFAULT_TEMPLATE} /><div className="align-right"><button className="primary">Save delivery settings</button></div></form>
+        <form action={saveSettingsAction} className="panel settings-form"><div><label htmlFor="webhook">Discord webhook URL</label><input id="webhook" name="webhook" type="password" placeholder={settings.has_webhook ? "Saved securely — enter a new URL to replace it" : "https://discord.com/api/webhooks/…"} autoComplete="off" /><p className="hint">Encrypted before it is stored. Leave blank to keep the current webhook.</p></div><TemplateEditor initialValue={settings.message_template || DEFAULT_TEMPLATE} initialRoleId={settings.mention_role_id || ""} /><div className="align-right"><button className="primary">Save delivery settings</button></div></form>
       </section>
 
       <section className="section-block"><div className="section-title"><h2>Recent sends</h2></div>{dispatches.length ? <div className="activity-list">{dispatches.map((item) => <div key={item.id}><span className={`activity-dot ${item.success ? "success" : "failed"}`} /><div><strong>{item.success ? "Sent" : "Failed"} · {item.mode.replaceAll("_", " ")}</strong><p>{item.error || item.message}</p></div><time>{relativeDate(item.created_at)}</time></div>)}</div> : <div className="empty-state compact"><p>No sends yet.</p></div>}</section>

@@ -111,7 +111,24 @@ input:focus, textarea:focus { border-color: #666; box-shadow: 0 0 0 2px rgb(0 0 
 .hint { margin-top: .4rem; }
 .hint code { padding: .05rem .2rem; background: #eee; border-radius: 3px; }
 .discord-preview { min-height: 160px; padding: 1rem; border-radius: 5px; background: #313338; color: #e2e2e2; }
-.discord-preview p { margin: 0; white-space: pre-wrap; }
+.discord-preview p { margin: 0; }
+.discord-line, .discord-heading, .discord-subtext, .discord-bullet { white-space: pre-wrap; overflow-wrap: anywhere; }
+.discord-heading { color: #f2f3f5; font-weight: 700; line-height: 1.25; margin: .45rem 0 .2rem; }
+.discord-heading.h1 { font-size: 1.5rem; }
+.discord-heading.h2 { font-size: 1.25rem; }
+.discord-heading.h3 { font-size: 1rem; }
+.discord-subtext { color: #949ba4; font-size: .8rem; }
+.discord-bullet { padding-left: .75rem; }
+.discord-preview code { padding: .12rem .3rem; border-radius: 3px; background: #1e1f22; font: .88em ui-monospace, SFMono-Regular, Menlo, monospace; }
+.discord-preview pre { overflow-x: auto; margin: .45rem 0; padding: .65rem; border: 1px solid #1e1f22; border-radius: 4px; background: #2b2d31; white-space: pre-wrap; }
+.discord-preview pre code { padding: 0; background: transparent; }
+.role-mention { padding: .08rem .25rem; border-radius: 3px; color: #c9cdfb; background: rgb(88 101 242 / 30%); font-weight: 600; }
+.spoiler { border-radius: 3px; color: transparent; background: #1e1f22; cursor: pointer; }
+.spoiler:hover, .spoiler:focus { color: inherit; background: rgb(30 31 34 / 70%); }
+.format-help { margin-top: .65rem; color: var(--muted); font-size: .8rem; }
+.format-help summary { cursor: pointer; color: var(--text); font-weight: 600; }
+.format-help p { margin: .4rem 0 0; }
+.format-help code, .token-help code { padding: .05rem .2rem; border-radius: 3px; background: #eee; color: var(--text); }
 .align-right { text-align: right; }
 
 .activity-list > div { display: grid; grid-template-columns: 10px 1fr auto; align-items: start; gap: .7rem; padding: .75rem 1rem; border-bottom: 1px solid var(--border); }

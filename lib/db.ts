@@ -25,6 +25,7 @@ const migrations = [
       `create table if not exists settings (
         singleton boolean primary key default true check (singleton),
         webhook_url_encrypted text,
+        mention_role_id text check (mention_role_id is null or mention_role_id ~ '^[0-9]{15,22}$'),
         message_template text not null default '**Question of the Day — {date}**\n\n{question}',
         updated_at timestamptz not null default now()
       )`,
@@ -42,6 +43,16 @@ const migrations = [
       )`,
       `create unique index if not exists dispatches_one_scheduled_per_day
         on dispatches(local_date) where mode = 'scheduled'`,
+    ],
+  },
+  {
+    version: 2,
+    statements: [
+      `alter table settings add column if not exists mention_role_id text
+        check (mention_role_id is null or mention_role_id ~ '^[0-9]{15,22}$')`,
+      `update settings
+        set message_template = replace(message_template, chr(92) || 'n', chr(10))
+        where position(chr(92) || 'n' in message_template) > 0`,
     ],
   },
 ] as const;

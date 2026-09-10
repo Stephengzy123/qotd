@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { clearSession, createSession, requireRole, verifyCredentials } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
 import { encryptSecret, hashAddress, validateDiscordWebhook } from "@/lib/security";
-import { sendQuestion, validateTemplate } from "@/lib/qotd";
+import { normalizeTemplate, sendQuestion, validateTemplate } from "@/lib/qotd";
 
 function messageUrl(path: string, kind: "ok" | "error", message: string) {
   return `${path}?${kind}=${encodeURIComponent(message)}`;
@@ -67,16 +67,17 @@ export async function reviewQuestionAction(formData: FormData) {
 
 export async function saveSettingsAction(formData: FormData) {
   await requireRole("admin");
-  const template = String(formData.get("template") || "").trim();
+  const template = normalizeTemplate(String(formData.get("template") || "").trim());
   const webhook = String(formData.get("webhook") || "").trim();
-  const templateError = validateTemplate(template);
+  const roleId = String(formData.get("roleId") || "").trim();
+  const templateError = validateTemplate(template, roleId);
   if (templateError) redirect(messageUrl("/admin", "error", templateError));
   if (webhook && !validateDiscordWebhook(webhook)) redirect(messageUrl("/admin", "error", "Enter a valid Discord webhook URL."));
   const sql = await dbReady();
   if (webhook) {
-    await sql`update settings set message_template = ${template}, webhook_url_encrypted = ${encryptSecret(webhook)}, updated_at = now() where singleton = true`;
+    await sql`update settings set message_template = ${template}, mention_role_id = ${roleId || null}, webhook_url_encrypted = ${encryptSecret(webhook)}, updated_at = now() where singleton = true`;
   } else {
-    await sql`update settings set message_template = ${template}, updated_at = now() where singleton = true`;
+    await sql`update settings set message_template = ${template}, mention_role_id = ${roleId || null}, updated_at = now() where singleton = true`;
   }
   revalidatePath("/admin");
   redirect(messageUrl("/admin", "ok", "Delivery settings saved."));
