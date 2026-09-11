@@ -70,7 +70,10 @@ function renderInline(text: string, keyPrefix = "inline"): ReactNode[] {
 }
 
 export function DiscordMarkdown({ value }: { value: string }) {
-  const blocks = protectEscapes(value).split(/(```(?:[^\n`]*)\n?[\s\S]*?```)/g);
+  // Saved form values can use CRLF, while textarea edits use LF. Normalize
+  // before parsing so both previews recognize block syntax on the first render.
+  const normalizedValue = value.replace(/\r\n?/g, "\n");
+  const blocks = protectEscapes(normalizedValue).split(/(```(?:[^\n`]*)\n?[\s\S]*?```)/g);
   let multilineQuote = false;
   return blocks.flatMap((block, blockIndex) => {
     if (block.startsWith("```") && block.endsWith("```")) {
