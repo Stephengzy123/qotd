@@ -135,9 +135,9 @@ export async function saveSettingsAction(formData: FormData) {
 
 export async function sendQuestionAction(formData: FormData) {
   await requireRole("admin");
-  const id = String(formData.get("id") || "") || null;
-  const mode = id ? "manual_selected" : "manual_random";
-  const result = await sendAnnouncement(id, mode);
+  const id = String(formData.get("id") || "");
+  if (!/^[0-9a-f-]{36}$/i.test(id)) redirect(messageUrl("/admin", "error", "Select an announcement to send."));
+  const result = await sendAnnouncement(id, "manual_selected");
   revalidatePath("/admin");
   redirect(messageUrl("/admin", "error" in result ? "error" : "ok", "error" in result ? (result.error || "Send failed.") : "Announcement sent to Discord."));
 }

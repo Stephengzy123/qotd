@@ -29,8 +29,18 @@ export function isValidFuturePacificDate(value: string, now = new Date()) {
   return value > pacificParts(now).localDate;
 }
 
-export function displayScheduledDate(value: string | Date) {
-  const localDate = value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10);
+export function scheduledDateValue(value: unknown) {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString().slice(0, 10);
+  if (typeof value !== "string") return null;
+  const localDate = value.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+  if (!localDate) return null;
+  const parsed = new Date(`${localDate}T12:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === localDate ? localDate : null;
+}
+
+export function displayScheduledDate(value: unknown) {
+  const localDate = scheduledDateValue(value);
+  if (!localDate) return "Date unavailable";
   return new Intl.DateTimeFormat("en-US", {
     timeZone: "UTC",
     weekday: "long",
@@ -48,14 +58,16 @@ export function formatAnnouncement(announcement: string, scheduledDate: string, 
     .slice(0, 2000);
 }
 
-type Mode = "scheduled" | "manual_random" | "manual_selected";
+type Mode = "scheduled" | "manual_selected";
 
-export async function sendAnnouncement(announcementId: string | null, mode: Mode, localDate?: string) {
+export async function sendAnnouncement(announcementId: string, mode: Mode, localDate?: string) {
   const sql = await dbReady();
   const claimed = await sql.begin(async (tx) => {
-    const announcements = announcementId
-      ? await tx`select id, question, scheduled_date from questions where id = ${announcementId} and status = 'approved' and scheduled_date is not null limit 1`
-      : await tx`select id, question, scheduled_date from questions where status = 'approved' and scheduled_date is not null order by random() limit 1`;
+    const announcements = await tx`
+      select id, question, scheduled_date from questions
+      where id = ${announcementId} and status = 'approved' and scheduled_date is not null
+      limit 1
+    `;
     const announcement = announcements[0];
     if (!announcement) return { error: "There are no approved announcements ready to send." } as const;
     const settings = (await tx`
@@ -65,7 +77,8 @@ export async function sendAnnouncement(announcementId: string | null, mode: Mode
     if (!settings?.webhook_url_encrypted) return { error: "Set a Discord webhook before sending." } as const;
     const roleId = settings.mention_role_id as string | null;
     if (!roleId) return { error: "Set a Discord role ID before sending." } as const;
-    const scheduledDate = String(announcement.scheduled_date).slice(0, 10);
+    const scheduledDate = scheduledDateValue(announcement.scheduled_date);
+    if (!scheduledDate) return { error: "This announcement has an invalid posting date. Unapprove it and choose the date again." } as const;
     const message = formatAnnouncement(announcement.question, scheduledDate, roleId);
     const claim = await tx`
       update questions set status = 'sent', updated_at = now()
