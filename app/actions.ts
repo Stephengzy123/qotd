@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { clearSession, createSession, requireRole, verifyCredentials } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
 import { encryptSecret, hashAddress, validateDiscordWebhook } from "@/lib/security";
-import { isValidAnnouncementDate, isValidFuturePacificDate, sendAnnouncement, sendPendingNotification, validateAnnouncementTemplate, type AnnouncementType } from "@/lib/qotd";
+import { isValidAnnouncementDate, isValidFuturePacificDate, normalizeDiscordTemplate, sendAnnouncement, sendPendingNotification, validateAnnouncementTemplate, type AnnouncementType } from "@/lib/qotd";
 import { fetchCalendarByUrl, normalizeCalendarFeedUrl } from "@/lib/calendar";
 
 function messageUrl(path: string, kind: "ok" | "error", message: string) {
@@ -139,8 +139,8 @@ export async function deleteApprovedQuestionAction(formData: FormData) {
 
 export async function saveSettingsAction(formData: FormData) {
   await requireRole("admin");
-  const announcementTemplate = String(formData.get("announcementTemplate") || "").trim();
-  const eventTemplate = String(formData.get("eventTemplate") || "").trim();
+  const announcementTemplate = normalizeDiscordTemplate(String(formData.get("announcementTemplate") || "").trim());
+  const eventTemplate = normalizeDiscordTemplate(String(formData.get("eventTemplate") || "").trim());
   const webhook = String(formData.get("webhook") || "").trim();
   const calendarFeed = String(formData.get("calendarFeed") || "").trim();
   const roleId = String(formData.get("roleId") || "").trim();

@@ -7,6 +7,13 @@ export const DEFAULT_EVENT_TEMPLATE = "# <:sgs:1372767087612657724> Announcement
 const COMMON_TEMPLATE_TOKENS = ["{date}", "{announcement}", "{mention-role}"];
 export type AnnouncementType = "announcement" | "event";
 
+export function normalizeDiscordTemplate(template: string) {
+  return template.split("\n").map((line) => {
+    const cleaned = line.replace(/[\uFEFF\u200B\u200C\u200D]/g, "");
+    return /^\s*(?:#{1,3}|-#)\s+/.test(cleaned) ? cleaned : line;
+  }).join("\n");
+}
+
 export function pacificParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Los_Angeles",
@@ -72,16 +79,16 @@ export function validateAnnouncementTemplate(template: string, type: Announcemen
 }
 
 export function formatAnnouncement(template: string, announcement: string, scheduledDate: string, roleId: string, title?: string | null, calendar = "") {
-  const calendarApplied = template.split("\n").flatMap((line) => {
+  const calendarApplied = normalizeDiscordTemplate(template).split("\n").flatMap((line) => {
     if (line.trim() === "{calendar}") return calendar ? [line.replace("{calendar}", calendar)] : [];
     return [line.replaceAll("{calendar}", calendar)];
   }).join("\n");
-  return calendarApplied
+  const formatted = calendarApplied
     .replaceAll("{date}", displayScheduledDate(scheduledDate))
     .replaceAll("{announcement}", announcement)
     .replaceAll("{title}", title || "")
-    .replaceAll("{mention-role}", `<@&${roleId}>`)
-    .slice(0, 2000);
+    .replaceAll("{mention-role}", `<@&${roleId}>`);
+  return normalizeDiscordTemplate(formatted).slice(0, 2000);
 }
 
 type Mode = "scheduled" | "manual_selected";

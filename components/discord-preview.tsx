@@ -81,9 +81,9 @@ export function DiscordMarkdown({ value }: { value: string }) {
       return <pre key={`code-${blockIndex}`}><code>{hasLanguage ? inner.slice(newline + 1) : inner}</code></pre>;
     }
     return block.split("\n").map((line, lineIndex) => {
-      // Text copied into the editor can contain indentation, a BOM, or an
-      // invisible zero-width character before Discord's block marker.
-      const syntaxLine = line.replace(/^[\s\uFEFF\u200B\u200C\u200D]+/, "");
+      // Text copied into the editor can contain a BOM or an invisible
+      // zero-width character before or inside Discord's block marker.
+      const syntaxLine = line.replace(/[\uFEFF\u200B\u200C\u200D]/g, "").trimStart();
       const heading = syntaxLine.match(/^(#{1,3})\s+(.+)$/);
       const subtext = syntaxLine.match(/^-#\s+(.+)$/);
       const quote = syntaxLine.match(/^(>>>|>)\s?(.*)$/);
