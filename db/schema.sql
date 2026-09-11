@@ -1,6 +1,6 @@
 create extension if not exists pgcrypto;
 
-create table if not exists qotd_schema_migrations (
+create table if not exists announcement_schema_migrations (
   version integer primary key,
   applied_at timestamptz not null default now()
 );

@@ -102,24 +102,36 @@ async function migrateSchema() {
   await sql.begin(async (tx) => {
     // Serialize migrations across simultaneous Vercel cold starts.
     await tx`select pg_advisory_xact_lock(716834641)`;
-    await tx.unsafe(`create table if not exists qotd_schema_migrations (
+    await tx.unsafe(`create table if not exists announcement_schema_migrations (
       version integer primary key,
       applied_at timestamptz not null default now()
     )`);
-    const appliedRows = await tx<{ version: number }[]>`select version from qotd_schema_migrations`;
+    const appliedRows = await tx<{ version: number }[]>`select version from announcement_schema_migrations`;
     const applied = new Set(appliedRows.map((row) => Number(row.version)));
     const coreState = (await tx<{ complete: boolean }[]>`
       select
         to_regclass('questions') is not null and
         to_regclass('settings') is not null and
-        to_regclass('dispatches') is not null as complete
+        to_regclass('dispatches') is not null and
+        exists (
+          select 1 from information_schema.columns
+          where table_schema = current_schema() and table_name = 'questions' and column_name = 'scheduled_date'
+        ) and
+        exists (
+          select 1 from information_schema.columns
+          where table_schema = current_schema() and table_name = 'settings' and column_name = 'notification_webhook_url_encrypted'
+        ) and
+        exists (
+          select 1 from information_schema.columns
+          where table_schema = current_schema() and table_name = 'settings' and column_name = 'notification_user_id'
+        ) as complete
     `)[0];
     for (const migration of migrations) {
       // Re-run the baseline's idempotent statements if a migration record and
       // the actual schema ever drift apart.
       if (applied.has(migration.version) && coreState?.complete) continue;
       for (const statement of migration.statements) await tx.unsafe(statement);
-      await tx`insert into qotd_schema_migrations (version) values (${migration.version}) on conflict (version) do nothing`;
+      await tx`insert into announcement_schema_migrations (version) values (${migration.version}) on conflict (version) do nothing`;
     }
   });
 }
@@ -130,7 +142,19 @@ async function coreSchemaExists() {
     select
       to_regclass('questions') is not null and
       to_regclass('settings') is not null and
-      to_regclass('dispatches') is not null as complete
+      to_regclass('dispatches') is not null and
+      exists (
+        select 1 from information_schema.columns
+        where table_schema = current_schema() and table_name = 'questions' and column_name = 'scheduled_date'
+      ) and
+      exists (
+        select 1 from information_schema.columns
+        where table_schema = current_schema() and table_name = 'settings' and column_name = 'notification_webhook_url_encrypted'
+      ) and
+      exists (
+        select 1 from information_schema.columns
+        where table_schema = current_schema() and table_name = 'settings' and column_name = 'notification_user_id'
+      ) as complete
   `;
   return Boolean(rows[0]?.complete);
 }
