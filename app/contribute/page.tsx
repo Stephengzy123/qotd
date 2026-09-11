@@ -4,6 +4,7 @@ import { Notice } from "@/components/notice";
 import { AnnouncementComposer } from "@/components/announcement-composer";
 import { dbReady } from "@/lib/db";
 import { addDays, DEFAULT_ANNOUNCEMENT_TEMPLATE, pacificParts } from "@/lib/qotd";
+import { PendingButton } from "@/components/pending-button";
 
 export default async function ContributePage({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
   const session = await requireRole("contributor");
@@ -14,13 +15,13 @@ export default async function ContributePage({ searchParams }: { searchParams: P
   const template = (settings?.message_template as string) || DEFAULT_ANNOUNCEMENT_TEMPLATE;
   return (
     <main className="app-shell">
-      <header className="topbar"><strong>Announcements</strong><div className="account"><span>{session.username}</span><form action={logoutAction}><button className="text-button">Sign out</button></form></div></header>
+      <header className="topbar"><strong>Announcements</strong><div className="account"><span>{session.username}</span><form action={logoutAction}><PendingButton className="text-button" pendingText="Signing out…">Sign out</PendingButton></form></div></header>
       <section className="page-heading"><h1>Submit an announcement</h1></section>
       <Notice ok={params.ok} error={params.error} />
       <form action={submitQuestionAction} className="panel contribution-form">
         <AnnouncementComposer minimumDate={minimumDate} template={template} />
         <div><label htmlFor="note">Note <span className="muted">(optional)</span></label><textarea id="note" name="note" rows={3} maxLength={500} /></div>
-        <div className="form-footer"><p>Up to 8 submissions per network per hour, independent of the shared login.</p><button type="submit" className="primary">Submit</button></div>
+        <div className="form-footer"><p>Up to 8 submissions per network per hour, independent of the shared login.</p><PendingButton type="submit" className="primary" pendingText="Submitting…">Submit</PendingButton></div>
       </form>
     </main>
   );

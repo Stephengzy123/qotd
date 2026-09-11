@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { loginAction } from "@/app/actions";
 import { Notice } from "@/components/notice";
+import { PendingButton } from "@/components/pending-button";
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const session = await getSession();
@@ -15,7 +16,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <form action={loginAction} className="stack">
           <div><label htmlFor="username">Username</label><input id="username" name="username" autoComplete="username" required /></div>
           <div><label htmlFor="password">Password</label><input id="password" name="password" type="password" autoComplete="current-password" required /></div>
-          <button type="submit" className="primary">Sign in</button>
+          <PendingButton type="submit" className="primary" pendingText="Signing in…">Sign in</PendingButton>
         </form>
       </section>
     </main>

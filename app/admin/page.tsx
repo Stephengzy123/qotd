@@ -5,6 +5,7 @@ import { addDays, DEFAULT_ANNOUNCEMENT_TEMPLATE, displayScheduledDate, pacificPa
 import { Notice } from "@/components/notice";
 import { ApprovedQuestionActions } from "@/components/approved-question-actions";
 import { AnnouncementTemplateEditor } from "@/components/announcement-template-editor";
+import { PendingButton } from "@/components/pending-button";
 
 type Announcement = { id: string; question: string; contributor_note: string | null; status: string; created_at: Date; scheduled_date: string | Date | null };
 type Dispatch = { id: string; message: string; success: boolean; mode: string; created_at: Date; error: string | null };
@@ -31,17 +32,17 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   return (
     <main className="app-shell">
-      <header className="topbar"><strong>Announcement admin</strong><nav><a href="#inbox">Pending</a><a href="#approved">Approved</a><a href="#delivery">Settings</a></nav><div className="account"><span>{session.username}</span><form action={logoutAction}><button className="text-button">Sign out</button></form></div></header>
+      <header className="topbar"><strong>Announcement admin</strong><nav><a href="#inbox">Pending</a><a href="#approved">Approved</a><a href="#delivery">Settings</a></nav><div className="account"><span>{session.username}</span><form action={logoutAction}><PendingButton className="text-button" pendingText="Signing out…">Sign out</PendingButton></form></div></header>
       <section className="admin-heading"><div><h1>Announcements</h1><p>Approved announcements are sent at 5:00 AM PDT / 4:00 AM PST on their selected date.</p></div></section>
       <Notice ok={params.ok} error={params.error} />
       <section className="stats" aria-label="Queue summary"><div><span>Awaiting review</span><strong>{pending.length}</strong></div><div><span>Scheduled</span><strong>{approved.length}</strong></div><div><span>Sent recently</span><strong>{sent.length}</strong></div></section>
 
       <section id="inbox" className="section-block"><div className="section-title"><h2>Pending</h2><span className="count-badge">{pending.length}</span></div>
-        {pending.length ? <div className="question-list">{pending.map((item) => <form action={reviewQuestionAction} className="question-card" key={item.id}><input type="hidden" name="id" value={item.id} /><div className="question-meta"><span>Submitted {relativeDate(item.created_at)}</span><span className="status pending">Pending</span></div><label htmlFor={`date-${item.id}`}>Posting date</label><input id={`date-${item.id}`} name="scheduledDate" type="date" min={minimumDate} defaultValue={scheduledDateValue(item.scheduled_date) || ""} required /><label htmlFor={`announcement-${item.id}`}>Announcement</label><textarea id={`announcement-${item.id}`} name="announcement" defaultValue={item.question} minLength={8} maxLength={1500} required rows={6} />{item.contributor_note && <p className="review-note"><strong>Note:</strong> {item.contributor_note}</p>}<div className="card-actions"><button name="intent" value="reject" className="danger" formNoValidate>Reject</button><button name="intent" value="save" className="secondary">Save</button><button name="intent" value="approve" className="primary">Approve</button></div></form>)}</div> : <div className="empty-state compact"><p>No pending announcements.</p></div>}
+        {pending.length ? <div className="question-list">{pending.map((item) => <form action={reviewQuestionAction} className="question-card" key={item.id}><input type="hidden" name="id" value={item.id} /><div className="question-meta"><span>Submitted {relativeDate(item.created_at)}</span><span className="status pending">Pending</span></div><label htmlFor={`date-${item.id}`}>Posting date</label><input id={`date-${item.id}`} name="scheduledDate" type="date" min={minimumDate} defaultValue={scheduledDateValue(item.scheduled_date) || ""} required /><label htmlFor={`announcement-${item.id}`}>Announcement</label><textarea id={`announcement-${item.id}`} name="announcement" defaultValue={item.question} minLength={8} maxLength={1500} required rows={6} />{item.contributor_note && <p className="review-note"><strong>Note:</strong> {item.contributor_note}</p>}<div className="card-actions"><PendingButton name="intent" value="reject" className="danger" formNoValidate pendingText="Rejecting…">Reject</PendingButton><PendingButton name="intent" value="save" className="secondary" pendingText="Saving…">Save</PendingButton><PendingButton name="intent" value="approve" className="primary" pendingText="Approving…">Approve</PendingButton></div></form>)}</div> : <div className="empty-state compact"><p>No pending announcements.</p></div>}
       </section>
 
       <section id="approved" className="section-block"><div className="section-title"><h2>Approved</h2></div>
-        <form action={addApprovedQuestionAction} className="panel quick-add-form"><label htmlFor="admin-announcement">Add an approved announcement</label><div className="quick-add-fields"><input name="scheduledDate" type="date" min={minimumDate} defaultValue={minimumDate} required /><textarea id="admin-announcement" name="announcement" rows={3} minLength={8} maxLength={1500} required /><button className="primary">Add</button></div></form>
+        <form action={addApprovedQuestionAction} className="panel quick-add-form"><label htmlFor="admin-announcement">Add an approved announcement</label><div className="quick-add-fields"><input name="scheduledDate" type="date" min={minimumDate} defaultValue={minimumDate} required /><textarea id="admin-announcement" name="announcement" rows={3} minLength={8} maxLength={1500} required /><PendingButton className="primary" pendingText="Adding…">Add</PendingButton></div></form>
         {approved.length ? <div className="approved-list">{approved.map((item, index) => <article key={item.id} className="approved-row"><span className="queue-number">{String(index + 1).padStart(2, "0")}</span><div><strong className="scheduled-label">{item.scheduled_date ? displayScheduledDate(item.scheduled_date) : "Date needed"}</strong><p>{item.question}</p></div><ApprovedQuestionActions id={item.id} question={item.question} /></article>)}</div> : <div className="empty-state compact"><p>No approved announcements.</p></div>}
       </section>
 
@@ -53,7 +54,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <hr />
           <div><label htmlFor="notificationWebhook">Pending notification webhook URL</label><input id="notificationWebhook" name="notificationWebhook" type="password" placeholder={settings.has_notification_webhook ? "Saved securely — enter a new URL to replace it" : "https://discord.com/api/webhooks/…"} autoComplete="off" /><p className="hint">Optional. Sends a notice when a contributor adds a pending announcement.</p></div>
           <div><label htmlFor="notificationUserId">Discord user ID to notify</label><input id="notificationUserId" name="notificationUserId" inputMode="numeric" pattern="[0-9]{15,22}" defaultValue={settings.notification_user_id || ""} placeholder="123456789012345678" /><p className="hint">The notification begins with <code>{"<@user-id>"}</code> so Discord pings you.</p></div>
-          <div className="align-right"><button className="primary">Save settings</button></div>
+          <div className="align-right"><PendingButton className="primary" pendingText="Saving…">Save settings</PendingButton></div>
         </form>
       </section>
 

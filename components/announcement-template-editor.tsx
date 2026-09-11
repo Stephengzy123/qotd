@@ -5,6 +5,7 @@ import { DiscordMarkdown } from "@/components/discord-preview";
 
 export function AnnouncementTemplateEditor({ initialTemplate, defaultTemplate }: { initialTemplate: string; defaultTemplate: string }) {
   const [template, setTemplate] = useState(initialTemplate);
+  const [defaultRestored, setDefaultRestored] = useState(false);
   const preview = template
     .replaceAll("{date}", "September 11")
     .replaceAll("{announcement}", "Your announcement will appear here.")
@@ -15,9 +16,10 @@ export function AnnouncementTemplateEditor({ initialTemplate, defaultTemplate }:
       <div>
         <div className="field-heading">
           <label htmlFor="template">Message format</label>
-          <button type="button" className="text-button" onClick={() => setTemplate(defaultTemplate)}>Reset to default</button>
+          <button type="button" className="text-button" onClick={() => { setTemplate(defaultTemplate); setDefaultRestored(true); }}>Reset to default</button>
         </div>
-        <textarea id="template" name="template" rows={8} maxLength={500} required value={template} onChange={(event) => setTemplate(event.target.value)} />
+        <textarea id="template" name="template" rows={8} maxLength={500} required value={template} onChange={(event) => { setTemplate(event.target.value); setDefaultRestored(false); }} />
+        {defaultRestored && <p className="inline-feedback" role="status">Default restored. Save settings to apply it.</p>}
         <p className="hint token-help"><code>{"{date}"}</code> · <code>{"{announcement}"}</code> · <code>{"{mention-role}"}</code></p>
       </div>
       <div>

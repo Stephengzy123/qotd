@@ -20,6 +20,21 @@ body {
 button, input, textarea { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .45; }
+button[data-pending] { cursor: wait; opacity: .75; }
+button[data-pending]::before {
+  content: "";
+  display: inline-block;
+  width: .78em;
+  height: .78em;
+  margin-right: .45em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -.05em;
+  animation: button-spin .65s linear infinite;
+}
+@keyframes button-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { button[data-pending]::before { animation-duration: 1.5s; } }
 a { color: inherit; }
 h1, h2, h3, p { margin-top: 0; }
 h1 { font-size: 1.8rem; margin-bottom: .4rem; }
@@ -115,6 +130,7 @@ input:focus, textarea:focus { border-color: #666; box-shadow: 0 0 0 2px rgb(0 0 
 
 .template-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .hint { margin-top: .4rem; }
+.inline-feedback { margin: .4rem 0 0; color: var(--success); font-size: .8rem; }
 .hint code { padding: .05rem .2rem; background: #eee; border-radius: 3px; }
 .discord-preview { min-height: 160px; padding: 1rem; border-radius: 5px; background: #313338; color: #e2e2e2; }
 .discord-preview p { margin: 0; }
