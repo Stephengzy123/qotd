@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { clearSession, createSession, requireRole, verifyCredentials } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
 import { encryptSecret, hashAddress, validateDiscordWebhook } from "@/lib/security";
-import { isValidFuturePacificDate, sendAnnouncement, sendPendingNotification } from "@/lib/qotd";
+import { isValidFuturePacificDate, sendAnnouncement, sendPendingNotification, validateAnnouncementTemplate } from "@/lib/qotd";
 
 function messageUrl(path: string, kind: "ok" | "error", message: string) {
   return `${path}?${kind}=${encodeURIComponent(message)}`;
@@ -113,16 +113,20 @@ export async function deleteApprovedQuestionAction(formData: FormData) {
 
 export async function saveSettingsAction(formData: FormData) {
   await requireRole("admin");
+  const template = String(formData.get("template") || "").trim();
   const webhook = String(formData.get("webhook") || "").trim();
   const roleId = String(formData.get("roleId") || "").trim();
   const notificationWebhook = String(formData.get("notificationWebhook") || "").trim();
   const notificationUserId = String(formData.get("notificationUserId") || "").trim();
+  const templateError = validateAnnouncementTemplate(template);
+  if (templateError) redirect(messageUrl("/admin", "error", templateError));
   if (!/^\d{15,22}$/.test(roleId)) redirect(messageUrl("/admin", "error", "The announcement role ID must contain 15–22 digits."));
   if (notificationUserId && !/^\d{15,22}$/.test(notificationUserId)) redirect(messageUrl("/admin", "error", "The notification user ID must contain 15–22 digits."));
   if (webhook && !validateDiscordWebhook(webhook)) redirect(messageUrl("/admin", "error", "Enter a valid Discord webhook URL."));
   if (notificationWebhook && !validateDiscordWebhook(notificationWebhook)) redirect(messageUrl("/admin", "error", "Enter a valid notification webhook URL."));
   const sql = await dbReady();
   await sql`update settings set
+    message_template = ${template},
     mention_role_id = ${roleId},
     webhook_url_encrypted = coalesce(${webhook ? encryptSecret(webhook) : null}, webhook_url_encrypted),
     notification_webhook_url_encrypted = coalesce(${notificationWebhook ? encryptSecret(notificationWebhook) : null}, notification_webhook_url_encrypted),

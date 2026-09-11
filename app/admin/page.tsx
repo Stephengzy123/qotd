@@ -1,9 +1,10 @@
 import { addApprovedQuestionAction, logoutAction, reviewQuestionAction, saveSettingsAction, sendQuestionAction } from "@/app/actions";
 import { requireRole } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
-import { addDays, displayScheduledDate, FIXED_ANNOUNCEMENT_FORMAT, pacificParts, scheduledDateValue } from "@/lib/qotd";
+import { addDays, DEFAULT_ANNOUNCEMENT_TEMPLATE, displayScheduledDate, pacificParts, scheduledDateValue } from "@/lib/qotd";
 import { Notice } from "@/components/notice";
 import { ApprovedQuestionActions } from "@/components/approved-question-actions";
+import { AnnouncementTemplateEditor } from "@/components/announcement-template-editor";
 
 type Announcement = { id: string; question: string; contributor_note: string | null; status: string; created_at: Date; scheduled_date: string | Date | null };
 type Dispatch = { id: string; message: string; success: boolean; mode: string; created_at: Date; error: string | null };
@@ -20,12 +21,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     sql<Announcement[]>`select id, question, contributor_note, status, created_at, scheduled_date from questions where status = 'pending' order by scheduled_date asc nulls last, created_at asc`,
     sql<Announcement[]>`select id, question, contributor_note, status, created_at, scheduled_date from questions where status = 'approved' order by scheduled_date asc nulls last, created_at asc`,
     sql<Announcement[]>`select id, question, contributor_note, status, created_at, scheduled_date from questions where status = 'sent' order by sent_at desc limit 8`,
-    sql`select mention_role_id, webhook_url_encrypted is not null as has_webhook,
+    sql`select message_template, mention_role_id, webhook_url_encrypted is not null as has_webhook,
       notification_user_id, notification_webhook_url_encrypted is not null as has_notification_webhook
       from settings where singleton = true`,
     sql<Dispatch[]>`select id, message, success, mode, created_at, error from dispatches order by created_at desc limit 8`,
   ]);
-  const settings = settingsRows[0] || { mention_role_id: null, has_webhook: false, notification_user_id: null, has_notification_webhook: false };
+  const settings = settingsRows[0] || { message_template: DEFAULT_ANNOUNCEMENT_TEMPLATE, mention_role_id: null, has_webhook: false, notification_user_id: null, has_notification_webhook: false };
   const minimumDate = addDays(pacificParts().localDate, 1);
 
   return (
@@ -48,7 +49,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         <form action={saveSettingsAction} className="panel settings-form">
           <div><label htmlFor="webhook">Announcement webhook URL</label><input id="webhook" name="webhook" type="password" placeholder={settings.has_webhook ? "Saved securely — enter a new URL to replace it" : "https://discord.com/api/webhooks/…"} autoComplete="off" /><p className="hint">Leave blank to keep the saved webhook.</p></div>
           <div><label htmlFor="roleId">Role ID mentioned on announcements</label><input id="roleId" name="roleId" inputMode="numeric" pattern="[0-9]{15,22}" defaultValue={settings.mention_role_id || ""} required /></div>
-          <div><span className="label">Fixed message format</span><pre className="fixed-format">{FIXED_ANNOUNCEMENT_FORMAT}</pre></div>
+          <AnnouncementTemplateEditor initialTemplate={settings.message_template || DEFAULT_ANNOUNCEMENT_TEMPLATE} defaultTemplate={DEFAULT_ANNOUNCEMENT_TEMPLATE} />
           <hr />
           <div><label htmlFor="notificationWebhook">Pending notification webhook URL</label><input id="notificationWebhook" name="notificationWebhook" type="password" placeholder={settings.has_notification_webhook ? "Saved securely — enter a new URL to replace it" : "https://discord.com/api/webhooks/…"} autoComplete="off" /><p className="hint">Optional. Sends a notice when a contributor adds a pending announcement.</p></div>
           <div><label htmlFor="notificationUserId">Discord user ID to notify</label><input id="notificationUserId" name="notificationUserId" inputMode="numeric" pattern="[0-9]{15,22}" defaultValue={settings.notification_user_id || ""} placeholder="123456789012345678" /><p className="hint">The notification begins with <code>{"<@user-id>"}</code> so Discord pings you.</p></div>

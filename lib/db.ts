@@ -82,6 +82,16 @@ const migrations = [
         '{announcement}' || chr(10) || chr(10) || '-# {mention-role}' where singleton = true`,
     ],
   },
+  {
+    version: 5,
+    statements: [
+      `update settings
+        set message_template = '# <:sgs:1372767087612657724> Announcements for {date}' || chr(10) || chr(10) ||
+          '{announcement}' || chr(10) || chr(10) || '-# {mention-role}'
+        where singleton = true and message_template = '# Announcements for {date}' || chr(10) || chr(10) ||
+          '{announcement}' || chr(10) || chr(10) || '-# {mention-role}'`,
+    ],
+  },
 ] as const;
 
 export function db() {

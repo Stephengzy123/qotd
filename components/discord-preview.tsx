@@ -15,7 +15,7 @@ function restoreEscapes(text: string) {
 }
 
 function renderInline(text: string): ReactNode[] {
-  const tokenPattern = /(`[^`\n]+`|\|\|.+?\|\||\*\*.+?\*\*|__.+?__|\*[^*\n]+?\*|_[^_\n]+?_|<@&?\d+>)/g;
+  const tokenPattern = /(`[^`\n]+`|\|\|.+?\|\||\*\*.+?\*\*|__.+?__|\*[^*\n]+?\*|_[^_\n]+?_|<@&?\d+>|<a?:[a-zA-Z0-9_]+:\d+>)/g;
   return text.split(tokenPattern).map((part, index) => {
     if (/^`[^`\n]+`$/.test(part)) return <code key={index}>{restoreEscapes(part.slice(1, -1))}</code>;
     if (/^\|\|.+\|\|$/.test(part)) return <span className="spoiler" tabIndex={0} key={index}>{restoreEscapes(part.slice(2, -2))}</span>;
@@ -23,6 +23,8 @@ function renderInline(text: string): ReactNode[] {
     if (/^__.+__$/.test(part)) return <u key={index}>{restoreEscapes(part.slice(2, -2))}</u>;
     if (/^\*[^*]+\*$/.test(part) || /^_[^_]+_$/.test(part)) return <em key={index}>{restoreEscapes(part.slice(1, -1))}</em>;
     if (/^<@&?\d+>$/.test(part)) return <span className="role-mention" key={index}>{part.startsWith("<@&") ? "@role" : "@user"}</span>;
+    const customEmoji = part.match(/^<a?:([a-zA-Z0-9_]+):\d+>$/);
+    if (customEmoji) return <span className="custom-emoji" key={index}>:{customEmoji[1]}:</span>;
     return <Fragment key={index}>{restoreEscapes(part)}</Fragment>;
   });
 }

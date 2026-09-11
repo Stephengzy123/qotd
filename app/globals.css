@@ -42,8 +42,7 @@ input:focus, textarea:focus { border-color: #666; box-shadow: 0 0 0 2px rgb(0 0 
 .login-card h1 { margin-bottom: 1.25rem; }
 .stack { display: grid; gap: 1rem; }
 
-.app-shell { max-width: 1050px; margin: 0 auto; padding: 0 1rem 4rem; }
-.app-shell.narrow { max-width: 720px; }
+.app-shell { width: min(100%, 1440px); margin: 0 auto; padding: 0 1.5rem 4rem; }
 .topbar { min-height: 58px; display: flex; align-items: center; gap: 1.5rem; border-bottom: 1px solid var(--border); }
 .topbar > strong { margin-right: auto; }
 .topbar nav { display: flex; gap: 1.25rem; font-size: .9rem; }
@@ -130,6 +129,7 @@ input:focus, textarea:focus { border-color: #666; box-shadow: 0 0 0 2px rgb(0 0 
 .discord-preview pre { overflow-x: auto; margin: .45rem 0; padding: .65rem; border: 1px solid #1e1f22; border-radius: 4px; background: #2b2d31; white-space: pre-wrap; }
 .discord-preview pre code { padding: 0; background: transparent; }
 .role-mention { padding: .08rem .25rem; border-radius: 3px; color: #c9cdfb; background: rgb(88 101 242 / 30%); font-weight: 600; }
+.custom-emoji { display: inline-block; color: #dbdee1; font-size: .8em; font-weight: 500; vertical-align: .08em; }
 .spoiler { border-radius: 3px; color: transparent; background: #1e1f22; cursor: pointer; }
 .spoiler:hover, .spoiler:focus { color: inherit; background: rgb(30 31 34 / 70%); }
 .format-help { margin-top: .65rem; color: var(--muted); font-size: .8rem; }
@@ -148,6 +148,7 @@ input:focus, textarea:focus { border-color: #666; box-shadow: 0 0 0 2px rgb(0 0 
 .activity-list time { color: var(--muted); font-size: .75rem; }
 
 @media (max-width: 700px) {
+  .app-shell { padding-inline: .8rem; }
   .topbar nav, .account > span { display: none; }
   .stats, .question-list, .template-grid { grid-template-columns: 1fr; }
   .stats { gap: .4rem; }

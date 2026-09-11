@@ -1,7 +1,8 @@
 import { dbReady } from "@/lib/db";
 import { decryptSecret } from "@/lib/security";
 
-export const FIXED_ANNOUNCEMENT_FORMAT = "# Announcements for {date}\n\n{announcement}\n\n-# {mention-role}";
+export const DEFAULT_ANNOUNCEMENT_TEMPLATE = "# <:sgs:1372767087612657724> Announcements for {date}\n\n{announcement}\n\n-# {mention-role}";
+const ALLOWED_TEMPLATE_TOKENS = ["{date}", "{announcement}", "{mention-role}"];
 
 export function pacificParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -43,18 +44,23 @@ export function displayScheduledDate(value: unknown) {
   if (!localDate) return "Date unavailable";
   return new Intl.DateTimeFormat("en-US", {
     timeZone: "UTC",
-    weekday: "long",
-    year: "numeric",
     month: "long",
     day: "numeric",
   }).format(new Date(`${localDate}T12:00:00Z`));
 }
 
-export function formatAnnouncement(announcement: string, scheduledDate: string, roleId: string) {
-  return FIXED_ANNOUNCEMENT_FORMAT
-    .replace("{date}", displayScheduledDate(scheduledDate))
-    .replace("{announcement}", announcement)
-    .replace("{mention-role}", `<@&${roleId}>`)
+export function validateAnnouncementTemplate(template: string) {
+  if (!template.includes("{announcement}")) return "The format must include {announcement}.";
+  if (template.length > 500) return "Keep the format under 500 characters.";
+  const unknown = template.match(/\{[^{}]+\}/g)?.filter((token) => !ALLOWED_TEMPLATE_TOKENS.includes(token));
+  return unknown?.length ? `Unknown element: ${unknown[0]}` : null;
+}
+
+export function formatAnnouncement(template: string, announcement: string, scheduledDate: string, roleId: string) {
+  return template
+    .replaceAll("{date}", displayScheduledDate(scheduledDate))
+    .replaceAll("{announcement}", announcement)
+    .replaceAll("{mention-role}", `<@&${roleId}>`)
     .slice(0, 2000);
 }
 
@@ -71,7 +77,7 @@ export async function sendAnnouncement(announcementId: string, mode: Mode, local
     const announcement = announcements[0];
     if (!announcement) return { error: "There are no approved announcements ready to send." } as const;
     const settings = (await tx`
-      select webhook_url_encrypted, mention_role_id
+      select webhook_url_encrypted, mention_role_id, message_template
       from settings where singleton = true
     `)[0];
     if (!settings?.webhook_url_encrypted) return { error: "Set a Discord webhook before sending." } as const;
@@ -79,7 +85,8 @@ export async function sendAnnouncement(announcementId: string, mode: Mode, local
     if (!roleId) return { error: "Set a Discord role ID before sending." } as const;
     const scheduledDate = scheduledDateValue(announcement.scheduled_date);
     if (!scheduledDate) return { error: "This announcement has an invalid posting date. Unapprove it and choose the date again." } as const;
-    const message = formatAnnouncement(announcement.question, scheduledDate, roleId);
+    const template = (settings.message_template as string) || DEFAULT_ANNOUNCEMENT_TEMPLATE;
+    const message = formatAnnouncement(template, announcement.question, scheduledDate, roleId);
     const claim = await tx`
       update questions set status = 'sent', updated_at = now()
       where id = ${announcement.id} and status = 'approved'

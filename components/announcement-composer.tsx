@@ -6,14 +6,17 @@ import { DiscordMarkdown } from "@/components/discord-preview";
 function displayDate(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "selected date";
   return new Intl.DateTimeFormat("en-US", {
-    weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "UTC",
+    month: "long", day: "numeric", timeZone: "UTC",
   }).format(new Date(`${value}T12:00:00Z`));
 }
 
-export function AnnouncementComposer({ minimumDate }: { minimumDate: string }) {
+export function AnnouncementComposer({ minimumDate, template }: { minimumDate: string; template: string }) {
   const [announcement, setAnnouncement] = useState("");
   const [scheduledDate, setScheduledDate] = useState(minimumDate);
-  const preview = `# Announcements for ${displayDate(scheduledDate)}\n\n${announcement || "Your announcement will appear here."}\n\n-# <@&123456789012345678>`;
+  const preview = template
+    .replaceAll("{date}", displayDate(scheduledDate))
+    .replaceAll("{announcement}", announcement || "Your announcement will appear here.")
+    .replaceAll("{mention-role}", "<@&123456789012345678>");
 
   return (
     <>
