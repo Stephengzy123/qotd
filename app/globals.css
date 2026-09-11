@@ -160,6 +160,14 @@ input:focus, select:focus, textarea:focus { border-color: #666; box-shadow: 0 0 
 .format-help code, .token-help code { padding: .05rem .2rem; border-radius: 3px; background: #eee; color: var(--text); }
 .align-right { text-align: right; }
 .settings-form hr { width: 100%; margin: 0; border: 0; border-top: 1px solid var(--border); }
+.webhook-profile { display: flex; align-items: center; gap: .75rem; padding: .85rem; border: 1px solid var(--border); border-radius: 6px; background: var(--background); }
+.webhook-avatar { width: 40px; height: 40px; flex-shrink: 0; border-radius: 50%; object-fit: cover; }
+.webhook-avatar-fallback { display: grid; place-items: center; background: #5865f2; color: white; font-weight: 700; }
+.webhook-profile-copy { min-width: 0; overflow-wrap: anywhere; }
+.webhook-profile-copy strong, .webhook-profile-copy span, .webhook-profile-copy a { display: block; }
+.webhook-profile-copy span { color: var(--success); font-size: .8rem; }
+.webhook-profile-copy a { margin-top: .2rem; font-size: .8rem; }
+.webhook-profile-message { margin: 0; }
 .fixed-format { margin: 0; padding: .75rem; border: 1px solid var(--border); border-radius: 5px; background: #f3f3f3; white-space: pre-wrap; }
 
 .activity-list > div { display: grid; grid-template-columns: 10px 1fr auto; align-items: start; gap: .7rem; padding: .75rem 1rem; border-bottom: 1px solid var(--border); }

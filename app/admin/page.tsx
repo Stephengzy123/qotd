@@ -7,6 +7,8 @@ import { ApprovedQuestionActions } from "@/components/approved-question-actions"
 import { AnnouncementTemplateEditor } from "@/components/announcement-template-editor";
 import { PendingButton } from "@/components/pending-button";
 import { AdminEntryFields } from "@/components/admin-entry-fields";
+import { Suspense } from "react";
+import { WebhookProfile } from "@/components/webhook-profile";
 
 type Announcement = { id: string; question: string; contributor_note: string | null; status: string; created_at: Date; scheduled_date: string | Date | null; question_type: "announcement" | "event"; event_title: string | null; days_early: number };
 type Dispatch = { id: string; message: string; success: boolean; mode: string; created_at: Date; error: string | null };
@@ -23,7 +25,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     sql<Announcement[]>`select id, question, contributor_note, status, created_at, scheduled_date, question_type, event_title, days_early from questions where status = 'pending' order by scheduled_date asc nulls last, created_at asc`,
     sql<Announcement[]>`select id, question, contributor_note, status, created_at, scheduled_date, question_type, event_title, days_early from questions where status = 'approved' order by scheduled_date asc nulls last, created_at asc`,
     sql<Announcement[]>`select id, question, contributor_note, status, created_at, scheduled_date, question_type, event_title, days_early from questions where status = 'sent' order by sent_at desc limit 8`,
-    sql`select message_template, event_message_template, mention_role_id, webhook_url_encrypted is not null as has_webhook,
+    sql`select message_template, event_message_template, mention_role_id, webhook_url_encrypted, notification_webhook_url_encrypted, webhook_url_encrypted is not null as has_webhook,
       notification_user_id, notification_webhook_url_encrypted is not null as has_notification_webhook,
       calendar_feed_url_encrypted is not null as has_calendar_feed
       from settings where singleton = true`,
@@ -52,12 +54,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       <section id="delivery" className="section-block"><div className="section-title"><h2>Settings</h2><span className={`status ${settings.has_webhook && settings.mention_role_id ? "ready" : "pending"}`}>{settings.has_webhook && settings.mention_role_id ? "Ready" : "Setup needed"}</span></div>
         <form action={saveSettingsAction} className="panel settings-form">
           <div><label htmlFor="webhook">Announcement webhook URL</label><input id="webhook" name="webhook" type="password" placeholder={settings.has_webhook ? "Saved securely — enter a new URL to replace it" : "https://discord.com/api/webhooks/…"} autoComplete="off" /><p className="hint">Leave blank to keep the saved webhook.</p></div>
+          <Suspense fallback={<p className="hint" role="status">Loading saved announcement webhook…</p>}><WebhookProfile encryptedUrl={settings.webhook_url_encrypted} /></Suspense>
           <div><label htmlFor="roleId">Role ID mentioned on announcements</label><input id="roleId" name="roleId" inputMode="numeric" pattern="[0-9]{15,22}" defaultValue={settings.mention_role_id || ""} required /></div>
           <div><label htmlFor="calendarFeed">Calendar feed URL</label><input id="calendarFeed" name="calendarFeed" type="password" placeholder={settings.has_calendar_feed ? "Saved securely — enter a new URL to replace it" : "webcal://… or https://…"} autoComplete="off" /><p className="hint">Optional. All-day events for the Announcement date appear through <code>{"{calendar}"}</code>. Leave blank to keep the saved calendar.</p></div>
           <AnnouncementTemplateEditor fieldName="announcementTemplate" label="Announcement format" initialTemplate={settings.message_template || DEFAULT_ANNOUNCEMENT_TEMPLATE} defaultTemplate={DEFAULT_ANNOUNCEMENT_TEMPLATE} />
           <AnnouncementTemplateEditor fieldName="eventTemplate" label="Event format" initialTemplate={settings.event_message_template || DEFAULT_EVENT_TEMPLATE} defaultTemplate={DEFAULT_EVENT_TEMPLATE} event />
           <hr />
           <div><label htmlFor="notificationWebhook">Pending notification webhook URL</label><input id="notificationWebhook" name="notificationWebhook" type="password" placeholder={settings.has_notification_webhook ? "Saved securely — enter a new URL to replace it" : "https://discord.com/api/webhooks/…"} autoComplete="off" /><p className="hint">Optional. Sends a notice when a contributor adds a pending announcement.</p></div>
+          <Suspense fallback={<p className="hint" role="status">Loading saved notification webhook…</p>}><WebhookProfile encryptedUrl={settings.notification_webhook_url_encrypted} /></Suspense>
           <div><label htmlFor="notificationUserId">Discord user ID to notify</label><input id="notificationUserId" name="notificationUserId" inputMode="numeric" pattern="[0-9]{15,22}" defaultValue={settings.notification_user_id || ""} placeholder="123456789012345678" /><p className="hint">The notification begins with <code>{"<@user-id>"}</code> so Discord pings you.</p></div>
           <div className="align-right"><PendingButton className="primary" pendingText="Saving…">Save settings</PendingButton></div>
         </form>
