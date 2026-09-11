@@ -81,11 +81,14 @@ export function DiscordMarkdown({ value }: { value: string }) {
       return <pre key={`code-${blockIndex}`}><code>{hasLanguage ? inner.slice(newline + 1) : inner}</code></pre>;
     }
     return block.split("\n").map((line, lineIndex) => {
-      const heading = line.match(/^(#{1,3})\s+(.+)$/);
-      const subtext = line.match(/^-#\s+(.+)$/);
-      const quote = line.match(/^\s*(>>>|>)\s?(.*)$/);
-      const bullet = line.match(/^(\s*)[-*]\s+(.+)$/);
-      const numbered = line.match(/^(\s*)\d+[.)]\s+(.+)$/);
+      // Text copied into the editor can contain indentation, a BOM, or an
+      // invisible zero-width character before Discord's block marker.
+      const syntaxLine = line.replace(/^[\s\uFEFF\u200B\u200C\u200D]+/, "");
+      const heading = syntaxLine.match(/^(#{1,3})\s+(.+)$/);
+      const subtext = syntaxLine.match(/^-#\s+(.+)$/);
+      const quote = syntaxLine.match(/^(>>>|>)\s?(.*)$/);
+      const bullet = syntaxLine.match(/^(\s*)[-*]\s+(.+)$/);
+      const numbered = syntaxLine.match(/^(\s*)\d+[.)]\s+(.+)$/);
       const key = `${blockIndex}-${lineIndex}`;
       if (heading) return <div className={`discord-heading h${heading[1].length}`} key={key}>{renderInline(heading[2], key)}</div>;
       if (subtext) return <div className="discord-subtext" key={key}>{renderInline(subtext[1], key)}</div>;
