@@ -1,6 +1,6 @@
 # Announcement Handler
 
-A Next.js app for collecting, reviewing, and scheduling Discord announcements. Contributors choose a future Pacific date and preview the fixed Discord message. Admins approve announcements and configure the delivery and review-notification webhooks.
+A Next.js app for collecting, reviewing, and scheduling Discord announcements and events. Contributors preview Discord Markdown, while admins approve entries, customize both message formats, and configure the delivery and review-notification webhooks.
 
 ## Set up Neon
 
@@ -29,6 +29,11 @@ Generate password hashes with `npm run hash-password -- "your password"`. Genera
 
 ## Deploy
 
-Import the `announcement-bot` branch as a separate Vercel project and add the environment variables above. The daily cron runs at 12:00 UTC, which is 5:00 AM PDT and 4:00 AM PST. It sends every approved announcement whose chosen date is due; overdue announcements are included so a missed run does not discard them.
+Import the `announcement-bot` branch as a separate Vercel project and add the environment variables above. Two daily UTC cron checks account for daylight saving time; only the check that runs during the 6 PM Pacific hour sends messages. Vercel Hobby may invoke it at any point within that hour.
+
+- An **Announcement date** is the date the message is for. It publishes the previous day during the 6 PM Pacific hour.
+- An **Event publish date** is the day its message publishes during the 6 PM Pacific hour. It does not need to match the date of the event.
+
+Overdue approved entries are included in the next run so a missed invocation does not silently discard them.
 
 Configure both encrypted webhooks and the Discord IDs from the admin page. The notification webhook is optional and pings the configured user whenever a contributor submission enters Pending.

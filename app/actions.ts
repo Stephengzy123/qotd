@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { clearSession, createSession, requireRole, verifyCredentials } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
 import { encryptSecret, hashAddress, validateDiscordWebhook } from "@/lib/security";
-import { isValidFuturePacificDate, sendAnnouncement, sendPendingNotification, validateAnnouncementTemplate } from "@/lib/qotd";
+import { isValidAnnouncementDate, isValidFuturePacificDate, sendAnnouncement, sendPendingNotification, validateAnnouncementTemplate, type AnnouncementType } from "@/lib/qotd";
 
 function messageUrl(path: string, kind: "ok" | "error", message: string) {
   return `${path}?${kind}=${encodeURIComponent(message)}`;
@@ -34,13 +34,17 @@ export async function logoutAction() {
 
 export async function submitQuestionAction(formData: FormData) {
   await requireRole("contributor");
+  const type: AnnouncementType = formData.get("type") === "event" ? "event" : "announcement";
   const announcement = String(formData.get("announcement") || "").trim();
+  const eventTitle = String(formData.get("eventTitle") || "").trim();
   const scheduledDate = String(formData.get("scheduledDate") || "");
   const note = String(formData.get("note") || "").trim();
   if (announcement.length < 8 || announcement.length > 1500) {
     redirect(messageUrl("/contribute", "error", "Announcements must be between 8 and 1,500 characters."));
   }
-  if (!isValidFuturePacificDate(scheduledDate)) redirect(messageUrl("/contribute", "error", "Choose a valid Pacific date after today."));
+  if (type === "announcement" && !isValidAnnouncementDate(scheduledDate)) redirect(messageUrl("/contribute", "error", "Choose an announcement date whose previous-day 6 PM publishing window has not passed."));
+  if (type === "event" && !isValidFuturePacificDate(scheduledDate)) redirect(messageUrl("/contribute", "error", "Choose a valid future event publish date."));
+  if (type === "event" && (eventTitle.length < 1 || eventTitle.length > 200)) redirect(messageUrl("/contribute", "error", "Event titles must be between 1 and 200 characters."));
   if (note.length > 500) redirect(messageUrl("/contribute", "error", "Notes must be 500 characters or fewer."));
   const ipHash = await clientHash();
   const sql = await dbReady();
@@ -49,8 +53,8 @@ export async function submitQuestionAction(formData: FormData) {
     where submitter_ip_hash = ${ipHash} and created_at > now() - interval '1 hour'
   `)[0].count);
   if (recent >= 8) redirect(messageUrl("/contribute", "error", "You’ve submitted several announcements recently. Please try again in a little while."));
-  await sql`insert into questions (question, contributor_note, scheduled_date, submitter_ip_hash) values (${announcement}, ${note || null}, ${scheduledDate}, ${ipHash})`;
-  await sendPendingNotification(announcement, scheduledDate);
+  await sql`insert into questions (question, contributor_note, scheduled_date, question_type, event_title, submitter_ip_hash) values (${announcement}, ${note || null}, ${scheduledDate}, ${type}, ${type === "event" ? eventTitle : null}, ${ipHash})`;
+  await sendPendingNotification(announcement, scheduledDate, type, type === "event" ? eventTitle : null);
   revalidatePath("/admin");
   redirect(messageUrl("/contribute", "ok", "Your announcement is ready for review."));
 }
@@ -58,7 +62,9 @@ export async function submitQuestionAction(formData: FormData) {
 export async function reviewQuestionAction(formData: FormData) {
   await requireRole("admin");
   const id = String(formData.get("id") || "");
+  const type: AnnouncementType = formData.get("type") === "event" ? "event" : "announcement";
   const announcement = String(formData.get("announcement") || "").trim();
+  const eventTitle = String(formData.get("eventTitle") || "").trim();
   const scheduledDate = String(formData.get("scheduledDate") || "");
   const intent = String(formData.get("intent") || "save");
   if (!id || announcement.length < 8 || announcement.length > 1500) redirect(messageUrl("/admin", "error", "Check the announcement length and try again."));
@@ -67,8 +73,10 @@ export async function reviewQuestionAction(formData: FormData) {
   if (status === "rejected") {
     await sql`update questions set question = ${announcement}, status = 'rejected', updated_at = now() where id = ${id} and status <> 'sent'`;
   } else {
-    if (!isValidFuturePacificDate(scheduledDate)) redirect(messageUrl("/admin", "error", "Choose a valid Pacific date after today."));
-    await sql`update questions set question = ${announcement}, scheduled_date = ${scheduledDate}, status = ${status}, updated_at = now() where id = ${id} and status <> 'sent'`;
+    if (type === "announcement" && !isValidAnnouncementDate(scheduledDate)) redirect(messageUrl("/admin", "error", "Choose an announcement date whose previous-day 6 PM publishing window has not passed."));
+    if (type === "event" && !isValidFuturePacificDate(scheduledDate)) redirect(messageUrl("/admin", "error", "Choose a valid future event publish date."));
+    if (type === "event" && (eventTitle.length < 1 || eventTitle.length > 200)) redirect(messageUrl("/admin", "error", "Event titles must be between 1 and 200 characters."));
+    await sql`update questions set question = ${announcement}, scheduled_date = ${scheduledDate}, question_type = ${type}, event_title = ${type === "event" ? eventTitle : null}, status = ${status}, updated_at = now() where id = ${id} and status <> 'sent'`;
   }
   revalidatePath("/admin");
   redirect(messageUrl("/admin", "ok", status === "approved" ? "Announcement approved." : status === "rejected" ? "Announcement rejected." : "Changes saved."));
@@ -76,16 +84,20 @@ export async function reviewQuestionAction(formData: FormData) {
 
 export async function addApprovedQuestionAction(formData: FormData) {
   const session = await requireRole("admin");
+  const type: AnnouncementType = formData.get("type") === "event" ? "event" : "announcement";
   const announcement = String(formData.get("announcement") || "").trim();
+  const eventTitle = String(formData.get("eventTitle") || "").trim();
   const scheduledDate = String(formData.get("scheduledDate") || "");
   if (announcement.length < 8 || announcement.length > 1500) {
     redirect(messageUrl("/admin", "error", "Announcements must be between 8 and 1,500 characters."));
   }
-  if (!isValidFuturePacificDate(scheduledDate)) redirect(messageUrl("/admin", "error", "Choose a valid Pacific date after today."));
+  if (type === "announcement" && !isValidAnnouncementDate(scheduledDate)) redirect(messageUrl("/admin", "error", "Choose an announcement date whose previous-day 6 PM publishing window has not passed."));
+  if (type === "event" && !isValidFuturePacificDate(scheduledDate)) redirect(messageUrl("/admin", "error", "Choose a valid future event publish date."));
+  if (type === "event" && (eventTitle.length < 1 || eventTitle.length > 200)) redirect(messageUrl("/admin", "error", "Event titles must be between 1 and 200 characters."));
   const sql = await dbReady();
   await sql`
-    insert into questions (question, scheduled_date, status, submitter_ip_hash)
-    values (${announcement}, ${scheduledDate}, 'approved', ${hashAddress(`admin:${session.username}`)})
+    insert into questions (question, scheduled_date, question_type, event_title, status, submitter_ip_hash)
+    values (${announcement}, ${scheduledDate}, ${type}, ${type === "event" ? eventTitle : null}, 'approved', ${hashAddress(`admin:${session.username}`)})
   `;
   revalidatePath("/admin");
   redirect(messageUrl("/admin", "ok", "Announcement added to Approved."));
@@ -113,20 +125,24 @@ export async function deleteApprovedQuestionAction(formData: FormData) {
 
 export async function saveSettingsAction(formData: FormData) {
   await requireRole("admin");
-  const template = String(formData.get("template") || "").trim();
+  const announcementTemplate = String(formData.get("announcementTemplate") || "").trim();
+  const eventTemplate = String(formData.get("eventTemplate") || "").trim();
   const webhook = String(formData.get("webhook") || "").trim();
   const roleId = String(formData.get("roleId") || "").trim();
   const notificationWebhook = String(formData.get("notificationWebhook") || "").trim();
   const notificationUserId = String(formData.get("notificationUserId") || "").trim();
-  const templateError = validateAnnouncementTemplate(template);
-  if (templateError) redirect(messageUrl("/admin", "error", templateError));
+  const announcementTemplateError = validateAnnouncementTemplate(announcementTemplate, "announcement");
+  const eventTemplateError = validateAnnouncementTemplate(eventTemplate, "event");
+  if (announcementTemplateError) redirect(messageUrl("/admin", "error", announcementTemplateError));
+  if (eventTemplateError) redirect(messageUrl("/admin", "error", eventTemplateError));
   if (!/^\d{15,22}$/.test(roleId)) redirect(messageUrl("/admin", "error", "The announcement role ID must contain 15–22 digits."));
   if (notificationUserId && !/^\d{15,22}$/.test(notificationUserId)) redirect(messageUrl("/admin", "error", "The notification user ID must contain 15–22 digits."));
   if (webhook && !validateDiscordWebhook(webhook)) redirect(messageUrl("/admin", "error", "Enter a valid Discord webhook URL."));
   if (notificationWebhook && !validateDiscordWebhook(notificationWebhook)) redirect(messageUrl("/admin", "error", "Enter a valid notification webhook URL."));
   const sql = await dbReady();
   await sql`update settings set
-    message_template = ${template},
+    message_template = ${announcementTemplate},
+    event_message_template = ${eventTemplate},
     mention_role_id = ${roleId},
     webhook_url_encrypted = coalesce(${webhook ? encryptSecret(webhook) : null}, webhook_url_encrypted),
     notification_webhook_url_encrypted = coalesce(${notificationWebhook ? encryptSecret(notificationWebhook) : null}, notification_webhook_url_encrypted),

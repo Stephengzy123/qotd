@@ -2,7 +2,9 @@ import { dbReady } from "@/lib/db";
 import { decryptSecret } from "@/lib/security";
 
 export const DEFAULT_ANNOUNCEMENT_TEMPLATE = "# <:sgs:1372767087612657724> Announcements for {date}\n\n{announcement}\n\n-# {mention-role}";
-const ALLOWED_TEMPLATE_TOKENS = ["{date}", "{announcement}", "{mention-role}"];
+export const DEFAULT_EVENT_TEMPLATE = "# <:sgs:1372767087612657724> Announcement for {title}\n\n{announcement}\n\n-# {mention-role}";
+const COMMON_TEMPLATE_TOKENS = ["{date}", "{announcement}", "{mention-role}"];
+export type AnnouncementType = "announcement" | "event";
 
 export function pacificParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -30,6 +32,15 @@ export function isValidFuturePacificDate(value: string, now = new Date()) {
   return value > pacificParts(now).localDate;
 }
 
+export function minimumAnnouncementDate(now = new Date()) {
+  const { localDate, hour } = pacificParts(now);
+  return addDays(localDate, hour >= 18 ? 2 : 1);
+}
+
+export function isValidAnnouncementDate(value: string, now = new Date()) {
+  return isValidFuturePacificDate(value, now) && value >= minimumAnnouncementDate(now);
+}
+
 export function scheduledDateValue(value: unknown) {
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString().slice(0, 10);
   if (typeof value !== "string") return null;
@@ -49,17 +60,20 @@ export function displayScheduledDate(value: unknown) {
   }).format(new Date(`${localDate}T12:00:00Z`));
 }
 
-export function validateAnnouncementTemplate(template: string) {
+export function validateAnnouncementTemplate(template: string, type: AnnouncementType) {
   if (!template.includes("{announcement}")) return "The format must include {announcement}.";
+  if (type === "event" && !template.includes("{title}")) return "The event format must include {title}.";
   if (template.length > 500) return "Keep the format under 500 characters.";
-  const unknown = template.match(/\{[^{}]+\}/g)?.filter((token) => !ALLOWED_TEMPLATE_TOKENS.includes(token));
+  const allowedTokens = type === "event" ? [...COMMON_TEMPLATE_TOKENS, "{title}"] : COMMON_TEMPLATE_TOKENS;
+  const unknown = template.match(/\{[^{}]+\}/g)?.filter((token) => !allowedTokens.includes(token));
   return unknown?.length ? `Unknown element: ${unknown[0]}` : null;
 }
 
-export function formatAnnouncement(template: string, announcement: string, scheduledDate: string, roleId: string) {
+export function formatAnnouncement(template: string, announcement: string, scheduledDate: string, roleId: string, title?: string | null) {
   return template
     .replaceAll("{date}", displayScheduledDate(scheduledDate))
     .replaceAll("{announcement}", announcement)
+    .replaceAll("{title}", title || "")
     .replaceAll("{mention-role}", `<@&${roleId}>`)
     .slice(0, 2000);
 }
@@ -70,14 +84,14 @@ export async function sendAnnouncement(announcementId: string, mode: Mode, local
   const sql = await dbReady();
   const claimed = await sql.begin(async (tx) => {
     const announcements = await tx`
-      select id, question, scheduled_date from questions
+      select id, question, scheduled_date, question_type, event_title from questions
       where id = ${announcementId} and status = 'approved' and scheduled_date is not null
       limit 1
     `;
     const announcement = announcements[0];
     if (!announcement) return { error: "There are no approved announcements ready to send." } as const;
     const settings = (await tx`
-      select webhook_url_encrypted, mention_role_id, message_template
+      select webhook_url_encrypted, mention_role_id, message_template, event_message_template
       from settings where singleton = true
     `)[0];
     if (!settings?.webhook_url_encrypted) return { error: "Set a Discord webhook before sending." } as const;
@@ -85,8 +99,11 @@ export async function sendAnnouncement(announcementId: string, mode: Mode, local
     if (!roleId) return { error: "Set a Discord role ID before sending." } as const;
     const scheduledDate = scheduledDateValue(announcement.scheduled_date);
     if (!scheduledDate) return { error: "This announcement has an invalid posting date. Unapprove it and choose the date again." } as const;
-    const template = (settings.message_template as string) || DEFAULT_ANNOUNCEMENT_TEMPLATE;
-    const message = formatAnnouncement(template, announcement.question, scheduledDate, roleId);
+    const type = announcement.question_type === "event" ? "event" : "announcement";
+    const template = type === "event"
+      ? (settings.event_message_template as string) || DEFAULT_EVENT_TEMPLATE
+      : (settings.message_template as string) || DEFAULT_ANNOUNCEMENT_TEMPLATE;
+    const message = formatAnnouncement(template, announcement.question, scheduledDate, roleId, announcement.event_title as string | null);
     const claim = await tx`
       update questions set status = 'sent', updated_at = now()
       where id = ${announcement.id} and status = 'approved'
@@ -130,7 +147,7 @@ export async function sendAnnouncement(announcementId: string, mode: Mode, local
   return success ? { success: true, message: claimed.message } : { error: errorMessage || "Send failed." };
 }
 
-export async function sendPendingNotification(announcement: string, scheduledDate: string) {
+export async function sendPendingNotification(announcement: string, scheduledDate: string, type: AnnouncementType, title?: string | null) {
   const sql = await dbReady();
   const settings = (await sql`
     select notification_webhook_url_encrypted, notification_user_id
@@ -149,7 +166,8 @@ export async function sendPendingNotification(announcement: string, scheduledDat
       // Use the known production URL when Vercel's value is unavailable or malformed.
     }
   }
-  const content = `<@${userId}> New announcement awaiting review for ${displayScheduledDate(scheduledDate)}:\n${excerpt}\n[Review it here](${reviewUrl})`;
+  const subject = type === "event" ? `event “${title}” with a publish date of` : "announcement for";
+  const content = `<@${userId}> New ${subject} ${displayScheduledDate(scheduledDate)} is awaiting review:\n${excerpt}\n[Review it here](${reviewUrl})`;
   try {
     await fetch(decryptSecret(settings.notification_webhook_url_encrypted as string), {
       method: "POST",

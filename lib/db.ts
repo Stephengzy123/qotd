@@ -14,6 +14,8 @@ const migrations = [
         id uuid primary key default gen_random_uuid(),
         question text not null check (char_length(question) between 8 and 1500),
         scheduled_date date,
+        question_type text not null default 'announcement' check (question_type in ('announcement', 'event')),
+        event_title text check (event_title is null or char_length(event_title) between 1 and 200),
         contributor_note text check (contributor_note is null or char_length(contributor_note) <= 500),
         status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'sent')),
         submitter_ip_hash text not null,
@@ -92,6 +94,23 @@ const migrations = [
           '{announcement}' || chr(10) || chr(10) || '-# {mention-role}'`,
     ],
   },
+  {
+    version: 6,
+    statements: [
+      `alter table questions add column if not exists question_type text not null default 'announcement'`,
+      `alter table questions add column if not exists event_title text`,
+      `alter table questions drop constraint if exists questions_question_type_check`,
+      `alter table questions add constraint questions_question_type_check
+        check (question_type in ('announcement', 'event'))`,
+      `alter table questions drop constraint if exists questions_event_title_check`,
+      `alter table questions add constraint questions_event_title_check
+        check (event_title is null or char_length(event_title) between 1 and 200)`,
+      `alter table settings add column if not exists event_message_template text not null default
+        '# <:sgs:1372767087612657724> Announcement for {title}' || chr(10) || chr(10) ||
+        '{announcement}' || chr(10) || chr(10) || '-# {mention-role}'`,
+      `create index if not exists questions_type_scheduled_date_idx on questions(status, question_type, scheduled_date)`,
+    ],
+  },
 ] as const;
 
 export function db() {
@@ -134,6 +153,18 @@ async function migrateSchema() {
         exists (
           select 1 from information_schema.columns
           where table_schema = current_schema() and table_name = 'settings' and column_name = 'notification_user_id'
+        ) and
+        exists (
+          select 1 from information_schema.columns
+          where table_schema = current_schema() and table_name = 'questions' and column_name = 'question_type'
+        ) and
+        exists (
+          select 1 from information_schema.columns
+          where table_schema = current_schema() and table_name = 'questions' and column_name = 'event_title'
+        ) and
+        exists (
+          select 1 from information_schema.columns
+          where table_schema = current_schema() and table_name = 'settings' and column_name = 'event_message_template'
         ) as complete
     `)[0];
     for (const migration of migrations) {
@@ -164,6 +195,18 @@ async function coreSchemaExists() {
       exists (
         select 1 from information_schema.columns
         where table_schema = current_schema() and table_name = 'settings' and column_name = 'notification_user_id'
+      ) and
+      exists (
+        select 1 from information_schema.columns
+        where table_schema = current_schema() and table_name = 'questions' and column_name = 'question_type'
+      ) and
+      exists (
+        select 1 from information_schema.columns
+        where table_schema = current_schema() and table_name = 'questions' and column_name = 'event_title'
+      ) and
+      exists (
+        select 1 from information_schema.columns
+        where table_schema = current_schema() and table_name = 'settings' and column_name = 'event_message_template'
       ) as complete
   `;
   return Boolean(rows[0]?.complete);

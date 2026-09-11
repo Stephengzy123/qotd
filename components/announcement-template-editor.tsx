@@ -3,11 +3,20 @@
 import { useState } from "react";
 import { DiscordMarkdown } from "@/components/discord-preview";
 
-export function AnnouncementTemplateEditor({ initialTemplate, defaultTemplate }: { initialTemplate: string; defaultTemplate: string }) {
+type TemplateEditorProps = {
+  initialTemplate: string;
+  defaultTemplate: string;
+  fieldName: "announcementTemplate" | "eventTemplate";
+  label: string;
+  event?: boolean;
+};
+
+export function AnnouncementTemplateEditor({ initialTemplate, defaultTemplate, fieldName, label, event = false }: TemplateEditorProps) {
   const [template, setTemplate] = useState(initialTemplate);
   const [defaultRestored, setDefaultRestored] = useState(false);
   const preview = template
     .replaceAll("{date}", "September 11")
+    .replaceAll("{title}", "Fall Festival")
     .replaceAll("{announcement}", "Your announcement will appear here.")
     .replaceAll("{mention-role}", "<@&123456789012345678>");
 
@@ -15,12 +24,12 @@ export function AnnouncementTemplateEditor({ initialTemplate, defaultTemplate }:
     <div className="template-grid">
       <div>
         <div className="field-heading">
-          <label htmlFor="template">Message format</label>
+          <label htmlFor={fieldName}>{label}</label>
           <button type="button" className="text-button" onClick={() => { setTemplate(defaultTemplate); setDefaultRestored(true); }}>Reset to default</button>
         </div>
-        <textarea id="template" name="template" rows={8} maxLength={500} required value={template} onChange={(event) => { setTemplate(event.target.value); setDefaultRestored(false); }} />
+        <textarea id={fieldName} name={fieldName} rows={8} maxLength={500} required value={template} onChange={(changeEvent) => { setTemplate(changeEvent.target.value); setDefaultRestored(false); }} />
         {defaultRestored && <p className="inline-feedback" role="status">Default restored. Save settings to apply it.</p>}
-        <p className="hint token-help"><code>{"{date}"}</code> · <code>{"{announcement}"}</code> · <code>{"{mention-role}"}</code></p>
+        <p className="hint token-help"><code>{"{announcement}"}</code> · {event && <><code>{"{title}"}</code> · </>}<code>{"{date}"}</code> · <code>{"{mention-role}"}</code></p>
       </div>
       <div>
         <span className="label">Preview</span>
