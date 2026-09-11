@@ -111,6 +111,25 @@ const migrations = [
       `create index if not exists questions_type_scheduled_date_idx on questions(status, question_type, scheduled_date)`,
     ],
   },
+  {
+    version: 7,
+    statements: [
+      `alter table settings add column if not exists calendar_feed_url_encrypted text`,
+      `update settings
+        set message_template = '# <:sgs:1372767087612657724> Announcements for {date}' || chr(10) ||
+          '{calendar}' || chr(10) || chr(10) || '{announcement}' || chr(10) || chr(10) || '-# {mention-role}'
+        where singleton = true and message_template = '# <:sgs:1372767087612657724> Announcements for {date}' || chr(10) || chr(10) ||
+          '{announcement}' || chr(10) || chr(10) || '-# {mention-role}'`,
+    ],
+  },
+  {
+    version: 8,
+    statements: [
+      `alter table questions add column if not exists days_early integer not null default 0`,
+      `alter table questions drop constraint if exists questions_days_early_check`,
+      `alter table questions add constraint questions_days_early_check check (days_early between 0 and 365)`,
+    ],
+  },
 ] as const;
 
 export function db() {
@@ -165,6 +184,14 @@ async function migrateSchema() {
         exists (
           select 1 from information_schema.columns
           where table_schema = current_schema() and table_name = 'settings' and column_name = 'event_message_template'
+        ) and
+        exists (
+          select 1 from information_schema.columns
+          where table_schema = current_schema() and table_name = 'settings' and column_name = 'calendar_feed_url_encrypted'
+        ) and
+        exists (
+          select 1 from information_schema.columns
+          where table_schema = current_schema() and table_name = 'questions' and column_name = 'days_early'
         ) as complete
     `)[0];
     for (const migration of migrations) {
@@ -207,6 +234,14 @@ async function coreSchemaExists() {
       exists (
         select 1 from information_schema.columns
         where table_schema = current_schema() and table_name = 'settings' and column_name = 'event_message_template'
+      ) and
+      exists (
+        select 1 from information_schema.columns
+        where table_schema = current_schema() and table_name = 'settings' and column_name = 'calendar_feed_url_encrypted'
+      ) and
+      exists (
+        select 1 from information_schema.columns
+        where table_schema = current_schema() and table_name = 'questions' and column_name = 'days_early'
       ) as complete
   `;
   return Boolean(rows[0]?.complete);

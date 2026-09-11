@@ -7,6 +7,7 @@ import { clearSession, createSession, requireRole, verifyCredentials } from "@/l
 import { dbReady } from "@/lib/db";
 import { encryptSecret, hashAddress, validateDiscordWebhook } from "@/lib/security";
 import { isValidAnnouncementDate, isValidFuturePacificDate, sendAnnouncement, sendPendingNotification, validateAnnouncementTemplate, type AnnouncementType } from "@/lib/qotd";
+import { fetchCalendarByUrl, normalizeCalendarFeedUrl } from "@/lib/calendar";
 
 function messageUrl(path: string, kind: "ok" | "error", message: string) {
   return `${path}?${kind}=${encodeURIComponent(message)}`;
@@ -16,6 +17,13 @@ async function clientHash() {
   const h = await headers();
   const address = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
   return hashAddress(address);
+}
+
+function daysEarlyValue(formData: FormData) {
+  const raw = String(formData.get("daysEarly") ?? "0");
+  if (!/^\d{1,3}$/.test(raw)) return null;
+  const value = Number(raw);
+  return value >= 0 && value <= 365 ? value : null;
 }
 
 export async function loginAction(formData: FormData) {
@@ -66,6 +74,7 @@ export async function reviewQuestionAction(formData: FormData) {
   const announcement = String(formData.get("announcement") || "").trim();
   const eventTitle = String(formData.get("eventTitle") || "").trim();
   const scheduledDate = String(formData.get("scheduledDate") || "");
+  const requestedDaysEarly = daysEarlyValue(formData);
   const intent = String(formData.get("intent") || "save");
   if (!id || announcement.length < 8 || announcement.length > 1500) redirect(messageUrl("/admin", "error", "Check the announcement length and try again."));
   const status = intent === "approve" ? "approved" : intent === "reject" ? "rejected" : "pending";
@@ -73,10 +82,12 @@ export async function reviewQuestionAction(formData: FormData) {
   if (status === "rejected") {
     await sql`update questions set question = ${announcement}, status = 'rejected', updated_at = now() where id = ${id} and status <> 'sent'`;
   } else {
-    if (type === "announcement" && !isValidAnnouncementDate(scheduledDate)) redirect(messageUrl("/admin", "error", "Choose an announcement date whose previous-day 6 PM publishing window has not passed."));
+    const daysEarly = type === "announcement" ? requestedDaysEarly : 0;
+    if (daysEarly === null) redirect(messageUrl("/admin", "error", "Days early must be between 0 and 365."));
+    if (type === "announcement" && !isValidAnnouncementDate(scheduledDate, new Date(), daysEarly)) redirect(messageUrl("/admin", "error", "Choose an announcement date whose calculated 6 PM publishing window has not passed."));
     if (type === "event" && !isValidFuturePacificDate(scheduledDate)) redirect(messageUrl("/admin", "error", "Choose a valid future event publish date."));
     if (type === "event" && (eventTitle.length < 1 || eventTitle.length > 200)) redirect(messageUrl("/admin", "error", "Event titles must be between 1 and 200 characters."));
-    await sql`update questions set question = ${announcement}, scheduled_date = ${scheduledDate}, question_type = ${type}, event_title = ${type === "event" ? eventTitle : null}, status = ${status}, updated_at = now() where id = ${id} and status <> 'sent'`;
+    await sql`update questions set question = ${announcement}, scheduled_date = ${scheduledDate}, question_type = ${type}, event_title = ${type === "event" ? eventTitle : null}, days_early = ${daysEarly}, status = ${status}, updated_at = now() where id = ${id} and status <> 'sent'`;
   }
   revalidatePath("/admin");
   redirect(messageUrl("/admin", "ok", status === "approved" ? "Announcement approved." : status === "rejected" ? "Announcement rejected." : "Changes saved."));
@@ -88,16 +99,19 @@ export async function addApprovedQuestionAction(formData: FormData) {
   const announcement = String(formData.get("announcement") || "").trim();
   const eventTitle = String(formData.get("eventTitle") || "").trim();
   const scheduledDate = String(formData.get("scheduledDate") || "");
+  const requestedDaysEarly = daysEarlyValue(formData);
   if (announcement.length < 8 || announcement.length > 1500) {
     redirect(messageUrl("/admin", "error", "Announcements must be between 8 and 1,500 characters."));
   }
-  if (type === "announcement" && !isValidAnnouncementDate(scheduledDate)) redirect(messageUrl("/admin", "error", "Choose an announcement date whose previous-day 6 PM publishing window has not passed."));
+  const daysEarly = type === "announcement" ? requestedDaysEarly : 0;
+  if (daysEarly === null) redirect(messageUrl("/admin", "error", "Days early must be between 0 and 365."));
+  if (type === "announcement" && !isValidAnnouncementDate(scheduledDate, new Date(), daysEarly)) redirect(messageUrl("/admin", "error", "Choose an announcement date whose calculated 6 PM publishing window has not passed."));
   if (type === "event" && !isValidFuturePacificDate(scheduledDate)) redirect(messageUrl("/admin", "error", "Choose a valid future event publish date."));
   if (type === "event" && (eventTitle.length < 1 || eventTitle.length > 200)) redirect(messageUrl("/admin", "error", "Event titles must be between 1 and 200 characters."));
   const sql = await dbReady();
   await sql`
-    insert into questions (question, scheduled_date, question_type, event_title, status, submitter_ip_hash)
-    values (${announcement}, ${scheduledDate}, ${type}, ${type === "event" ? eventTitle : null}, 'approved', ${hashAddress(`admin:${session.username}`)})
+    insert into questions (question, scheduled_date, question_type, event_title, days_early, status, submitter_ip_hash)
+    values (${announcement}, ${scheduledDate}, ${type}, ${type === "event" ? eventTitle : null}, ${daysEarly}, 'approved', ${hashAddress(`admin:${session.username}`)})
   `;
   revalidatePath("/admin");
   redirect(messageUrl("/admin", "ok", "Announcement added to Approved."));
@@ -128,6 +142,7 @@ export async function saveSettingsAction(formData: FormData) {
   const announcementTemplate = String(formData.get("announcementTemplate") || "").trim();
   const eventTemplate = String(formData.get("eventTemplate") || "").trim();
   const webhook = String(formData.get("webhook") || "").trim();
+  const calendarFeed = String(formData.get("calendarFeed") || "").trim();
   const roleId = String(formData.get("roleId") || "").trim();
   const notificationWebhook = String(formData.get("notificationWebhook") || "").trim();
   const notificationUserId = String(formData.get("notificationUserId") || "").trim();
@@ -139,12 +154,22 @@ export async function saveSettingsAction(formData: FormData) {
   if (notificationUserId && !/^\d{15,22}$/.test(notificationUserId)) redirect(messageUrl("/admin", "error", "The notification user ID must contain 15–22 digits."));
   if (webhook && !validateDiscordWebhook(webhook)) redirect(messageUrl("/admin", "error", "Enter a valid Discord webhook URL."));
   if (notificationWebhook && !validateDiscordWebhook(notificationWebhook)) redirect(messageUrl("/admin", "error", "Enter a valid notification webhook URL."));
+  const normalizedCalendarFeed = calendarFeed ? normalizeCalendarFeedUrl(calendarFeed) : null;
+  if (calendarFeed && !normalizedCalendarFeed) redirect(messageUrl("/admin", "error", "Enter a valid HTTPS or webcal calendar feed URL."));
+  if (normalizedCalendarFeed) {
+    try {
+      await fetchCalendarByUrl(normalizedCalendarFeed);
+    } catch {
+      redirect(messageUrl("/admin", "error", "The calendar feed could not be read. Check its URL and try again."));
+    }
+  }
   const sql = await dbReady();
   await sql`update settings set
     message_template = ${announcementTemplate},
     event_message_template = ${eventTemplate},
     mention_role_id = ${roleId},
     webhook_url_encrypted = coalesce(${webhook ? encryptSecret(webhook) : null}, webhook_url_encrypted),
+    calendar_feed_url_encrypted = coalesce(${normalizedCalendarFeed ? encryptSecret(normalizedCalendarFeed) : null}, calendar_feed_url_encrypted),
     notification_webhook_url_encrypted = coalesce(${notificationWebhook ? encryptSecret(notificationWebhook) : null}, notification_webhook_url_encrypted),
     notification_user_id = ${notificationUserId || null},
     updated_at = now()

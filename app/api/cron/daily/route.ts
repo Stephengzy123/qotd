@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   const due = await sql<{ id: string }[]>`
     select id from questions
     where status = 'approved' and (
-      (question_type = 'announcement' and scheduled_date <= ${tomorrow}) or
+      (question_type = 'announcement' and scheduled_date - (days_early + 1) <= ${localDate}) or
       (question_type = 'event' and scheduled_date <= ${localDate})
     )
     order by scheduled_date asc, created_at asc

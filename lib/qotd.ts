@@ -1,7 +1,8 @@
 import { dbReady } from "@/lib/db";
 import { decryptSecret } from "@/lib/security";
+import { calendarHeading, getCalendarByDate } from "@/lib/calendar";
 
-export const DEFAULT_ANNOUNCEMENT_TEMPLATE = "# <:sgs:1372767087612657724> Announcements for {date}\n\n{announcement}\n\n-# {mention-role}";
+export const DEFAULT_ANNOUNCEMENT_TEMPLATE = "# <:sgs:1372767087612657724> Announcements for {date}\n{calendar}\n\n{announcement}\n\n-# {mention-role}";
 export const DEFAULT_EVENT_TEMPLATE = "# <:sgs:1372767087612657724> Announcement for {title}\n\n{announcement}\n\n-# {mention-role}";
 const COMMON_TEMPLATE_TOKENS = ["{date}", "{announcement}", "{mention-role}"];
 export type AnnouncementType = "announcement" | "event";
@@ -32,13 +33,14 @@ export function isValidFuturePacificDate(value: string, now = new Date()) {
   return value > pacificParts(now).localDate;
 }
 
-export function minimumAnnouncementDate(now = new Date()) {
+export function minimumAnnouncementDate(now = new Date(), daysEarly = 0) {
   const { localDate, hour } = pacificParts(now);
-  return addDays(localDate, hour >= 18 ? 2 : 1);
+  return addDays(localDate, (hour >= 18 ? 2 : 1) + daysEarly);
 }
 
-export function isValidAnnouncementDate(value: string, now = new Date()) {
-  return isValidFuturePacificDate(value, now) && value >= minimumAnnouncementDate(now);
+export function isValidAnnouncementDate(value: string, now = new Date(), daysEarly = 0) {
+  return Number.isInteger(daysEarly) && daysEarly >= 0 && daysEarly <= 365 &&
+    isValidFuturePacificDate(value, now) && value >= minimumAnnouncementDate(now, daysEarly);
 }
 
 export function scheduledDateValue(value: unknown) {
@@ -64,13 +66,17 @@ export function validateAnnouncementTemplate(template: string, type: Announcemen
   if (!template.includes("{announcement}")) return "The format must include {announcement}.";
   if (type === "event" && !template.includes("{title}")) return "The event format must include {title}.";
   if (template.length > 500) return "Keep the format under 500 characters.";
-  const allowedTokens = type === "event" ? [...COMMON_TEMPLATE_TOKENS, "{title}"] : COMMON_TEMPLATE_TOKENS;
+  const allowedTokens = type === "event" ? [...COMMON_TEMPLATE_TOKENS, "{title}"] : [...COMMON_TEMPLATE_TOKENS, "{calendar}"];
   const unknown = template.match(/\{[^{}]+\}/g)?.filter((token) => !allowedTokens.includes(token));
   return unknown?.length ? `Unknown element: ${unknown[0]}` : null;
 }
 
-export function formatAnnouncement(template: string, announcement: string, scheduledDate: string, roleId: string, title?: string | null) {
-  return template
+export function formatAnnouncement(template: string, announcement: string, scheduledDate: string, roleId: string, title?: string | null, calendar = "") {
+  const calendarApplied = template.split("\n").flatMap((line) => {
+    if (line.trim() === "{calendar}") return calendar ? [line.replace("{calendar}", calendar)] : [];
+    return [line.replaceAll("{calendar}", calendar)];
+  }).join("\n");
+  return calendarApplied
     .replaceAll("{date}", displayScheduledDate(scheduledDate))
     .replaceAll("{announcement}", announcement)
     .replaceAll("{title}", title || "")
@@ -82,28 +88,36 @@ type Mode = "scheduled" | "manual_selected";
 
 export async function sendAnnouncement(announcementId: string, mode: Mode, localDate?: string) {
   const sql = await dbReady();
-  const claimed = await sql.begin(async (tx) => {
-    const announcements = await tx`
+  const announcements = await sql`
       select id, question, scheduled_date, question_type, event_title from questions
       where id = ${announcementId} and status = 'approved' and scheduled_date is not null
       limit 1
     `;
-    const announcement = announcements[0];
-    if (!announcement) return { error: "There are no approved announcements ready to send." } as const;
-    const settings = (await tx`
-      select webhook_url_encrypted, mention_role_id, message_template, event_message_template
+  const announcement = announcements[0];
+  if (!announcement) return { error: "There are no approved announcements ready to send." } as const;
+  const settings = (await sql`
+      select webhook_url_encrypted, mention_role_id, message_template, event_message_template, calendar_feed_url_encrypted
       from settings where singleton = true
     `)[0];
-    if (!settings?.webhook_url_encrypted) return { error: "Set a Discord webhook before sending." } as const;
-    const roleId = settings.mention_role_id as string | null;
-    if (!roleId) return { error: "Set a Discord role ID before sending." } as const;
-    const scheduledDate = scheduledDateValue(announcement.scheduled_date);
-    if (!scheduledDate) return { error: "This announcement has an invalid posting date. Unapprove it and choose the date again." } as const;
-    const type = announcement.question_type === "event" ? "event" : "announcement";
-    const template = type === "event"
-      ? (settings.event_message_template as string) || DEFAULT_EVENT_TEMPLATE
-      : (settings.message_template as string) || DEFAULT_ANNOUNCEMENT_TEMPLATE;
-    const message = formatAnnouncement(template, announcement.question, scheduledDate, roleId, announcement.event_title as string | null);
+  if (!settings?.webhook_url_encrypted) return { error: "Set a Discord webhook before sending." } as const;
+  const roleId = settings.mention_role_id as string | null;
+  if (!roleId) return { error: "Set a Discord role ID before sending." } as const;
+  const scheduledDate = scheduledDateValue(announcement.scheduled_date);
+  if (!scheduledDate) return { error: "This announcement has an invalid posting date. Unapprove it and choose the date again." } as const;
+  const type = announcement.question_type === "event" ? "event" : "announcement";
+  const template = type === "event"
+    ? (settings.event_message_template as string) || DEFAULT_EVENT_TEMPLATE
+    : (settings.message_template as string) || DEFAULT_ANNOUNCEMENT_TEMPLATE;
+  let calendar = "";
+  if (type === "announcement" && settings.calendar_feed_url_encrypted) {
+    try {
+      calendar = calendarHeading(await getCalendarByDate(settings.calendar_feed_url_encrypted as string, scheduledDate));
+    } catch {
+      // A calendar outage must not prevent an approved announcement from being sent.
+    }
+  }
+  const message = formatAnnouncement(template, announcement.question, scheduledDate, roleId, announcement.event_title as string | null, calendar);
+  const claimed = await sql.begin(async (tx) => {
     const claim = await tx`
       update questions set status = 'sent', updated_at = now()
       where id = ${announcement.id} and status = 'approved'
@@ -115,17 +129,17 @@ export async function sendAnnouncement(announcementId: string, mode: Mode, local
       values (${announcement.id}, ${localDate || null}, ${mode}, ${message}, false)
       returning id
     `;
-    return { dispatchId: rows[0].id as string, announcement, message, roleId, encryptedUrl: settings.webhook_url_encrypted as string } as const;
+    return { dispatchId: rows[0].id as string } as const;
   });
 
   if ("error" in claimed) return claimed;
   let responseStatus: number | null = null;
   let errorMessage: string | null = null;
   try {
-    const response = await fetch(decryptSecret(claimed.encryptedUrl), {
+    const response = await fetch(decryptSecret(settings.webhook_url_encrypted as string), {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ content: claimed.message, allowed_mentions: { parse: [], roles: [claimed.roleId] } }),
+      body: JSON.stringify({ content: message, allowed_mentions: { parse: [], roles: [roleId] } }),
       redirect: "manual",
       signal: AbortSignal.timeout(10_000),
     });
@@ -139,12 +153,12 @@ export async function sendAnnouncement(announcementId: string, mode: Mode, local
   await sql.begin(async (tx) => {
     await tx`update dispatches set success = ${success}, response_status = ${responseStatus}, error = ${errorMessage} where id = ${claimed.dispatchId}`;
     if (success) {
-      await tx`update questions set sent_at = now(), updated_at = now() where id = ${claimed.announcement.id} and status = 'sent'`;
+      await tx`update questions set sent_at = now(), updated_at = now() where id = ${announcement.id} and status = 'sent'`;
     } else {
-      await tx`update questions set status = 'approved', updated_at = now() where id = ${claimed.announcement.id} and status = 'sent' and sent_at is null`;
+      await tx`update questions set status = 'approved', updated_at = now() where id = ${announcement.id} and status = 'sent' and sent_at is null`;
     }
   });
-  return success ? { success: true, message: claimed.message } : { error: errorMessage || "Send failed." };
+  return success ? { success: true, message } : { error: errorMessage || "Send failed." };
 }
 
 export async function sendPendingNotification(announcement: string, scheduledDate: string, type: AnnouncementType, title?: string | null) {

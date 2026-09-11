@@ -1,6 +1,6 @@
 # Announcement Handler
 
-A Next.js app for collecting, reviewing, and scheduling Discord announcements and events. Contributors preview Discord Markdown, while admins approve entries, customize both message formats, and configure the delivery and review-notification webhooks.
+A Next.js app for collecting, reviewing, and scheduling Discord announcements and events. Contributors preview Discord Markdown and matching all-day calendar entries, while admins approve entries, customize both message formats, and configure delivery.
 
 ## Set up Neon
 
@@ -34,6 +34,10 @@ Import the `announcement-bot` branch as a separate Vercel project and add the en
 - An **Announcement date** is the date the message is for. It publishes the previous day during the 6 PM Pacific hour.
 - An **Event publish date** is the day its message publishes during the 6 PM Pacific hour. It does not need to match the date of the event.
 
+Admins can add per-announcement lead time. `0` days early keeps the normal previous-evening send; `1` sends two evenings before the Announcement date, and so on. The admin page displays the calculated send date before approval.
+
 Overdue approved entries are included in the next run so a missed invocation does not silently discard them.
 
 Configure both encrypted webhooks and the Discord IDs from the admin page. The notification webhook is optional and pings the configured user whenever a contributor submission enters Pending.
+
+An optional `webcal://` or HTTPS iCalendar feed can also be saved from the admin page. Its URL is encrypted with `WEBHOOK_ENCRYPTION_KEY`. For regular announcements, `{calendar}` expands to one `## Event title` line for every all-day calendar event on the Announcement date. It disappears when that date has no matching event and is ignored by Event mode.

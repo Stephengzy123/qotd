@@ -16,6 +16,7 @@ export function AnnouncementTemplateEditor({ initialTemplate, defaultTemplate, f
   const [defaultRestored, setDefaultRestored] = useState(false);
   const preview = template
     .replaceAll("{date}", "September 11")
+    .replaceAll("{calendar}", event ? "" : "## Day 2 (EFGH)")
     .replaceAll("{title}", "Fall Festival")
     .replaceAll("{announcement}", "Your announcement will appear here.")
     .replaceAll("{mention-role}", "<@&123456789012345678>");
@@ -29,7 +30,7 @@ export function AnnouncementTemplateEditor({ initialTemplate, defaultTemplate, f
         </div>
         <textarea id={fieldName} name={fieldName} rows={8} maxLength={500} required value={template} onChange={(changeEvent) => { setTemplate(changeEvent.target.value); setDefaultRestored(false); }} />
         {defaultRestored && <p className="inline-feedback" role="status">Default restored. Save settings to apply it.</p>}
-        <p className="hint token-help"><code>{"{announcement}"}</code> · {event && <><code>{"{title}"}</code> · </>}<code>{"{date}"}</code> · <code>{"{mention-role}"}</code></p>
+        <p className="hint token-help"><code>{"{announcement}"}</code> · {event ? <><code>{"{title}"}</code> · </> : <><code>{"{calendar}"}</code> · </>}<code>{"{date}"}</code> · <code>{"{mention-role}"}</code></p>
       </div>
       <div>
         <span className="label">Preview</span>

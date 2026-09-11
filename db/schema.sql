@@ -11,6 +11,7 @@ create table if not exists questions (
   scheduled_date date,
   question_type text not null default 'announcement' check (question_type in ('announcement', 'event')),
   event_title text check (event_title is null or char_length(event_title) between 1 and 200),
+  days_early integer not null default 0 check (days_early between 0 and 365),
   contributor_note text check (contributor_note is null or char_length(contributor_note) <= 500),
   status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'sent')),
   submitter_ip_hash text not null,
@@ -27,8 +28,9 @@ create table if not exists settings (
   webhook_url_encrypted text,
   mention_role_id text check (mention_role_id is null or mention_role_id ~ '^[0-9]{15,22}$'),
   next_number integer not null default 1 check (next_number > 0),
-  message_template text not null default '# <:sgs:1372767087612657724> Announcements for {date}\n\n{announcement}\n\n-# {mention-role}',
+  message_template text not null default '# <:sgs:1372767087612657724> Announcements for {date}\n{calendar}\n\n{announcement}\n\n-# {mention-role}',
   event_message_template text not null default '# <:sgs:1372767087612657724> Announcement for {title}\n\n{announcement}\n\n-# {mention-role}',
+  calendar_feed_url_encrypted text,
   notification_webhook_url_encrypted text,
   notification_user_id text check (notification_user_id is null or notification_user_id ~ '^[0-9]{15,22}$'),
   updated_at timestamptz not null default now()
