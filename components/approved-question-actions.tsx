@@ -14,7 +14,7 @@ export function ApprovedQuestionActions({ id, question }: { id: string; question
         <button className="send-button">Unapprove</button>
       </form>
       <form action={deleteApprovedQuestionAction} onSubmit={(event) => {
-        if (!window.confirm("Permanently delete this question?")) event.preventDefault();
+        if (!window.confirm("Permanently delete this announcement?")) event.preventDefault();
       }}>
         <input type="hidden" name="id" value={id} />
         <button className="send-button delete-link">Delete</button>

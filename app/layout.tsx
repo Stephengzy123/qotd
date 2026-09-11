@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "QoTD Handler",
-  description: "Collect, review, and deliver your community’s question of the day.",
+  title: "Announcement Handler",
+  description: "Collect, review, and schedule Discord announcements.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

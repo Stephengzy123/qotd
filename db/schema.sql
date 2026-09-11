@@ -7,7 +7,8 @@ create table if not exists qotd_schema_migrations (
 
 create table if not exists questions (
   id uuid primary key default gen_random_uuid(),
-  question text not null check (char_length(question) between 8 and 500),
+  question text not null check (char_length(question) between 8 and 1500),
+  scheduled_date date,
   contributor_note text check (contributor_note is null or char_length(contributor_note) <= 500),
   status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'sent')),
   submitter_ip_hash text not null,
@@ -24,7 +25,9 @@ create table if not exists settings (
   webhook_url_encrypted text,
   mention_role_id text check (mention_role_id is null or mention_role_id ~ '^[0-9]{15,22}$'),
   next_number integer not null default 1 check (next_number > 0),
-  message_template text not null default '**Question of the Day — {date}**\n\n{question}',
+  message_template text not null default '# Announcements for {date}\n\n{announcement}\n\n-# {mention-role}',
+  notification_webhook_url_encrypted text,
+  notification_user_id text check (notification_user_id is null or notification_user_id ~ '^[0-9]{15,22}$'),
   updated_at timestamptz not null default now()
 );
 
@@ -42,5 +45,4 @@ create table if not exists dispatches (
   created_at timestamptz not null default now()
 );
 
-create unique index if not exists dispatches_one_scheduled_per_day
-  on dispatches(local_date) where mode = 'scheduled';
+create index if not exists questions_scheduled_date_idx on questions(status, scheduled_date);

@@ -12,7 +12,8 @@ const migrations = [
       `create extension if not exists pgcrypto`,
       `create table if not exists questions (
         id uuid primary key default gen_random_uuid(),
-        question text not null check (char_length(question) between 8 and 500),
+        question text not null check (char_length(question) between 8 and 1500),
+        scheduled_date date,
         contributor_note text check (contributor_note is null or char_length(contributor_note) <= 500),
         status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'sent')),
         submitter_ip_hash text not null,
@@ -63,6 +64,22 @@ const migrations = [
         check (next_number > 0)`,
       `update settings
         set next_number = greatest(1, (select count(*)::integer + 1 from dispatches where success = true))`,
+    ],
+  },
+  {
+    version: 4,
+    statements: [
+      `alter table questions add column if not exists scheduled_date date`,
+      `alter table questions drop constraint if exists questions_question_check`,
+      `alter table questions add constraint questions_question_check
+        check (char_length(question) between 8 and 1500)`,
+      `alter table settings add column if not exists notification_webhook_url_encrypted text`,
+      `alter table settings add column if not exists notification_user_id text
+        check (notification_user_id is null or notification_user_id ~ '^[0-9]{15,22}$')`,
+      `drop index if exists dispatches_one_scheduled_per_day`,
+      `create index if not exists questions_scheduled_date_idx on questions(status, scheduled_date)`,
+      `update settings set message_template = '# Announcements for {date}' || chr(10) || chr(10) ||
+        '{announcement}' || chr(10) || chr(10) || '-# {mention-role}' where singleton = true`,
     ],
   },
 ] as const;

@@ -1,5 +1,5 @@
 {
-  "name": "qotd-handler",
+  "name": "announcement-handler",
   "version": "1.0.0",
   "private": true,
   "scripts": {

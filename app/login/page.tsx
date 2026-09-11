@@ -10,7 +10,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <main className="login-shell">
       <section className="login-card">
-        <h1>QoTD login</h1>
+        <h1>Announcement login</h1>
         <Notice error={params.error} />
         <form action={loginAction} className="stack">
           <div><label htmlFor="username">Username</label><input id="username" name="username" autoComplete="username" required /></div>

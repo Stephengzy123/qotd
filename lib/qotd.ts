@@ -1,8 +1,7 @@
 import { dbReady } from "@/lib/db";
 import { decryptSecret } from "@/lib/security";
 
-export const DEFAULT_TEMPLATE = "**Question of the Day — {date}**\n\n{question}";
-export const ALLOWED_TOKENS = ["{date}", "{question}", "{number}", "{mention-role}"];
+export const FIXED_ANNOUNCEMENT_FORMAT = "# Announcements for {date}\n\n{announcement}\n\n-# {mention-role}";
 
 export function pacificParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -13,63 +12,73 @@ export function pacificParts(date = new Date()) {
     hour: "2-digit",
     hourCycle: "h23",
   }).formatToParts(date);
-  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value || "";
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value || "";
   return { localDate: `${get("year")}-${get("month")}-${get("day")}`, hour: Number(get("hour")) };
 }
 
-export function formatMessage(template: string, question: string, number?: number, roleId?: string | null, date = new Date()) {
-  const displayDate = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
+export function addDays(localDate: string, days: number) {
+  const date = new Date(`${localDate}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+export function isValidFuturePacificDate(value: string, now = new Date()) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T12:00:00Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) return false;
+  return value > pacificParts(now).localDate;
+}
+
+export function displayScheduledDate(value: string | Date) {
+  const localDate = value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10);
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
     weekday: "long",
     year: "numeric",
     month: "long",
     day: "numeric",
-  }).format(date);
-  return template
-    .replaceAll("{date}", displayDate)
-    .replaceAll("{question}", question)
-    .replaceAll("{number}", number ? String(number) : "—")
-    .replaceAll("{mention-role}", roleId ? `<@&${roleId}>` : "")
-    .slice(0, 2000);
+  }).format(new Date(`${localDate}T12:00:00Z`));
 }
 
-export function validateTemplate(template: string, roleId?: string) {
-  if (!template.includes("{question}")) return "The template must include {question}.";
-  if (template.length > 1800) return "Keep the template under 1,800 characters.";
-  if (roleId && !/^\d{15,22}$/.test(roleId)) return "The Discord role ID must contain 15–22 digits.";
-  if (template.includes("{mention-role}") && !roleId) return "Set a role ID before using {mention-role}.";
-  const unknown = template.match(/\{[^{}]+\}/g)?.filter((token) => !ALLOWED_TOKENS.includes(token));
-  return unknown?.length ? `Unknown element: ${unknown[0]}` : null;
+export function formatAnnouncement(announcement: string, scheduledDate: string, roleId: string) {
+  return FIXED_ANNOUNCEMENT_FORMAT
+    .replace("{date}", displayScheduledDate(scheduledDate))
+    .replace("{announcement}", announcement)
+    .replace("{mention-role}", `<@&${roleId}>`)
+    .slice(0, 2000);
 }
 
 type Mode = "scheduled" | "manual_random" | "manual_selected";
 
-export async function sendQuestion(questionId: string | null, mode: Mode, localDate?: string) {
+export async function sendAnnouncement(announcementId: string | null, mode: Mode, localDate?: string) {
   const sql = await dbReady();
   const claimed = await sql.begin(async (tx) => {
-    const questions = questionId
-      ? await tx`select id, question from questions where id = ${questionId} and status = 'approved' limit 1`
-      : await tx`select id, question from questions where status = 'approved' order by random() limit 1`;
-    const question = questions[0];
-    if (!question) return { error: "There are no approved questions ready to send." } as const;
+    const announcements = announcementId
+      ? await tx`select id, question, scheduled_date from questions where id = ${announcementId} and status = 'approved' and scheduled_date is not null limit 1`
+      : await tx`select id, question, scheduled_date from questions where status = 'approved' and scheduled_date is not null order by random() limit 1`;
+    const announcement = announcements[0];
+    if (!announcement) return { error: "There are no approved announcements ready to send." } as const;
     const settings = (await tx`
-      select webhook_url_encrypted, message_template, mention_role_id, next_number
+      select webhook_url_encrypted, mention_role_id
       from settings where singleton = true
-      for update
     `)[0];
     if (!settings?.webhook_url_encrypted) return { error: "Set a Discord webhook before sending." } as const;
-    const count = Number(settings.next_number) || 1;
     const roleId = settings.mention_role_id as string | null;
-    const message = formatMessage(settings.message_template || DEFAULT_TEMPLATE, question.question, count, roleId);
-    const rows = await tx`
-      insert into dispatches (question_id, local_date, mode, message, success)
-      values (${question.id}, ${localDate || null}, ${mode}, ${message}, false)
-      on conflict do nothing
+    if (!roleId) return { error: "Set a Discord role ID before sending." } as const;
+    const scheduledDate = String(announcement.scheduled_date).slice(0, 10);
+    const message = formatAnnouncement(announcement.question, scheduledDate, roleId);
+    const claim = await tx`
+      update questions set status = 'sent', updated_at = now()
+      where id = ${announcement.id} and status = 'approved'
       returning id
     `;
-    if (!rows[0]) return { error: "Today’s scheduled question was already handled." } as const;
-    await tx`update settings set next_number = ${count + 1} where singleton = true`;
-    return { dispatchId: rows[0].id as string, question, message, number: count, roleId, encryptedUrl: settings.webhook_url_encrypted as string } as const;
+    if (!claim[0]) return { error: "That announcement is already being handled." } as const;
+    const rows = await tx`
+      insert into dispatches (question_id, local_date, mode, message, success)
+      values (${announcement.id}, ${localDate || null}, ${mode}, ${message}, false)
+      returning id
+    `;
+    return { dispatchId: rows[0].id as string, announcement, message, roleId, encryptedUrl: settings.webhook_url_encrypted as string } as const;
   });
 
   if ("error" in claimed) return claimed;
@@ -79,7 +88,7 @@ export async function sendQuestion(questionId: string | null, mode: Mode, localD
     const response = await fetch(decryptSecret(claimed.encryptedUrl), {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ content: claimed.message, allowed_mentions: { parse: [], roles: claimed.roleId ? [claimed.roleId] : [] } }),
+      body: JSON.stringify({ content: claimed.message, allowed_mentions: { parse: [], roles: [claimed.roleId] } }),
       redirect: "manual",
       signal: AbortSignal.timeout(10_000),
     });
@@ -93,10 +102,33 @@ export async function sendQuestion(questionId: string | null, mode: Mode, localD
   await sql.begin(async (tx) => {
     await tx`update dispatches set success = ${success}, response_status = ${responseStatus}, error = ${errorMessage} where id = ${claimed.dispatchId}`;
     if (success) {
-      await tx`update questions set status = 'sent', sent_at = now(), updated_at = now() where id = ${claimed.question.id}`;
+      await tx`update questions set sent_at = now(), updated_at = now() where id = ${claimed.announcement.id} and status = 'sent'`;
     } else {
-      await tx`update settings set next_number = ${claimed.number} where singleton = true and next_number = ${claimed.number + 1}`;
+      await tx`update questions set status = 'approved', updated_at = now() where id = ${claimed.announcement.id} and status = 'sent' and sent_at is null`;
     }
   });
   return success ? { success: true, message: claimed.message } : { error: errorMessage || "Send failed." };
+}
+
+export async function sendPendingNotification(announcement: string, scheduledDate: string) {
+  const sql = await dbReady();
+  const settings = (await sql`
+    select notification_webhook_url_encrypted, notification_user_id
+    from settings where singleton = true
+  `)[0];
+  if (!settings?.notification_webhook_url_encrypted || !settings.notification_user_id) return;
+  const userId = settings.notification_user_id as string;
+  const excerpt = announcement.length > 180 ? `${announcement.slice(0, 177)}...` : announcement;
+  const content = `<@${userId}> New announcement awaiting review for ${displayScheduledDate(scheduledDate)}:\n${excerpt}`;
+  try {
+    await fetch(decryptSecret(settings.notification_webhook_url_encrypted as string), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content, allowed_mentions: { parse: [], users: [userId] } }),
+      redirect: "manual",
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    // Notification delivery must never discard a successfully saved submission.
+  }
 }
