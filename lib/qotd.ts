@@ -139,7 +139,17 @@ export async function sendPendingNotification(announcement: string, scheduledDat
   if (!settings?.notification_webhook_url_encrypted || !settings.notification_user_id) return;
   const userId = settings.notification_user_id as string;
   const excerpt = announcement.length > 180 ? `${announcement.slice(0, 177)}...` : announcement;
-  const content = `<@${userId}> New announcement awaiting review for ${displayScheduledDate(scheduledDate)}:\n${excerpt}`;
+  const projectHost = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  let reviewUrl = "https://announcement-bot.vercel.app/admin#inbox";
+  if (projectHost) {
+    try {
+      const productionUrl = new URL(projectHost.startsWith("http") ? projectHost : `https://${projectHost}`);
+      if (productionUrl.protocol === "https:") reviewUrl = `${productionUrl.origin}/admin#inbox`;
+    } catch {
+      // Use the known production URL when Vercel's value is unavailable or malformed.
+    }
+  }
+  const content = `<@${userId}> New announcement awaiting review for ${displayScheduledDate(scheduledDate)}:\n${excerpt}\n[Review it here](${reviewUrl})`;
   try {
     await fetch(decryptSecret(settings.notification_webhook_url_encrypted as string), {
       method: "POST",
