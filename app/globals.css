@@ -80,6 +80,9 @@ input:focus, select:focus, textarea:focus { border-color: #666; box-shadow: 0 0 
 .notice { margin: 0 0 1rem; padding: .7rem .8rem; border: 1px solid; border-radius: 5px; }
 .notice-ok { color: var(--success); background: #edf8f2; border-color: #badfcf; }
 .notice-error { color: var(--danger); background: #fff0f0; border-color: #e7bcbc; }
+.notice-toast { position: fixed; z-index: 1000; top: 1rem; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 2rem); display: flex; align-items: center; gap: 1rem; box-shadow: 0 4px 20px #0002; }
+.notice-toast span { overflow-wrap: anywhere; }
+.notice-toast button { flex-shrink: 0; }
 
 .panel, .question-card, .approved-list, .activity-list, .empty-state, .stats > div {
   background: var(--surface);
@@ -174,7 +177,16 @@ input:focus, select:focus, textarea:focus { border-color: #666; box-shadow: 0 0 
 .activity-dot { width: 8px; height: 8px; margin-top: .45rem; border-radius: 50%; }
 .activity-dot.success { background: var(--success); }
 .activity-dot.failed { background: var(--danger); }
-.activity-list p { margin: .1rem 0 0; max-width: 680px; overflow: hidden; color: var(--muted); font-size: .82rem; text-overflow: ellipsis; white-space: nowrap; }
+.activity-list p { margin: .1rem 0 0; color: var(--muted); font-size: .82rem; }
+.approved-row > div, .activity-list > div > div { min-width: 0; }
+.message-excerpt { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .85rem; line-height: 1.45; }
+.queued-actions, .recent-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .35rem; }
+.recent-actions { flex-direction: column; align-items: flex-end; }
+.message-dialog { width: min(720px, calc(100% - 2rem)); max-height: 85dvh; overflow-y: auto; padding: 1.25rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); box-shadow: 0 12px 48px #0004; }
+.message-dialog::backdrop { background: #0008; }
+.message-dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.activity-list .message-dialog .discord-preview { font-size: 1rem; }
+.activity-list p.send-error { color: var(--danger); }
 .activity-list time { color: var(--muted); font-size: .75rem; }
 
 @media (max-width: 700px) {
@@ -185,6 +197,7 @@ input:focus, select:focus, textarea:focus { border-color: #666; box-shadow: 0 0 
   .approved-row { grid-template-columns: 26px 1fr; }
   .approved-row form { grid-column: 2; }
   .approved-actions { grid-column: 2; flex-wrap: wrap; }
+  .queued-actions, .recent-actions { grid-column: 2; }
   .approved-actions form { grid-column: auto; }
   .form-footer { align-items: stretch; flex-direction: column; }
   .form-footer button { width: 100%; }
