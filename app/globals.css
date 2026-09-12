@@ -106,7 +106,7 @@ input:focus, select:focus, textarea:focus { border-color: #666; box-shadow: 0 0 
 .status.ready { color: var(--success); background: #e3f4ec; }
 .status.pending { color: #795400; background: #fff2cf; }
 
-.question-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: .75rem; }
+.question-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: .75rem; }
 .question-card { padding: 1rem; }
 .question-meta { margin-bottom: .6rem; color: var(--muted); font-size: .75rem; }
 .question-card textarea { line-height: 1.45; }
