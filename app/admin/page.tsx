@@ -2,6 +2,7 @@ import { addApprovedQuestionAction, logoutAction, reviewQuestionAction, saveSett
 import { requireRole } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
 import { addDays, DEFAULT_ANNOUNCEMENT_TEMPLATE, DEFAULT_EVENT_TEMPLATE, displayScheduledDate, minimumAnnouncementDate, pacificParts, scheduledDateValue } from "@/lib/qotd";
+import { ScheduledDeliveryCheck } from "@/components/scheduled-delivery-check";
 import { Notice } from "@/components/notice";
 import { ApprovedQuestionActions } from "@/components/approved-question-actions";
 import { AnnouncementTemplateEditor } from "@/components/announcement-template-editor";
@@ -40,6 +41,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   return (
     <main className="app-shell">
+      <ScheduledDeliveryCheck />
       <header className="topbar"><strong>Announcement admin</strong><nav><a href="#inbox">Pending</a><a href="#approved">Approved</a><a href="#delivery">Settings</a></nav><div className="account"><span>{session.username}</span><form action={logoutAction}><PendingButton className="text-button" pendingText="Signing out…">Sign out</PendingButton></form></div></header>
       <section className="admin-heading"><div><h1>Announcements</h1><p>Daily announcements publish the previous evening; events publish on their selected publish date, during the 6 PM Pacific hour.</p></div></section>
       <Notice ok={params.ok} error={params.error} />

@@ -1,5 +1,6 @@
 import { logoutAction, submitQuestionAction } from "@/app/actions";
 import { requireRole } from "@/lib/auth";
+import { ScheduledDeliveryCheck } from "@/components/scheduled-delivery-check";
 import { Notice } from "@/components/notice";
 import { AnnouncementComposer } from "@/components/announcement-composer";
 import { dbReady } from "@/lib/db";
@@ -17,6 +18,7 @@ export default async function ContributePage({ searchParams }: { searchParams: P
   const eventTemplate = (settings?.event_message_template as string) || DEFAULT_EVENT_TEMPLATE;
   return (
     <main className="app-shell">
+      <ScheduledDeliveryCheck />
       <header className="topbar"><strong>Announcements</strong><div className="account"><span>{session.username}</span><form action={logoutAction}><PendingButton className="text-button" pendingText="Signing out…">Sign out</PendingButton></form></div></header>
       <section className="page-heading"><h1>Submit an announcement</h1></section>
       <Notice ok={params.ok} error={params.error} />
