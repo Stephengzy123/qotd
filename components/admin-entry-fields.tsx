@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AnnouncementPreview } from "@/components/announcement-preview";
+import { MarkdownEditor } from "@/components/markdown-editor";
 import type { AnnouncementType } from "@/lib/qotd";
 
 type AdminEntryFieldsProps = {
@@ -43,7 +44,7 @@ export function AdminEntryFields({ idPrefix, announcementMinimumDate, eventMinim
       <div><label htmlFor={`${idPrefix}-date`}>{type === "event" ? "Event publish date" : "Announcement date"}</label><input id={`${idPrefix}-date`} name="scheduledDate" type="date" min={minimumDate} value={scheduledDate} onChange={(event) => setScheduledDate(event.target.value)} required /><p className="hint">{type === "event" ? "Published during the 6 PM Pacific hour on this date. This does not need to be the date of the event." : "The date this announcement is for. Published the previous day during the 6 PM Pacific hour."}</p></div>
       {publishDate && <p className="inline-feedback" role="status">Calculated send: {displayDate(publishDate)} during the 6 PM Pacific hour.</p>}
       <div className="template-grid">
-        <div><label htmlFor={`${idPrefix}-announcement`}>Announcement</label><textarea id={`${idPrefix}-announcement`} name="announcement" value={announcement} onChange={(event) => setAnnouncement(event.target.value)} rows={10} minLength={8} maxLength={1500} required /></div>
+        <MarkdownEditor id={`${idPrefix}-announcement`} name="announcement" value={announcement} onChange={setAnnouncement} minLength={8} maxLength={1500} required />
         <AnnouncementPreview type={type} announcement={announcement} eventTitle={eventTitle} scheduledDate={scheduledDate} announcementTemplate={announcementTemplate} eventTemplate={eventTemplate} />
       </div>
     </div>

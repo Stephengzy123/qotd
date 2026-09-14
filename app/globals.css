@@ -207,3 +207,13 @@ input:focus, select:focus, textarea:focus { border-color: #666; box-shadow: 0 0 
   .activity-list > div { grid-template-columns: 10px 1fr; }
   .activity-list time { grid-column: 2; }
 }
+
+.markdown-editor textarea { border-top-left-radius: 0; border-top-right-radius: 0; }
+.format-toolbar { display: flex; flex-wrap: wrap; gap: 2px; padding: .3rem; border: 1px solid var(--border); border-bottom: 0; border-radius: 5px 5px 0 0; background: #f6f6f6; }
+.format-toolbar button { min-width: 2rem; height: 1.85rem; padding: 0 .45rem; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--text); font-size: .8rem; cursor: pointer; }
+.format-toolbar button:hover { border-color: var(--border); background: white; }
+.format-toolbar button:focus-visible { outline: 2px solid #666; outline-offset: 1px; }
+.format-toolbar .tool-bold { font-weight: 800; }
+.format-toolbar .tool-italic { font-style: italic; }
+.format-toolbar .tool-underline { text-decoration: underline; }
+.format-toolbar .tool-strike { text-decoration: line-through; }
