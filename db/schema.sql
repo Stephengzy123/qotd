@@ -51,3 +51,26 @@ create table if not exists dispatches (
 );
 
 create index if not exists questions_scheduled_date_idx on questions(status, scheduled_date);
+
+create table if not exists accounts (
+  id uuid primary key default gen_random_uuid(),
+  username text not null check (char_length(username) between 2 and 64),
+  password_hash text not null,
+  role text not null check (role in ('contributor', 'admin')),
+  created_by text,
+  created_at timestamptz not null default now()
+);
+
+create unique index if not exists accounts_username_lower_idx on accounts(lower(username));
+
+create table if not exists activity_log (
+  id uuid primary key default gen_random_uuid(),
+  action text not null,
+  actor text,
+  actor_role text,
+  success boolean not null default true,
+  details jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists activity_log_created_idx on activity_log(created_at desc);

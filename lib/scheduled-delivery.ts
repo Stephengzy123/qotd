@@ -1,9 +1,10 @@
 import "server-only";
 import { dbReady } from "@/lib/db";
 import { addDays, pacificParts, sendAnnouncement } from "@/lib/qotd";
+import { logEvent } from "@/lib/log";
 
 // Both entry points share eligibility and the atomic claim in sendAnnouncement.
-export async function sendDueAnnouncements(now = new Date()) {
+export async function sendDueAnnouncements(now = new Date(), trigger: "cron" | "page_load" = "cron") {
   const { localDate, hour } = pacificParts(now);
   if (hour !== 18) return { success: true, skipped: true, sent: 0, failures: [] as string[], reason: "Not the 6 PM Pacific hour", localDate, hour };
   const tomorrow = addDays(localDate, 1);
@@ -23,5 +24,6 @@ export async function sendDueAnnouncements(now = new Date()) {
     if ("error" in result) failures.push(result.error || "Scheduled delivery failed.");
     else sent += 1;
   }
+  await logEvent({ action: "scheduled_delivery_run", actor: trigger, role: "system", success: failures.length === 0, details: { localDate, due: due.length, sent, failures } });
   return { success: failures.length === 0, localDate, tomorrow, sent, failures };
 }

@@ -1,4 +1,5 @@
-import { addApprovedQuestionAction, logoutAction, reviewQuestionAction, saveSettingsAction, sendQuestionAction } from "@/app/actions";
+import { addApprovedQuestionAction, createAccountAction, deleteAccountAction, logoutAction, reviewQuestionAction, saveSettingsAction, sendQuestionAction } from "@/app/actions";
+import { listAccounts } from "@/lib/accounts";
 import { requireRole } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
 import { addDays, DEFAULT_ANNOUNCEMENT_TEMPLATE, DEFAULT_EVENT_TEMPLATE, displayScheduledDate, minimumAnnouncementDate, pacificParts, scheduledDateValue } from "@/lib/qotd";
@@ -16,6 +17,15 @@ import { WebhookProfile } from "@/components/webhook-profile";
 
 type Announcement = { id: string; question: string; contributor_note: string | null; status: string; created_at: Date; scheduled_date: string | Date | null; question_type: "announcement" | "event"; event_title: string | null; days_early: number };
 type Dispatch = { id: string; message: string; success: boolean; mode: string; created_at: Date; error: string | null };
+type ActivityEntry = { id: string; action: string; actor: string | null; actor_role: string | null; success: boolean; details: Record<string, unknown> | null; created_at: Date };
+
+function describeDetails(details: Record<string, unknown> | null) {
+  if (!details) return "";
+  return Object.entries(details)
+    .filter(([, value]) => value !== undefined && value !== null && value !== "")
+    .map(([key, value]) => `${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`)
+    .join(" · ");
+}
 
 function relativeDate(date: Date) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" }).format(date);
@@ -25,7 +35,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const session = await requireRole("admin");
   const params = await searchParams;
   const sql = await dbReady();
-  const [pending, approved, sent, settingsRows, dispatches] = await Promise.all([
+  const [pending, approved, sent, settingsRows, dispatches, accounts, activity] = await Promise.all([
     sql<Announcement[]>`select id, question, contributor_note, status, created_at, scheduled_date, question_type, event_title, days_early from questions where status = 'pending' order by scheduled_date asc nulls last, created_at asc`,
     sql<Announcement[]>`select id, question, contributor_note, status, created_at, scheduled_date, question_type, event_title, days_early from questions where status = 'approved' order by scheduled_date asc nulls last, created_at asc`,
     sql<Announcement[]>`select id, question, contributor_note, status, created_at, scheduled_date, question_type, event_title, days_early from questions where status = 'sent' order by sent_at desc limit 8`,
@@ -34,7 +44,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       calendar_feed_url_encrypted is not null as has_calendar_feed
       from settings where singleton = true`,
     sql<Dispatch[]>`select id, message, success, mode, created_at, error from dispatches order by created_at desc limit 8`,
+    listAccounts(),
+    sql<ActivityEntry[]>`select id, action, actor, actor_role, success, details, created_at from activity_log order by created_at desc limit 50`,
   ]);
+  const envAccounts = [
+    { username: process.env.ADMIN_USERNAME, role: "admin" },
+    { username: process.env.CONTRIBUTOR_USERNAME, role: "contributor" },
+  ].filter((item): item is { username: string; role: string } => Boolean(item.username));
   const settings = settingsRows[0] || { message_template: DEFAULT_ANNOUNCEMENT_TEMPLATE, event_message_template: DEFAULT_EVENT_TEMPLATE, mention_role_id: null, has_webhook: false, notification_user_id: null, has_notification_webhook: false, has_calendar_feed: false };
   const eventMinimumDate = addDays(pacificParts().localDate, 1);
   const announcementMinimumDate = minimumAnnouncementDate();
@@ -42,7 +58,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   return (
     <main className="app-shell">
       <ScheduledDeliveryCheck />
-      <header className="topbar"><strong>Announcement admin</strong><nav><a href="#inbox">Pending</a><a href="#approved">Approved</a><a href="#delivery">Settings</a></nav><div className="account"><span>{session.username}</span><form action={logoutAction}><PendingButton className="text-button" pendingText="Signing out…">Sign out</PendingButton></form></div></header>
+      <header className="topbar"><strong>Announcement admin</strong><nav><a href="#inbox">Pending</a><a href="#approved">Approved</a><a href="#delivery">Settings</a><a href="#accounts">Accounts</a><a href="#activity">Activity</a></nav><div className="account"><span>{session.username}</span><form action={logoutAction}><PendingButton className="text-button" pendingText="Signing out…">Sign out</PendingButton></form></div></header>
       <section className="admin-heading"><div><h1>Announcements</h1><p>Daily announcements publish the previous evening; events publish on their selected publish date, during the 6 PM Pacific hour.</p></div></section>
       <Notice ok={params.ok} error={params.error} />
       <section className="stats" aria-label="Queue summary"><div><span>Awaiting review</span><strong>{pending.length}</strong></div><div><span>Scheduled</span><strong>{approved.length}</strong></div><div><span>Sent recently</span><strong>{sent.length}</strong></div></section>
@@ -72,7 +88,24 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </form>
       </section>
 
+      <section id="accounts" className="section-block"><div className="section-title"><h2>Accounts</h2><span className="count-badge">{envAccounts.length + accounts.length}</span></div>
+        <form action={createAccountAction} className="panel settings-form"><h3>Create an account</h3>
+          <div><label htmlFor="new-username">Username</label><input id="new-username" name="username" autoComplete="off" pattern="[A-Za-z0-9._\-]{2,64}" minLength={2} maxLength={64} required /><p className="hint">2–64 letters, numbers, dots, underscores, or dashes.</p></div>
+          <div><label htmlFor="new-password">Password</label><input id="new-password" name="password" type="password" autoComplete="new-password" minLength={8} maxLength={128} required /><p className="hint">At least 8 characters. Share it with the person directly; it is stored hashed and cannot be shown again.</p></div>
+          <div><label htmlFor="new-role">Role</label><select id="new-role" name="role" defaultValue="contributor"><option value="contributor">Contributor</option><option value="admin">Admin</option></select></div>
+          <div className="align-right"><PendingButton className="primary" pendingText="Creating…">Create account</PendingButton></div>
+        </form>
+        <div className="activity-list">
+          {envAccounts.map((account) => <div key={`env-${account.username}`}><span className="activity-dot success" /><div><strong>{account.username}</strong><p>{account.role} · configured in environment variables</p></div><div className="recent-actions"><span className="hint">Built in</span></div></div>)}
+          {accounts.map((account) => <div key={account.id}><span className="activity-dot success" /><div><strong>{account.username}</strong><p>{account.role}{account.created_by ? ` · created by ${account.created_by}` : ""}</p></div><div className="recent-actions"><time>{relativeDate(account.created_at)}</time><form action={deleteAccountAction}><input type="hidden" name="id" value={account.id} /><PendingButton className="danger" pendingText="Deleting…">Delete</PendingButton></form></div></div>)}
+        </div>
+      </section>
+
       <section className="section-block"><div className="section-title"><h2>Recent sends</h2></div>{dispatches.length ? <div className="activity-list">{dispatches.map((item) => <div key={item.id}><span className={`activity-dot ${item.success ? "success" : "failed"}`} /><div><strong>{item.success ? "Sent" : "Failed"} · {item.mode.replaceAll("_", " ")}</strong>{item.error && <p className="send-error">{item.error}</p>}<p className="message-excerpt">{item.message}</p></div><div className="recent-actions"><time>{relativeDate(item.created_at)}</time><MessagePreview title={item.success ? "Sent message" : "Attempted message"}><div className="discord-preview"><DiscordMarkdown value={item.message} /></div></MessagePreview></div></div>)}</div> : <div className="empty-state compact"><p>No sends yet.</p></div>}</section>
+
+      <section id="activity" className="section-block"><div className="section-title"><h2>Activity log</h2><span className="count-badge">{activity.length}</span></div>
+        {activity.length ? <div className="activity-list">{activity.map((entry) => <div key={entry.id}><span className={`activity-dot ${entry.success ? "success" : "failed"}`} /><div><strong>{entry.action.replaceAll("_", " ")}{entry.actor ? ` · ${entry.actor}` : ""}{entry.actor_role ? ` (${entry.actor_role})` : ""}</strong>{entry.details && <p className={entry.success ? undefined : "send-error"}>{describeDetails(entry.details)}</p>}</div><div className="recent-actions"><time>{relativeDate(entry.created_at)}</time></div></div>)}</div> : <div className="empty-state compact"><p>Nothing logged yet.</p></div>}
+      </section>
     </main>
   );
 }

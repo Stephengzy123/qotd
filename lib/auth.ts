@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { redirect } from "next/navigation";
+import { findAccount } from "@/lib/accounts";
 
 export type Role = "contributor" | "admin";
 type Session = { role: Role; username: string; expires: number };
@@ -32,6 +33,13 @@ export async function verifyCredentials(username: string, password: string): Pro
     if (candidate.username && candidate.hash && safeEqual(username, candidate.username)) {
       if (await bcrypt.compare(password, candidate.hash)) return candidate.role;
     }
+  }
+  // Accounts created from the admin page live in the database.
+  try {
+    const account = await findAccount(username);
+    if (account && (await bcrypt.compare(password, account.password_hash))) return account.role;
+  } catch (error) {
+    console.error(`[activity] account lookup failed: ${error instanceof Error ? error.message : String(error)}`);
   }
   // Keep unknown-user checks computationally similar to valid-user checks.
   await bcrypt.compare(password, "$2b$12$AOvuXu3KkvUDBQ.oNqo5UOKap7Un5ol1ElLrgH2HmgMqcMJ5UG0rS");
