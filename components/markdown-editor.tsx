@@ -1,6 +1,10 @@
 "use client";
 
-import { useRef, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { RichTextEditor } from "@/components/rich-text-editor";
+
+type EditorMode = "regular" | "discord";
+const MODE_STORAGE_KEY = "announcement-editor-mode";
 
 type Wrap = { kind: "wrap"; before: string; after?: string; placeholder: string };
 type LinePrefix = { kind: "line"; prefix: string; placeholder: string; numbered?: boolean };
@@ -66,6 +70,21 @@ function applyTool(tool: Tool, value: string, start: number, end: number) {
 
 export function MarkdownEditor({ id, name, value, onChange, rows = 10, minLength, maxLength, required, label = "Announcement", heading }: MarkdownEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [mode, setMode] = useState<EditorMode>("regular");
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(MODE_STORAGE_KEY);
+      if (saved === "discord" || saved === "regular") setMode(saved);
+    } catch {
+      // Private browsing or blocked storage keeps the default mode.
+    }
+  }, []);
+
+  function switchMode(next: EditorMode) {
+    setMode(next);
+    try { window.localStorage.setItem(MODE_STORAGE_KEY, next); } catch { /* ignore */ }
+  }
 
   function run(tool: Tool) {
     const textarea = textareaRef.current;
@@ -88,14 +107,27 @@ export function MarkdownEditor({ id, name, value, onChange, rows = 10, minLength
 
   return (
     <div className="markdown-editor">
-      {heading ?? <label htmlFor={id}>{label}</label>}
-      <div className="format-toolbar" role="toolbar" aria-label="Formatting">
-        {TOOLS.map((tool) => <button type="button" key={tool.title} className={tool.className} title={tool.shortcut ? `${tool.title} (⌘/Ctrl+${tool.shortcut.toUpperCase()})` : tool.title} aria-label={tool.title} onMouseDown={(event) => event.preventDefault()} onClick={() => run(tool)}>{tool.label}</button>)}
+      <div className="editor-heading">
+        {heading ?? <label htmlFor={id}>{label}</label>}
+        <div className="mode-switch" role="tablist" aria-label="Editor mode">
+          <button type="button" role="tab" aria-selected={mode === "regular"} className={mode === "regular" ? "active" : undefined} onClick={() => switchMode("regular")}>Regular writing</button>
+          <button type="button" role="tab" aria-selected={mode === "discord"} className={mode === "discord" ? "active" : undefined} onClick={() => switchMode("discord")}>Discord markup</button>
+        </div>
       </div>
-      <textarea ref={textareaRef} id={id} name={name} rows={rows} minLength={minLength} maxLength={maxLength} required={required} value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={onKeyDown} />
+      {mode === "regular" ? <>
+        <RichTextEditor id={id} value={value} onChange={onChange} />
+        {/* The form always submits Markdown, whichever mode is active. */}
+        <textarea name={name} value={value} readOnly className="mirror-field" minLength={minLength} maxLength={maxLength} required={required} tabIndex={-1} aria-hidden="true" />
+        <p className="hint">Formatting is converted to Discord markup automatically. Switch to Discord markup to see or edit the raw text.</p>
+      </> : <>
+        <div className="format-toolbar" role="toolbar" aria-label="Formatting">
+          {TOOLS.map((tool) => <button type="button" key={tool.title} className={tool.className} title={tool.shortcut ? `${tool.title} (⌘/Ctrl+${tool.shortcut.toUpperCase()})` : tool.title} aria-label={tool.title} onMouseDown={(event) => event.preventDefault()} onClick={() => run(tool)}>{tool.label}</button>)}
+        </div>
+        <textarea ref={textareaRef} id={id} name={name} rows={rows} minLength={minLength} maxLength={maxLength} required={required} value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={onKeyDown} />
+      </>}
       <details className="format-help">
         <summary>Discord formatting</summary>
-        <p>Select text and use the toolbar, or type the markers directly. <code>⌘/Ctrl+B</code> bold · <code>⌘/Ctrl+I</code> italic · <code>⌘/Ctrl+U</code> underline.</p>
+        <p>Select text and use the toolbar, or type the markers directly in Discord markup mode. <code>⌘/Ctrl+B</code> bold · <code>⌘/Ctrl+I</code> italic · <code>⌘/Ctrl+U</code> underline.</p>
         <p><code>#</code> heading · <code>##</code> smaller heading · <code>###</code> smallest heading · <code>-#</code> subtext</p>
         <p><code>**bold**</code> · <code>*italic*</code> · <code>__underline__</code> · <code>~~strikethrough~~</code> · <code>||spoiler||</code></p>
         <p><code>[text](https://example.com)</code> link · <code>&gt;</code> quote · <code>-</code> list · <code>1.</code> numbered list</p>
