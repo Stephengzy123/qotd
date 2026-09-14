@@ -42,6 +42,9 @@ export async function logoutAction() {
 
 export async function submitQuestionAction(formData: FormData) {
   await requireRole("contributor");
+  if (formData.get("checkedAnnouncements") !== "yes") {
+    redirect(messageUrl("/contribute", "error", "Check the scheduled and recently sent announcements, then confirm that your submission is not repetitive."));
+  }
   const type: AnnouncementType = formData.get("type") === "event" ? "event" : "announcement";
   const announcement = String(formData.get("announcement") || "").trim();
   const eventTitle = String(formData.get("eventTitle") || "").trim();
