@@ -1,4 +1,4 @@
-import { addApprovedQuestionAction, createAccountAction, deleteAccountAction, logoutAction, reviewQuestionAction, saveSettingsAction, sendQuestionAction } from "@/app/actions";
+import { addApprovedQuestionAction, createAccountAction, deleteAccountAction, logoutAction, updateAccountAction, reviewQuestionAction, saveSettingsAction, sendQuestionAction } from "@/app/actions";
 import { listAccounts } from "@/lib/accounts";
 import { requireRole } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
@@ -59,7 +59,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   return (
     <main className="app-shell">
       <ScheduledDeliveryCheck />
-      <header className="topbar"><strong>Announcement admin</strong><nav className="admin-navigation" aria-label="Admin"><a href="#inbox">Pending</a><a href="#approved">Approved</a><a href="#delivery">Settings</a><a href="#accounts">Accounts</a><a href="#activity">Activity</a><a href="/live">Live feed</a></nav><div className="account"><span>{session.username}</span><form action={logoutAction}><PendingButton className="text-button" pendingText="Signing out…">Sign out</PendingButton></form></div></header>
+      <header className="topbar"><strong>Announcement admin</strong><nav className="admin-navigation" aria-label="Admin"><a href="#inbox">Pending</a><a href="#approved">Approved</a><a href="#delivery">Settings</a><a href="#accounts">Accounts</a><a href="#activity">Activity</a><a href="/live">Live feed</a><a href="/admin/logs">Logs</a></nav><div className="account"><span>{session.username}</span><form action={logoutAction}><PendingButton className="text-button" pendingText="Signing out…">Sign out</PendingButton></form></div></header>
       <section className="admin-heading"><div><h1>Announcements</h1><p>Daily announcements publish the previous evening; events publish on their selected publish date, during the 6 PM Pacific hour.</p></div></section>
       <Notice ok={params.ok} error={params.error} />
       <section className="stats" aria-label="Queue summary"><div><span>Awaiting review</span><strong>{pending.length}</strong></div><div><span>Scheduled</span><strong>{approved.length}</strong></div><div><span>Sent recently</span><strong>{sent.length}</strong></div></section>
@@ -100,13 +100,19 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </form>
         <div className="activity-list">
           {envAccounts.map((account) => <div key={`env-${account.username}`}><span className="activity-dot success" /><div><strong>{account.username}</strong><p>{account.role} · configured in environment variables</p></div><div className="recent-actions"><span className="hint">Built in</span></div></div>)}
-          {accounts.map((account) => <div key={account.id}><span className="activity-dot success" /><div><strong>{account.username}</strong><p>{account.role}{account.created_by ? ` · created by ${account.created_by}` : ""}</p></div><div className="recent-actions"><time>{relativeDate(account.created_at)}</time><form action={deleteAccountAction}><input type="hidden" name="id" value={account.id} /><PendingButton className="danger" pendingText="Deleting…">Delete</PendingButton></form></div></div>)}
+          {accounts.map((account) => <div key={account.id} className="account-row"><span className="activity-dot success" /><div><strong>{account.username}</strong><p>{account.role}{account.created_by ? ` · created by ${account.created_by}` : ""} · added {relativeDate(account.created_at)}</p>
+            <form action={updateAccountAction} className="account-manage"><input type="hidden" name="id" value={account.id} />
+              <label className="sr-only" htmlFor={`role-${account.id}`}>Role</label><select id={`role-${account.id}`} name="role" defaultValue={account.role}><option value="contributor">Contributor</option><option value="admin">Admin</option></select>
+              <label className="sr-only" htmlFor={`password-${account.id}`}>New password</label><input id={`password-${account.id}`} name="password" type="password" autoComplete="new-password" minLength={12} maxLength={72} placeholder="New password (optional)" />
+              <PendingButton className="secondary" pendingText="Saving…">Save</PendingButton>
+            </form></div>
+            <div className="recent-actions"><form action={deleteAccountAction}><input type="hidden" name="id" value={account.id} /><PendingButton className="danger" pendingText="Deleting…">Delete</PendingButton></form></div></div>)}
         </div>
       </section>
 
       <section className="section-block"><div className="section-title"><h2>Recent sends</h2></div>{dispatches.length ? <div className="activity-list">{dispatches.map((item) => <div key={item.id}><span className={`activity-dot ${item.success ? "success" : "failed"}`} /><div><strong>{item.success ? "Sent" : "Failed"} · {item.mode.replaceAll("_", " ")}</strong>{item.error && <p className="send-error">{item.error}</p>}<p className="message-excerpt">{item.message}</p></div><div className="recent-actions"><time>{relativeDate(item.created_at)}</time><MessagePreview title={item.success ? "Sent message" : "Attempted message"}><div className="discord-preview"><DiscordMarkdown value={item.message} /></div></MessagePreview></div></div>)}</div> : <div className="empty-state compact"><p>No sends yet.</p></div>}</section>
 
-      <section id="activity" className="section-block"><div className="section-title"><h2>Activity log</h2><span className="count-badge">{activity.length}</span></div>
+      <section id="activity" className="section-block"><div className="section-title"><h2>Activity log</h2><a href="/admin/logs" className="secondary">View all logs →</a></div><p className="hint">Latest 50 events. The full log is searchable and filterable.</p>
         {activity.length ? <div className="activity-list">{activity.map((entry) => <div key={entry.id}><span className={`activity-dot ${entry.success ? "success" : "failed"}`} /><div><strong>{entry.action.replaceAll("_", " ")}{entry.actor ? ` · ${entry.actor}` : ""}{entry.actor_role ? ` (${entry.actor_role})` : ""}</strong>{entry.details && <p className={entry.success ? undefined : "send-error"}>{describeDetails(entry.details)}</p>}</div><div className="recent-actions"><time>{relativeDate(entry.created_at)}</time></div></div>)}</div> : <div className="empty-state compact"><p>Nothing logged yet.</p></div>}
       </section>
     </main>
