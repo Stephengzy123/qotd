@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLiveMessages, parseLiveCursor } from "@/lib/live-messages";
+import { getSession } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export async function GET(request: NextRequest) {
@@ -10,7 +11,9 @@ export async function GET(request: NextRequest) {
   try { before = parseLiveCursor(params.get("before")); after = parseLiveCursor(params.get("after")); }
   catch { return NextResponse.json({ error: "Invalid cursor" }, { status: 400 }); }
   try {
-    return NextResponse.json(await getLiveMessages(type, before, after), { headers: { "Cache-Control": "no-store" } });
+    const hidden = params.get("hidden") === "true";
+    if (hidden && (await getSession())?.role !== "admin") return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    return NextResponse.json(await getLiveMessages(type, before, after, hidden), { headers: { "Cache-Control": "private, no-store" } });
   } catch {
     return NextResponse.json({ error: "Messages are temporarily unavailable" }, { status: 503 });
   }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
 import { calendarHeading, getCalendarByDate } from "@/lib/calendar";
+import { errorDetail, logEvent } from "@/lib/log";
 
 export const runtime = "nodejs";
 
@@ -20,7 +21,8 @@ export async function GET(request: NextRequest) {
   try {
     const titles = await getCalendarByDate(settings.calendar_feed_url_encrypted as string, date);
     return NextResponse.json({ calendar: calendarHeading(titles) });
-  } catch {
+  } catch (error) {
+    await logEvent({ action: "calendar_preview", actor: session.username, role: session.role, success: false, details: { date, error: errorDetail(error) } });
     return NextResponse.json({ error: "Calendar unavailable" }, { status: 502 });
   }
 }

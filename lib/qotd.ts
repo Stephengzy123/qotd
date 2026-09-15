@@ -1,3 +1,4 @@
+import { errorDetail, logEvent } from "@/lib/log";
 import { dbReady } from "@/lib/db";
 import { decryptSecret } from "@/lib/security";
 import { calendarHeading, getCalendarByDate } from "@/lib/calendar";
@@ -93,7 +94,8 @@ export function formatAnnouncement(template: string, announcement: string, sched
 
 type Mode = "scheduled" | "manual_selected";
 
-export async function sendAnnouncement(announcementId: string, mode: Mode, localDate?: string) {
+export async function sendAnnouncement(announcementId: string, mode: Mode, localDate?: string, actor?: string) {
+  const logBase = { action: "dispatch_announcement", actor: actor ?? (mode === "scheduled" ? "scheduler" : null), role: mode === "scheduled" ? "system" : "admin" } as const;
   const sql = await dbReady();
   const announcements = await sql`
       select id, question, scheduled_date, question_type, event_title from questions
@@ -119,8 +121,9 @@ export async function sendAnnouncement(announcementId: string, mode: Mode, local
   if (type === "announcement" && settings.calendar_feed_url_encrypted) {
     try {
       calendar = calendarHeading(await getCalendarByDate(settings.calendar_feed_url_encrypted as string, scheduledDate));
-    } catch {
+    } catch (error) {
       // A calendar outage must not prevent an approved announcement from being sent.
+      await logEvent({ action: "calendar_lookup", actor: logBase.actor, role: logBase.role, success: false, details: { announcementId, scheduledDate, error: errorDetail(error) } });
     }
   }
   const message = formatAnnouncement(template, announcement.question, scheduledDate, roleId, announcement.event_title as string | null, calendar);
@@ -139,7 +142,10 @@ export async function sendAnnouncement(announcementId: string, mode: Mode, local
     return { dispatchId: rows[0].id as string } as const;
   });
 
-  if ("error" in claimed) return claimed;
+  if ("error" in claimed) {
+    await logEvent({ ...logBase, success: false, details: { announcementId, mode, localDate, reason: claimed.error } });
+    return claimed;
+  }
   let responseStatus: number | null = null;
   let errorMessage: string | null = null;
   try {
@@ -165,6 +171,7 @@ export async function sendAnnouncement(announcementId: string, mode: Mode, local
       await tx`update questions set status = 'approved', updated_at = now() where id = ${announcement.id} and status = 'sent' and sent_at is null`;
     }
   });
+  await logEvent({ ...logBase, success, details: { announcementId, dispatchId: claimed.dispatchId, mode, localDate, type, scheduledDate, responseStatus, error: errorMessage ?? undefined, messageLength: message.length } });
   return success ? { success: true, message } : { error: errorMessage || "Send failed." };
 }
 
@@ -197,7 +204,9 @@ export async function sendPendingNotification(announcement: string, scheduledDat
       redirect: "manual",
       signal: AbortSignal.timeout(10_000),
     });
-  } catch {
+    await logEvent({ action: "pending_notification", role: "system", details: { type, scheduledDate, title: title ?? undefined } });
+  } catch (error) {
     // Notification delivery must never discard a successfully saved submission.
+    await logEvent({ action: "pending_notification", role: "system", success: false, details: { type, scheduledDate, title: title ?? undefined, error: errorDetail(error) } });
   }
 }

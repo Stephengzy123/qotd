@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { DiscordMarkdown } from "@/components/discord-preview";
+import { setLiveMessageHidden } from "@/app/live/actions";
 
-type Message = { id: string; message: string; type: string | null; sentAt: string; cursor: string };
+type Message = { id: string; message: string; type: string | null; sentAt: string; cursor: string; hidden: boolean };
 type Page = { messages: Message[]; hasMore: boolean };
 function timestamp(value: string) {
   const date = new Date(value), today = new Date(), yesterday = new Date();
@@ -12,7 +13,8 @@ function timestamp(value: string) {
   return `${day} at ${date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
 }
 
-export function LiveFeed() {
+export function LiveFeed({ isAdmin = false, botName = "Announcements", avatarUrl = null }: { isAdmin?: boolean; botName?: string; avatarUrl?: string | null }) {
+  const [showHidden, setShowHidden] = useState(false), [changing, setChanging] = useState<string | null>(null);
   const [filter, setFilter] = useState("all"), [theme, setTheme] = useState("system");
   const [messages, setMessages] = useState<Message[]>([]), [hasOlder, setHasOlder] = useState(false);
   const [loading, setLoading] = useState(true), [error, setError] = useState(""), [newMessages, setNewMessages] = useState(false);
@@ -29,6 +31,7 @@ export function LiveFeed() {
     if (direction !== "newer") setLoading(true);
     try {
       const params = new URLSearchParams({ type: filter });
+      if (isAdmin && showHidden) params.set("hidden", "true");
       const existing = records.current;
       if (direction === "older" && existing.length) params.set("before", existing[0].cursor);
       if (direction === "newer" && existing.length) params.set("after", existing[existing.length - 1].cursor);
@@ -49,7 +52,7 @@ export function LiveFeed() {
       setMessages(records.current);
     } catch (err) { if (version === generation.current) { retryDirection.current = direction; setError(err instanceof Error ? err.message : "Could not load messages."); } }
     finally { if (version === generation.current) { busy.current = false; setLoading(false); } }
-  }, [filter]);
+  }, [filter, isAdmin, showHidden]);
 
   useEffect(() => {
     generation.current++;
@@ -72,9 +75,10 @@ export function LiveFeed() {
   }, []);
 
   return <main className="live-shell" data-theme={theme}>
-    <header className="live-header"><div><span className="live-eyebrow">MESSAGE ARCHIVE</span><h1># announcements</h1><p>Only messages already sent by the bot.</p></div>
+    <header className="live-header"><h1># announcements</h1>
       <div className="live-controls"><label>Show<select value={filter} onChange={event => setFilter(event.target.value)}><option value="all">All messages</option><option value="announcement">Day announcements</option><option value="event">Events</option></select></label>
-        <label>Appearance<select value={theme} onChange={event => { setTheme(event.target.value); try { localStorage.setItem("announcement-live-theme", event.target.value); } catch {} }}><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label></div>
+        <label>Appearance<select value={theme} onChange={event => { setTheme(event.target.value); try { localStorage.setItem("announcement-live-theme", event.target.value); } catch {} }}><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+        {isAdmin && <label>Visibility<select value={showHidden ? "hidden" : "visible"} onChange={event => setShowHidden(event.target.value === "hidden")}><option value="visible">Visible</option><option value="hidden">Hidden</option></select></label>}</div>
     </header>
     <div ref={viewport} className="live-scroll" tabIndex={0} aria-label="Sent messages, oldest first" onScroll={() => {
       const el = viewport.current!; stickBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
@@ -86,11 +90,16 @@ export function LiveFeed() {
       {error && <p className="live-status" role="alert">{error} <button type="button" onClick={() => void load(retryDirection.current)}>Retry</button></p>}
       {!loading && !error && !messages.length && <p className="live-status">No sent messages in this category yet.</p>}
       {messages.map(message => <article className="live-message" key={message.id}>
-        <div className="live-avatar" aria-hidden="true">A</div><div className="live-message-body"><div className="live-message-meta"><strong>Announcements</strong><span className="live-bot">BOT</span><time dateTime={message.sentAt} title={new Date(message.sentAt).toLocaleString()}>{timestamp(message.sentAt)}</time><span>{message.type === "event" ? "Event" : message.type === "announcement" ? "Day announcement" : "Message"}</span></div>
+        {avatarUrl ? <img className="live-avatar" src={avatarUrl} alt="" width={38} height={38} referrerPolicy="no-referrer" /> : <div className="live-avatar" aria-hidden="true">{botName.slice(0, 1).toUpperCase()}</div>}<div className="live-message-body"><div className="live-message-meta"><strong>{botName}</strong><span className="live-bot">BOT</span><time dateTime={message.sentAt} title={new Date(message.sentAt).toLocaleString()}>{timestamp(message.sentAt)}</time>
+          {isAdmin && <button type="button" disabled={changing !== null} onClick={async () => {
+            setChanging(message.id);
+            try { await setLiveMessageHidden(message.id, !message.hidden); records.current = records.current.filter(item => item.id !== message.id); setMessages(records.current); }
+            catch { setError("Could not change message visibility. Please try again."); }
+            finally { setChanging(null); }
+          }}>{changing === message.id ? "Saving…" : message.hidden ? "Restore" : "Hide"}</button>}</div>
           <div className="discord-preview"><DiscordMarkdown value={message.message} /></div></div>
       </article>)}
     </div></div>
     {newMessages && <button type="button" className="live-jump" onClick={() => { stickBottom.current = true; if (viewport.current) viewport.current.scrollTop = viewport.current.scrollHeight; setNewMessages(false); }}>New messages ↓</button>}
-    <footer className="live-footer">Newest messages at the bottom · Times shown in your local timezone</footer>
   </main>;
 }

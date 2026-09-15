@@ -3,10 +3,10 @@ import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { redirect } from "next/navigation";
-import { dbReady } from "@/lib/db";
+import { findAccount } from "@/lib/accounts";
 
 export type Role = "contributor" | "admin";
-type Session = { role: Role; username: string; expires: number };
+type Session = { role: Role; username: string; expires: number; accountId?: string };
 const COOKIE_NAME = "qotd_session";
 
 function secret() {
@@ -34,9 +34,13 @@ export async function verifyCredentials(username: string, password: string): Pro
       if (await bcrypt.compare(password, candidate.hash)) return candidate.role;
     }
   }
-  const sql = await dbReady();
-  const user = (await sql`select password_hash from app_users where lower(username) = ${username.toLowerCase()} limit 1`)[0];
-  if (user) return await bcrypt.compare(password, user.password_hash as string) ? "contributor" : null;
+  // Accounts created from the admin page live in the database.
+  try {
+    const account = await findAccount(username);
+    if (account && (await bcrypt.compare(password, account.password_hash))) return account.role;
+  } catch (error) {
+    console.error(`[activity] account lookup failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
   // Keep unknown-user checks computationally similar to valid-user checks.
   await bcrypt.compare(password, "$2b$12$AOvuXu3KkvUDBQ.oNqo5UOKap7Un5ol1ElLrgH2HmgMqcMJ5UG0rS");
   return null;
@@ -44,6 +48,11 @@ export async function verifyCredentials(username: string, password: string): Pro
 
 export async function createSession(role: Role, username: string) {
   const session: Session = { role, username, expires: Date.now() + 1000 * 60 * 60 * 12 };
+  if (username !== process.env.ADMIN_USERNAME && username !== process.env.CONTRIBUTOR_USERNAME) {
+    const account = await findAccount(username);
+    if (!account || account.role !== role) throw new Error("Account no longer available");
+    session.accountId = account.id;
+  }
   const payload = Buffer.from(JSON.stringify(session)).toString("base64url");
   (await cookies()).set(COOKIE_NAME, `${payload}.${sign(payload)}`, {
     httpOnly: true,
@@ -62,6 +71,11 @@ export async function getSession(): Promise<Session | null> {
   try {
     const session = JSON.parse(Buffer.from(payload, "base64url").toString()) as Session;
     if (session.expires < Date.now() || !["admin", "contributor"].includes(session.role)) return null;
+    const configured = (session.role === "admin" && session.username === process.env.ADMIN_USERNAME) || (session.role === "contributor" && session.username === process.env.CONTRIBUTOR_USERNAME);
+    if (!configured) {
+      const account = await findAccount(session.username);
+      if (!account || account.role !== session.role || (session.accountId && session.accountId !== account.id)) return null;
+    }
     return session;
   } catch {
     return null;
