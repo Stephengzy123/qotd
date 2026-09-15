@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { DiscordMarkdown } from "@/components/discord-preview";
 import { setLiveMessageHidden } from "@/app/live/actions";
+import { LiveNotifications } from "@/components/live-notifications";
 
 type Message = { id: string; message: string; type: string | null; sentAt: string; cursor: string; hidden: boolean };
 type Page = { messages: Message[]; hasMore: boolean };
@@ -79,6 +80,7 @@ export function LiveFeed({ isAdmin = false, botName = "Announcements", avatarUrl
       <div className="live-controls"><label>Show<select value={filter} onChange={event => setFilter(event.target.value)}><option value="all">All messages</option><option value="announcement">Day announcements</option><option value="event">Events</option></select></label>
         <label>Appearance<select value={theme} onChange={event => { setTheme(event.target.value); try { localStorage.setItem("announcement-live-theme", event.target.value); } catch {} }}><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
         {isAdmin && <label>Visibility<select value={showHidden ? "hidden" : "visible"} onChange={event => setShowHidden(event.target.value === "hidden")}><option value="visible">Visible</option><option value="hidden">Hidden</option></select></label>}</div>
+      <LiveNotifications />
     </header>
     <div ref={viewport} className="live-scroll" tabIndex={0} aria-label="Sent messages, oldest first" onScroll={() => {
       const el = viewport.current!; stickBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;

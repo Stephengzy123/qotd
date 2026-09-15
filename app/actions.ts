@@ -1,4 +1,5 @@
 "use server";
+import { scheduleLivePush } from "@/lib/web-push";
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -218,6 +219,7 @@ export async function sendQuestionAction(formData: FormData) {
   const id = String(formData.get("id") || "");
   if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin", session, "send_announcement", "Select an announcement to send.", { id });
   const result = await sendAnnouncement(id, "manual_selected", undefined, session.username);
+  if (!("error" in result)) scheduleLivePush(result.dispatchId);
   await logEvent({ action: "send_announcement", actor: session.username, role: session.role, success: !("error" in result), details: { id, mode: "manual_selected", error: "error" in result ? result.error : undefined } });
   revalidatePath("/admin");
   redirect(messageUrl("/admin", "error" in result ? "error" : "ok", "error" in result ? (result.error || "Send failed.") : "Announcement sent to Discord."));

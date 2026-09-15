@@ -74,3 +74,12 @@ create table if not exists activity_log (
 );
 
 create index if not exists activity_log_created_idx on activity_log(created_at desc);
+
+create table if not exists push_subscriptions (
+  endpoint text primary key,
+  p256dh text not null,
+  auth text not null,
+  address_hash text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists push_subscriptions_address_idx on push_subscriptions(address_hash, created_at);

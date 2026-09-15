@@ -36,3 +36,7 @@
 .live-jump { position: fixed; bottom: 3rem; left: 50%; transform: translateX(-50%); box-shadow: 0 3px 14px #0003; }
 .live-footer { text-align: center; font-size: .7rem; color: var(--live-muted); padding: .6rem; border-top: 1px solid var(--live-border); }
 @media (max-width: 600px) { .live-header { flex-direction: column; align-items: stretch; padding: .8rem 1rem; } .live-controls label { flex: 1; } .live-message { gap: .6rem; } .live-avatar { width: 30px; height: 30px; } }
+.live-notifications { display: flex; flex-direction: column; align-items: flex-start; gap: .35rem; max-width: 22rem; }
+.live-notifications button { color: inherit; background: transparent; border: 1px solid currentColor; border-radius: 6px; padding: .45rem .7rem; cursor: pointer; font: inherit; font-size: .8rem; }
+.live-notifications button:disabled { opacity: .55; cursor: default; }
+.live-notifications small { font-size: .75rem; line-height: 1.4; }
