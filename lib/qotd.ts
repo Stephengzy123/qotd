@@ -172,7 +172,7 @@ export async function sendAnnouncement(announcementId: string, mode: Mode, local
     }
   });
   await logEvent({ ...logBase, success, details: { announcementId, dispatchId: claimed.dispatchId, mode, localDate, type, scheduledDate, responseStatus, error: errorMessage ?? undefined, messageLength: message.length } });
-  return success ? { success: true, message } : { error: errorMessage || "Send failed." };
+  return success ? { success: true, message, dispatchId: claimed.dispatchId } : { error: errorMessage || "Send failed." };
 }
 
 export async function sendPendingNotification(announcement: string, scheduledDate: string, type: AnnouncementType, title?: string | null) {
