@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { redirect } from "next/navigation";
+import { dbReady } from "@/lib/db";
 
 export type Role = "contributor" | "admin";
 type Session = { role: Role; username: string; expires: number };
@@ -33,6 +34,9 @@ export async function verifyCredentials(username: string, password: string): Pro
       if (await bcrypt.compare(password, candidate.hash)) return candidate.role;
     }
   }
+  const sql = await dbReady();
+  const user = (await sql`select password_hash from app_users where lower(username) = ${username.toLowerCase()} limit 1`)[0];
+  if (user) return await bcrypt.compare(password, user.password_hash as string) ? "contributor" : null;
   // Keep unknown-user checks computationally similar to valid-user checks.
   await bcrypt.compare(password, "$2b$12$AOvuXu3KkvUDBQ.oNqo5UOKap7Un5ol1ElLrgH2HmgMqcMJ5UG0rS");
   return null;

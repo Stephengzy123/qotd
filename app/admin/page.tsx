@@ -42,7 +42,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   return (
     <main className="app-shell">
       <ScheduledDeliveryCheck />
-      <header className="topbar"><strong>Announcement admin</strong><nav><a href="#inbox">Pending</a><a href="#approved">Approved</a><a href="#delivery">Settings</a></nav><div className="account"><span>{session.username}</span><form action={logoutAction}><PendingButton className="text-button" pendingText="Signing out…">Sign out</PendingButton></form></div></header>
+      <header className="topbar"><strong>Announcement admin</strong><nav className="admin-navigation" aria-label="Admin"><a href="#inbox">Pending</a><a href="#approved">Approved</a><a href="#delivery">Settings</a><a href="/admin/users">Users</a><a href="/live">Live feed</a></nav><div className="account"><span>{session.username}</span><form action={logoutAction}><PendingButton className="text-button" pendingText="Signing out…">Sign out</PendingButton></form></div></header>
       <section className="admin-heading"><div><h1>Announcements</h1><p>Daily announcements publish the previous evening; events publish on their selected publish date, during the 6 PM Pacific hour.</p></div></section>
       <Notice ok={params.ok} error={params.error} />
       <section className="stats" aria-label="Queue summary"><div><span>Awaiting review</span><strong>{pending.length}</strong></div><div><span>Scheduled</span><strong>{approved.length}</strong></div><div><span>Sent recently</span><strong>{sent.length}</strong></div></section>

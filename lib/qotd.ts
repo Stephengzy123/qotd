@@ -132,8 +132,8 @@ export async function sendAnnouncement(announcementId: string, mode: Mode, local
     `;
     if (!claim[0]) return { error: "That announcement is already being handled." } as const;
     const rows = await tx`
-      insert into dispatches (question_id, local_date, mode, message, success)
-      values (${announcement.id}, ${localDate || null}, ${mode}, ${message}, false)
+      insert into dispatches (question_id, local_date, mode, message, success, question_type)
+      values (${announcement.id}, ${localDate || null}, ${mode}, ${message}, false, ${type})
       returning id
     `;
     return { dispatchId: rows[0].id as string } as const;

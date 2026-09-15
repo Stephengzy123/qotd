@@ -3,6 +3,7 @@ import postgres from "postgres";
 const globalForDb = globalThis as unknown as {
   qotdSql?: ReturnType<typeof postgres>;
   qotdSchemaPromise?: Promise<void>;
+  qotdSchemaVersion?: number;
 };
 
 const migrations = [
@@ -130,6 +131,21 @@ const migrations = [
       `alter table questions add constraint questions_days_early_check check (days_early between 0 and 365)`,
     ],
   },
+  {
+    version: 9,
+    statements: [
+      `create table if not exists app_users (
+        id uuid primary key default gen_random_uuid(),
+        username text not null check (char_length(username) between 3 and 40),
+        password_hash text not null,
+        created_at timestamptz not null default now()
+      )`,
+      `create unique index if not exists app_users_username_idx on app_users(lower(username))`,
+      `alter table dispatches add column if not exists question_type text check (question_type in ('announcement', 'event'))`,
+      `update dispatches d set question_type = q.question_type from questions q where q.id = d.question_id and d.question_type is null`,
+      `create index if not exists dispatches_live_idx on dispatches(created_at desc, id desc) where success = true`,
+    ],
+  },
 ] as const;
 
 export function db() {
@@ -248,7 +264,8 @@ async function coreSchemaExists() {
 }
 
 export async function ensureSchema() {
-  if (!globalForDb.qotdSchemaPromise) {
+  if (!globalForDb.qotdSchemaPromise || globalForDb.qotdSchemaVersion !== migrations[migrations.length - 1].version) {
+    globalForDb.qotdSchemaVersion = migrations[migrations.length - 1].version;
     globalForDb.qotdSchemaPromise = migrateSchema().catch((error) => {
       globalForDb.qotdSchemaPromise = undefined;
       throw error;

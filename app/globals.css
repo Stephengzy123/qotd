@@ -195,6 +195,8 @@ input:focus, select:focus, textarea:focus { border-color: #666; box-shadow: 0 0 
 @media (max-width: 700px) {
   .app-shell { padding-inline: .8rem; }
   .topbar nav, .account > span { display: none; }
+  .topbar:has(.admin-navigation) { flex-wrap: wrap; }
+  .topbar .admin-navigation { display: flex; order: 3; flex-basis: 100%; flex-wrap: wrap; gap: .75rem; padding-bottom: .5rem; }
   .stats, .question-list, .template-grid { grid-template-columns: 1fr; }
   .stats { gap: .4rem; }
   .approved-row { grid-template-columns: 26px 1fr; }

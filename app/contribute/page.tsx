@@ -20,7 +20,7 @@ export default async function ContributePage({ searchParams }: { searchParams: P
   return (
     <main className="app-shell">
       <ScheduledDeliveryCheck />
-      <header className="topbar"><strong>Announcements</strong><div className="account"><span>{session.username}</span><form action={logoutAction}><PendingButton className="text-button" pendingText="Signing out…">Sign out</PendingButton></form></div></header>
+      <header className="topbar"><strong>Announcements</strong><a href="/live">Live feed</a><div className="account"><span>{session.username}</span><form action={logoutAction}><PendingButton className="text-button" pendingText="Signing out…">Sign out</PendingButton></form></div></header>
       <section className="page-heading"><h1>Submit an announcement</h1></section>
       <Notice ok={params.ok} error={params.error} />
       <ContributorAnnouncements announcementTemplate={announcementTemplate} eventTemplate={eventTemplate} />
