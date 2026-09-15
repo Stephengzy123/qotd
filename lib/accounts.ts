@@ -45,3 +45,13 @@ export async function deleteAccount(id: string) {
   const rows = await sql<{ username: string; role: Role }[]>`delete from accounts where id = ${id} returning username, role`;
   return rows[0] || null;
 }
+
+export async function updateAccount(id: string, role: Role, password: string | null): Promise<{ error: string; username?: undefined } | { username: string; error?: undefined }> {
+  if (password !== null && (password.length < 12 || Buffer.byteLength(password, "utf8") > 72)) return { error: "Passwords must be at least 12 characters and at most 72 bytes." };
+  const sql = await dbReady();
+  const hash = password !== null ? await bcrypt.hash(password, 12) : null;
+  const rows = await sql<{ username: string }[]>`
+    update accounts set role = ${role}, password_hash = coalesce(${hash}, password_hash) where id = ${id} returning username
+  `;
+  return rows[0] ? { username: rows[0].username } : { error: "That account no longer exists." };
+}
