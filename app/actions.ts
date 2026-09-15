@@ -8,7 +8,7 @@ import { dbReady } from "@/lib/db";
 import { encryptSecret, hashAddress, validateDiscordWebhook } from "@/lib/security";
 import { isValidAnnouncementDate, isValidFuturePacificDate, normalizeDiscordTemplate, sendAnnouncement, sendPendingNotification, validateAnnouncementTemplate, type AnnouncementType } from "@/lib/qotd";
 import { fetchCalendarByUrl, normalizeCalendarFeedUrl } from "@/lib/calendar";
-import { createAccount, deleteAccount } from "@/lib/accounts";
+import { createAccount, deleteAccount, updateAccount } from "@/lib/accounts";
 import { logEvent } from "@/lib/log";
 import type { Role } from "@/lib/auth";
 
@@ -243,4 +243,17 @@ export async function deleteAccountAction(formData: FormData) {
   await logEvent({ action: "delete_account", actor: session.username, role: session.role, details: { id, username: deleted.username, accountRole: deleted.role } });
   revalidatePath("/admin");
   redirect(messageUrl("/admin", "ok", `Account “${deleted.username}” deleted.`));
+}
+
+export async function updateAccountAction(formData: FormData) {
+  const session = await requireRole("admin");
+  const id = String(formData.get("id") || "");
+  const role: Role = formData.get("role") === "admin" ? "admin" : "contributor";
+  const password = String(formData.get("password") || "");
+  if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin", session, "update_account", "Invalid account.", { id });
+  const result = await updateAccount(id, role, password || null);
+  if (result.error !== undefined) await fail("/admin", session, "update_account", result.error, { id, role, passwordReset: Boolean(password) });
+  await logEvent({ action: "update_account", actor: session.username, role: session.role, details: { id, username: result.username, accountRole: role, passwordReset: Boolean(password) } });
+  revalidatePath("/admin");
+  redirect(messageUrl("/admin", "ok", password ? `Account “${result.username}” updated and password reset.` : `Account “${result.username}” updated.`));
 }
