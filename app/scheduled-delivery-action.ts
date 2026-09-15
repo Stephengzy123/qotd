@@ -8,6 +8,6 @@ export async function checkScheduledDeliveryAction() {
   if (!session || !["admin", "contributor"].includes(session.role)) {
     return { success: false, sent: 0 };
   }
-  const result = await sendDueAnnouncements();
+  const result = await sendDueAnnouncements(new Date(), "page_load");
   return { success: result.success, sent: result.sent };
 }

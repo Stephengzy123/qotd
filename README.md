@@ -27,6 +27,12 @@ RATE_LIMIT_SECRET=
 
 Generate password hashes with `npm run hash-password -- "your password"`. Generate random secrets with `openssl rand -base64 32`.
 
+The two environment-variable logins are built in. Admins can create additional contributor or admin accounts from the **Accounts** section of the admin page; those are stored in the `accounts` table with bcrypt-hashed passwords and can be deleted from the same section.
+
+## Activity log
+
+Every action — sign-ins (including failed attempts), sign-outs, submissions, edits, approvals, rejections, deletions, settings changes, account changes, manual and scheduled sends, cron requests, pending notifications, and calendar lookups — is written to the `activity_log` table and printed to the server console as a `[activity]` JSON line (visible in Vercel runtime logs). The admin page shows the latest 50 entries under **Activity**. Secrets such as webhook URLs and passwords are never logged.
+
 ## Deploy
 
 Import the `announcement-bot` branch as a separate Vercel project and add the environment variables above. Two daily UTC cron checks account for daylight saving time; only the check that runs during the 6 PM Pacific hour sends messages. Vercel Hobby may invoke it at any point within that hour.

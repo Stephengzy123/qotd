@@ -3,6 +3,7 @@ import postgres from "postgres";
 const globalForDb = globalThis as unknown as {
   qotdSql?: ReturnType<typeof postgres>;
   qotdSchemaPromise?: Promise<void>;
+  qotdSchemaVersion?: number;
 };
 
 const migrations = [
@@ -130,6 +131,63 @@ const migrations = [
       `alter table questions add constraint questions_days_early_check check (days_early between 0 and 365)`,
     ],
   },
+  {
+    version: 9,
+    statements: [
+      `create table if not exists app_users (
+        id uuid primary key default gen_random_uuid(),
+        username text not null check (char_length(username) between 3 and 40),
+        password_hash text not null,
+        created_at timestamptz not null default now()
+      )`,
+      `create unique index if not exists app_users_username_idx on app_users(lower(username))`,
+      `alter table dispatches add column if not exists question_type text check (question_type in ('announcement', 'event'))`,
+      `update dispatches d set question_type = q.question_type from questions q where q.id = d.question_id and d.question_type is null`,
+      `create index if not exists dispatches_live_idx on dispatches(created_at desc, id desc) where success = true`,
+    ],
+  },
+  {
+    version: 10,
+    statements: [
+      `create table if not exists app_users (
+        id uuid primary key default gen_random_uuid(),
+        username text not null check (char_length(username) between 3 and 40),
+        password_hash text not null,
+        created_at timestamptz not null default now()
+      )`,
+      `create unique index if not exists app_users_username_idx on app_users(lower(username))`,
+      `alter table dispatches add column if not exists question_type text check (question_type in ('announcement', 'event'))`,
+      `update dispatches d set question_type = q.question_type from questions q where q.id = d.question_id and d.question_type is null`,
+      `create index if not exists dispatches_live_idx on dispatches(created_at desc, id desc) where success = true`,
+      `create table if not exists accounts (
+        id uuid primary key default gen_random_uuid(),
+        username text not null check (char_length(username) between 2 and 64),
+        password_hash text not null,
+        role text not null check (role in ('contributor', 'admin')),
+        created_by text,
+        created_at timestamptz not null default now()
+      )`,
+      `create unique index if not exists accounts_username_lower_idx on accounts(lower(username))`,
+      `create table if not exists activity_log (
+        id uuid primary key default gen_random_uuid(),
+        action text not null,
+        actor text,
+        actor_role text,
+        success boolean not null default true,
+        details jsonb,
+        created_at timestamptz not null default now()
+      )`,
+      `create index if not exists activity_log_created_idx on activity_log(created_at desc)`,
+      `do $migration$ begin
+        if exists (select 1 from app_users u join accounts a on lower(a.username) = lower(u.username) where a.password_hash <> u.password_hash) then
+          raise exception 'Account migration blocked: duplicate usernames with different passwords in app_users and accounts';
+        end if;
+      end $migration$`,
+      `insert into accounts (username, password_hash, role, created_at)
+        select username, password_hash, 'contributor', created_at from app_users on conflict do nothing`,
+      `alter table dispatches add column if not exists hidden_from_live boolean not null default false`,
+    ],
+  },
 ] as const;
 
 export function db() {
@@ -192,12 +250,14 @@ async function migrateSchema() {
         exists (
           select 1 from information_schema.columns
           where table_schema = current_schema() and table_name = 'questions' and column_name = 'days_early'
-        ) as complete
+        ) and
+        to_regclass('accounts') is not null and
+        to_regclass('activity_log') is not null as complete
     `)[0];
     for (const migration of migrations) {
-      // Re-run the baseline's idempotent statements if a migration record and
-      // the actual schema ever drift apart.
-      if (applied.has(migration.version) && coreState?.complete) continue;
+      // Never replay historical data-changing migrations to repair schema drift.
+      // Migration 10 reconciles both independently released migration 9 variants.
+      if (applied.has(migration.version)) continue;
       for (const statement of migration.statements) await tx.unsafe(statement);
       await tx`insert into announcement_schema_migrations (version) values (${migration.version}) on conflict (version) do nothing`;
     }
@@ -242,13 +302,16 @@ async function coreSchemaExists() {
       exists (
         select 1 from information_schema.columns
         where table_schema = current_schema() and table_name = 'questions' and column_name = 'days_early'
-      ) as complete
+      ) and
+      to_regclass('accounts') is not null and
+      to_regclass('activity_log') is not null as complete
   `;
   return Boolean(rows[0]?.complete);
 }
 
 export async function ensureSchema() {
-  if (!globalForDb.qotdSchemaPromise) {
+  if (!globalForDb.qotdSchemaPromise || globalForDb.qotdSchemaVersion !== migrations[migrations.length - 1].version) {
+    globalForDb.qotdSchemaVersion = migrations[migrations.length - 1].version;
     globalForDb.qotdSchemaPromise = migrateSchema().catch((error) => {
       globalForDb.qotdSchemaPromise = undefined;
       throw error;
