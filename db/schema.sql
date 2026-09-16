@@ -43,6 +43,7 @@ create table if not exists dispatches (
   question_id uuid references questions(id) on delete set null,
   local_date date,
   mode text not null check (mode in ('scheduled', 'manual_random', 'manual_selected')),
+  destination text not null default 'discord' check (destination in ('discord', 'live')),
   message text not null,
   success boolean not null,
   response_status integer,
@@ -74,3 +75,12 @@ create table if not exists activity_log (
 );
 
 create index if not exists activity_log_created_idx on activity_log(created_at desc);
+
+create table if not exists push_subscriptions (
+  endpoint text primary key,
+  p256dh text not null,
+  auth text not null,
+  address_hash text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists push_subscriptions_address_idx on push_subscriptions(address_hash, created_at);

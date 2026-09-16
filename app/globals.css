@@ -134,6 +134,10 @@ input:focus, select:focus, textarea:focus { border-color: #666; box-shadow: 0 0 
 .queue-number { color: var(--muted); font-size: .8rem; }
 .approved-actions { display: flex; align-items: center; gap: .15rem; }
 .approved-actions form { margin: 0; }
+.approved-actions .send-options { display: grid; gap: .4rem; max-width: 16rem; }
+.send-options label { font-size: .8rem; margin: 0; }
+.send-options select { padding: .4rem; font-size: .85rem; }
+.send-options input[type="checkbox"] { width: auto; margin: 0 .3rem 0 0; }
 .delete-link { color: var(--danger); }
 
 .template-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }

@@ -188,6 +188,25 @@ const migrations = [
       `alter table dispatches add column if not exists hidden_from_live boolean not null default false`,
     ],
   },
+  {
+    version: 11,
+    statements: [
+      `create table if not exists push_subscriptions (
+        endpoint text primary key,
+        p256dh text not null,
+        auth text not null,
+        address_hash text not null,
+        created_at timestamptz not null default now()
+      )`,
+      `create index if not exists push_subscriptions_address_idx on push_subscriptions(address_hash, created_at)`,
+    ],
+  },
+  {
+    version: 12,
+    statements: [
+      `alter table dispatches add column if not exists destination text not null default 'discord' check (destination in ('discord', 'live'))`,
+    ],
+  },
 ] as const;
 
 export function db() {

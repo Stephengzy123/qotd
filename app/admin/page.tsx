@@ -44,7 +44,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       notification_user_id, notification_webhook_url_encrypted is not null as has_notification_webhook,
       calendar_feed_url_encrypted is not null as has_calendar_feed
       from settings where singleton = true`,
-    sql<Dispatch[]>`select id, message, success, mode, created_at, error from dispatches order by created_at desc limit 8`,
+    sql<Dispatch[]>`select id, message, success, case when destination = 'live' then 'live_only' else mode end as mode, created_at, error from dispatches order by created_at desc limit 8`,
     listAccounts(),
     sql<ActivityEntry[]>`select id, action, actor, actor_role, success, details, created_at from activity_log order by created_at desc limit 50`,
   ]);
