@@ -49,6 +49,20 @@ Configure both encrypted webhooks and the Discord IDs from the admin page. The n
 An optional `webcal://` or HTTPS iCalendar feed can also be saved from the admin page. Its URL is encrypted with `WEBHOOK_ENCRYPTION_KEY`. For regular announcements, `{calendar}` expands to one `## Event title` line for every all-day calendar event on the Announcement date. It disappears when that date has no matching event and is ignored by Event mode.
 # Live browser notifications
 
+`/live` is installable as **Live Announcements** with a standalone window and
+app icons. A first-visit invitation can be dismissed per browser; the install
+control remains available afterward. Browsers without an install prompt show
+manual installation instructions. Existing push subscriptions and the worker
+scope are preserved. The app requires a network connection; it does not cache
+admin pages or provide offline message history.
+
+On supported installed apps, incoming pushes increment a persistent unread badge;
+focusing a visible `/live` window clears it. This counts pushes received by that
+browser, not a cross-device unread history. Chrome 152+ on macOS attributes
+notifications to the installed app. Allow its separate OS permission and enable
+**Badge app icon** in system notification settings. Older browsers may still
+attribute alerts to Chrome or not support badges.
+
 Admin approved-item **Send to** options apply to immediate sends: **Discord + /live**
 (default) or **/live only**. Live-only publication marks the item sent so cron does
 not send it to Discord later; it still notifies browser subscribers. **Remove all
