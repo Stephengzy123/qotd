@@ -49,6 +49,14 @@ Configure both encrypted webhooks and the Discord IDs from the admin page. The n
 An optional `webcal://` or HTTPS iCalendar feed can also be saved from the admin page. Its URL is encrypted with `WEBHOOK_ENCRYPTION_KEY`. For regular announcements, `{calendar}` expands to one `## Event title` line for every all-day calendar event on the Announcement date. It disappears when that date has no matching event and is ignored by Event mode.
 # Live browser notifications
 
+Admin approved-item **Send to** options apply to immediate sends: **Discord + /live**
+(default) or **/live only**. Live-only publication marks the item sent so cron does
+not send it to Discord later; it still notifies browser subscribers. **Remove all
+pings** removes Discord user/role/everyone/here mentions from the outgoing message
+and disables Discord allowed mentions. Live-only messages and live-feed display
+always strip pings. Scheduled sends retain their existing behavior.
+Run `node scripts/test-send-options.cjs` to check these paths without real sends.
+
 Visitors can opt in or out on `/live`, without an account. Notifications are sent
 after a successful manual or scheduled Discord send, even with the tab closed.
 Clicking a notification opens `/live`. Only new messages are pushed; subscribing,

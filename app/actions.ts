@@ -218,11 +218,15 @@ export async function sendQuestionAction(formData: FormData) {
   const session = await requireRole("admin");
   const id = String(formData.get("id") || "");
   if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin", session, "send_announcement", "Select an announcement to send.", { id });
-  const result = await sendAnnouncement(id, "manual_selected", undefined, session.username);
+  const destination = String(formData.get("destination") || "discord");
+  if (destination !== "discord" && destination !== "live") await fail("/admin", session, "send_announcement", "Choose a valid destination.", { id });
+  const result = await sendAnnouncement(id, "manual_selected", undefined, session.username, { destination: destination as "discord" | "live", removePings: formData.get("removePings") === "on" });
   if (!("error" in result)) scheduleLivePush(result.dispatchId);
   await logEvent({ action: "send_announcement", actor: session.username, role: session.role, success: !("error" in result), details: { id, mode: "manual_selected", error: "error" in result ? result.error : undefined } });
   revalidatePath("/admin");
-  redirect(messageUrl("/admin", "error" in result ? "error" : "ok", "error" in result ? (result.error || "Send failed.") : "Announcement sent to Discord."));
+  revalidatePath("/live");
+  revalidatePath("/contribute");
+  redirect(messageUrl("/admin", "error" in result ? "error" : "ok", "error" in result ? (result.error || "Send failed.") : destination === "live" ? "Announcement published to /live only." : "Announcement sent to Discord."));
 }
 
 export async function createAccountAction(formData: FormData) {

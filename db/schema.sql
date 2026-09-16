@@ -43,6 +43,7 @@ create table if not exists dispatches (
   question_id uuid references questions(id) on delete set null,
   local_date date,
   mode text not null check (mode in ('scheduled', 'manual_random', 'manual_selected')),
+  destination text not null default 'discord' check (destination in ('discord', 'live')),
   message text not null,
   success boolean not null,
   response_status integer,
