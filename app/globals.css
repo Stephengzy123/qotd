@@ -285,3 +285,9 @@ body.dialog-open { overflow: hidden; }
 .pagination a { display: inline-flex; align-items: center; text-decoration: none; }
 .section-title a.secondary { min-height: 32px; padding: .3rem .7rem; font-size: .85rem; text-decoration: none; }
 @media (max-width: 760px) { .log-filters { grid-template-columns: 1fr; } }
+.quick-announcement { margin-bottom: 1rem; }
+.quick-announcement summary { cursor: pointer; font-weight: 650; }
+.quick-announcement fieldset { border: 0; padding: 1rem 0 0; display: grid; gap: .65rem; min-width: 0; }
+.quick-announcement .quick-ping input { width: auto; margin-right: .4rem; }
+.quick-identity { display: flex; gap: .5rem; align-items: center; margin-bottom: .8rem; }
+.quick-identity img { border-radius: 50%; }

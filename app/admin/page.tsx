@@ -15,6 +15,8 @@ import { AnnouncementPreview } from "@/components/announcement-preview";
 import { DiscordMarkdown } from "@/components/discord-preview";
 import { WebhookProfile } from "@/components/webhook-profile";
 import { ComposerDialog } from "@/components/composer-dialog";
+import { QuickAnnouncement } from "@/components/quick-announcement";
+import { getWebhookDetails } from "@/lib/webhook-details";
 
 type Announcement = { id: string; question: string; contributor_note: string | null; status: string; created_at: Date; scheduled_date: string | Date | null; question_type: "announcement" | "event"; event_title: string | null; days_early: number };
 type Dispatch = { id: string; message: string; success: boolean; mode: string; created_at: Date; error: string | null };
@@ -55,6 +57,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const settings = settingsRows[0] || { message_template: DEFAULT_ANNOUNCEMENT_TEMPLATE, event_message_template: DEFAULT_EVENT_TEMPLATE, mention_role_id: null, has_webhook: false, notification_user_id: null, has_notification_webhook: false, has_calendar_feed: false };
   const eventMinimumDate = addDays(pacificParts().localDate, 1);
   const announcementMinimumDate = minimumAnnouncementDate();
+  const quickProfile = await getWebhookDetails(settings.webhook_url_encrypted);
 
   return (
     <main className="app-shell">
@@ -62,6 +65,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       <header className="topbar"><strong>Announcement admin</strong><nav className="admin-navigation" aria-label="Admin"><a href="#inbox">Pending</a><a href="#approved">Approved</a><a href="#delivery">Settings</a><a href="#accounts">Accounts</a><a href="#activity">Activity</a><a href="/live">Live feed</a><a href="/admin/logs">Logs</a></nav><div className="account"><span>{session.username}</span><form action={logoutAction}><PendingButton className="text-button" pendingText="Signing out…">Sign out</PendingButton></form></div></header>
       <section className="admin-heading"><div><h1>Announcements</h1><p>Daily announcements publish the previous evening; events publish on their selected publish date, during the 6 PM Pacific hour.</p></div></section>
       <Notice ok={params.ok} error={params.error} />
+      <QuickAnnouncement roleId={settings.mention_role_id} avatarUrl={quickProfile.status === "connected" ? quickProfile.avatarUrl : null} />
       <section className="stats" aria-label="Queue summary"><div><span>Awaiting review</span><strong>{pending.length}</strong></div><div><span>Scheduled</span><strong>{approved.length}</strong></div><div><span>Sent recently</span><strong>{sent.length}</strong></div></section>
 
       <section id="inbox" className="section-block"><div className="section-title"><h2>Pending</h2><span className="count-badge">{pending.length}</span></div>

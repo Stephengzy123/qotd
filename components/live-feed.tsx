@@ -5,8 +5,9 @@ import { DiscordMarkdown } from "@/components/discord-preview";
 import { setLiveMessageHidden } from "@/app/live/actions";
 import { LiveNotifications } from "@/components/live-notifications";
 import { LiveInstall } from "@/components/live-install";
+import { QuickAnnouncement } from "@/components/quick-announcement";
 
-type Message = { id: string; message: string; type: string | null; sentAt: string; cursor: string; hidden: boolean };
+type Message = { id: string; message: string; type: string | null; sentAt: string; cursor: string; hidden: boolean; senderName?: string | null; senderAvatarUrl?: string | null };
 type Page = { messages: Message[]; hasMore: boolean };
 function timestamp(value: string) {
   const date = new Date(value), today = new Date(), yesterday = new Date();
@@ -15,7 +16,7 @@ function timestamp(value: string) {
   return `${day} at ${date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
 }
 
-export function LiveFeed({ isAdmin = false, botName = "Announcements", avatarUrl = null }: { isAdmin?: boolean; botName?: string; avatarUrl?: string | null }) {
+export function LiveFeed({ isAdmin = false, botName = "Announcements", avatarUrl = null, roleId = null }: { isAdmin?: boolean; botName?: string; avatarUrl?: string | null; roleId?: string | null }) {
   const [showHidden, setShowHidden] = useState(false), [changing, setChanging] = useState<string | null>(null);
   const [filter, setFilter] = useState("all"), [theme, setTheme] = useState("system");
   const [messages, setMessages] = useState<Message[]>([]), [hasOlder, setHasOlder] = useState(false);
@@ -94,7 +95,7 @@ export function LiveFeed({ isAdmin = false, botName = "Announcements", avatarUrl
       {error && <p className="live-status" role="alert">{error} <button type="button" onClick={() => void load(retryDirection.current)}>Retry</button></p>}
       {!loading && !error && !messages.length && <p className="live-status">No sent messages in this category yet.</p>}
       {messages.map(message => <article className="live-message" key={message.id}>
-        {avatarUrl ? <img className="live-avatar" src={avatarUrl} alt="" width={38} height={38} referrerPolicy="no-referrer" /> : <div className="live-avatar" aria-hidden="true">{botName.slice(0, 1).toUpperCase()}</div>}<div className="live-message-body"><div className="live-message-meta"><strong>{botName}</strong><span className="live-bot">BOT</span><time dateTime={message.sentAt} title={new Date(message.sentAt).toLocaleString()}>{timestamp(message.sentAt)}</time>
+        {(message.senderAvatarUrl || avatarUrl) ? <img className="live-avatar" src={message.senderAvatarUrl || avatarUrl!} alt="" width={38} height={38} referrerPolicy="no-referrer" /> : <div className="live-avatar" aria-hidden="true">{(message.senderName || botName).slice(0, 1).toUpperCase()}</div>}<div className="live-message-body"><div className="live-message-meta"><strong>{message.senderName || botName}</strong><span className="live-bot">BOT</span><time dateTime={message.sentAt} title={new Date(message.sentAt).toLocaleString()}>{timestamp(message.sentAt)}</time>
           {isAdmin && <button type="button" disabled={changing !== null} onClick={async () => {
             setChanging(message.id);
             try { await setLiveMessageHidden(message.id, !message.hidden); records.current = records.current.filter(item => item.id !== message.id); setMessages(records.current); }
@@ -105,5 +106,6 @@ export function LiveFeed({ isAdmin = false, botName = "Announcements", avatarUrl
       </article>)}
     </div></div>
     {newMessages && <button type="button" className="live-jump" onClick={() => { stickBottom.current = true; if (viewport.current) viewport.current.scrollTop = viewport.current.scrollHeight; setNewMessages(false); }}>New messages ↓</button>}
+    {isAdmin && <QuickAnnouncement compact roleId={roleId} avatarUrl={avatarUrl} onSent={() => { setFilter("all"); setShowHidden(false); stickBottom.current = true; if (filter === "all" && !showHidden) void load("newer"); }} />}
   </main>;
 }

@@ -49,6 +49,18 @@ Configure both encrypted webhooks and the Discord IDs from the admin page. The n
 An optional `webcal://` or HTTPS iCalendar feed can also be saved from the admin page. Its URL is encrypted with `WEBHOOK_ENCRYPTION_KEY`. For regular announcements, `{calendar}` expands to one `## Event title` line for every all-day calendar event on the Announcement date. It disappears when that date has no matching event and is ignored by Event mode.
 # Live browser notifications
 
+Admins can post immediately from the composer at the bottom of `/live` or the
+quick-announcement panel in `/admin`. Enter a nickname and raw Discord Markdown;
+there are no dates, calendar lines, approval steps, or announcement templates.
+The existing webhook avatar is retained. Quick messages default to **/live only**.
+Admins can explicitly select Discord + /live; quick posts always strip mention
+tokens and disable Discord pings server-side. No announcement-role ping is added.
+The saved nickname is shown in the live feed and browser notifications. Anonymous
+visitors and contributors cannot use the send action. Failed/uncertain sends keep
+the draft; check Discord and Recent sends before choosing **Start new attempt**.
+Migration 13 stores sender identity on dispatches. Test without sending anything:
+`node scripts/test-quick-announcement.cjs`.
+
 `/live` is installable as **Live Announcements** with a standalone window and
 app icons. A first-visit invitation can be dismissed per browser; the install
 control remains available afterward. Browsers without an install prompt show

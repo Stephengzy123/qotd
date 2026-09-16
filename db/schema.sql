@@ -45,6 +45,8 @@ create table if not exists dispatches (
   mode text not null check (mode in ('scheduled', 'manual_random', 'manual_selected')),
   destination text not null default 'discord' check (destination in ('discord', 'live')),
   message text not null,
+  sender_name text,
+  sender_avatar_url text,
   success boolean not null,
   response_status integer,
   error text,
