@@ -201,6 +201,12 @@ const migrations = [
       `create index if not exists push_subscriptions_address_idx on push_subscriptions(address_hash, created_at)`,
     ],
   },
+  {
+    version: 12,
+    statements: [
+      `alter table dispatches add column if not exists destination text not null default 'discord' check (destination in ('discord', 'live'))`,
+    ],
+  },
 ] as const;
 
 export function db() {
