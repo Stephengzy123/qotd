@@ -46,3 +46,12 @@
 .live-install button { font: inherit; color: inherit; background: transparent; border: 1px solid currentColor; border-radius: 6px; padding: .45rem .7rem; cursor: pointer; }
 .live-install button:disabled { opacity: .55; cursor: default; }
 .live-install-invite { border: 1px solid currentColor; border-radius: 8px; padding: .7rem; margin-bottom: .6rem; }
+.live-compose { flex: 0 0 auto; max-height: 45dvh; overflow-y: auto; margin: 0; padding: .65rem max(1rem, calc((100vw - 1080px)/2)); border-top: 1px solid var(--live-border); background: var(--live-surface); }
+.live-compose fieldset { grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr); gap: .4rem .65rem; align-items: center; padding: 0; }
+.live-compose textarea, .live-compose details, .live-compose .quick-ping, .live-compose small { grid-column: 1 / -1; }
+.live-compose label[for="quick-message"] { display: none; }
+.live-compose label { margin: 0; font-size: .8rem; }
+.live-compose input, .live-compose select, .live-compose textarea { padding: .4rem .6rem; background: var(--live-bg); color: var(--live-text); border-color: var(--live-border); }
+.live-compose p { margin: .35rem 0; }
+.live-shell:has(.live-compose) .live-jump { bottom: auto; top: 6rem; }
+@media (max-width: 600px) { .live-compose fieldset { grid-template-columns: auto minmax(0, 1fr); } }

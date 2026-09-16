@@ -2,7 +2,7 @@ import "server-only";
 import { dbReady } from "@/lib/db";
 import { liveMessageText } from "@/lib/live-text";
 
-type Row = { id: string; message: string; question_type: "announcement" | "event" | null; sent_time: string; hidden_from_live: boolean };
+type Row = { id: string; message: string; question_type: "announcement" | "event" | null; sent_time: string; hidden_from_live: boolean; sender_name: string | null; sender_avatar_url: string | null };
 export function parseLiveCursor(value: string | null): { time: string; id: string } | null {
   if (!value) return null;
   if (value.length > 300) throw new Error("Invalid cursor");
@@ -13,7 +13,7 @@ export function parseLiveCursor(value: string | null): { time: string; id: strin
 
 export async function getLiveMessages(type: string, before: ReturnType<typeof parseLiveCursor>, after: ReturnType<typeof parseLiveCursor>, hidden = false) {
   const sql = await dbReady();
-  const rows = await sql<Row[]>`select id, message, question_type, hidden_from_live, created_at::text as sent_time from dispatches
+  const rows = await sql<Row[]>`select id, message, question_type, hidden_from_live, sender_name, sender_avatar_url, created_at::text as sent_time from dispatches
     where success = true and hidden_from_live = ${hidden}
     ${type === "all" ? sql`` : sql`and question_type = ${type}`}
     ${before ? sql`and (created_at, id) < (${before.time}::timestamptz, ${before.id}::uuid)` : sql``}
@@ -22,7 +22,7 @@ export async function getLiveMessages(type: string, before: ReturnType<typeof pa
   const selected = rows.slice(0, 10);
   if (!after) selected.reverse();
   return {
-    messages: selected.map(row => ({ id: row.id, message: liveMessageText(row.message), hidden: row.hidden_from_live, type: row.question_type, sentAt: new Date(row.sent_time).toISOString(), cursor: Buffer.from(JSON.stringify({ time: row.sent_time, id: row.id })).toString("base64url") })),
+    messages: selected.map(row => ({ id: row.id, message: liveMessageText(row.message), senderName: row.sender_name, senderAvatarUrl: row.sender_avatar_url, hidden: row.hidden_from_live, type: row.question_type, sentAt: new Date(row.sent_time).toISOString(), cursor: Buffer.from(JSON.stringify({ time: row.sent_time, id: row.id })).toString("base64url") })),
     hasMore: rows.length > 10,
   };
 }

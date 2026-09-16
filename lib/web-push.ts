@@ -20,14 +20,14 @@ export function scheduleLivePush(dispatchId: string) {
 
 async function deliverLivePush(dispatchId: string) {
   const sql = await dbReady();
-  const message = (await sql`select message, created_at from dispatches where id = ${dispatchId} and success = true and hidden_from_live = false`)[0];
+  const message = (await sql`select message, created_at, sender_name, sender_avatar_url from dispatches where id = ${dispatchId} and success = true and hidden_from_live = false`)[0];
   if (!message) return;
   const settings = (await sql`select webhook_url_encrypted from settings where singleton = true`)[0];
   const profile = await getWebhookDetails(settings?.webhook_url_encrypted);
   const payload = JSON.stringify({
-    title: profile.status === "connected" ? profile.name : "Announcements",
+    title: message.sender_name || (profile.status === "connected" ? profile.name : "Announcements"),
     body: liveMessageText(message.message).replace(/<a?:[^:>]+:\d+>/g, "").replace(/[*_~`#|]/g, "").replace(/\s+/g, " ").trim().slice(0, 180),
-    icon: profile.status === "connected" ? profile.avatarUrl : null,
+    icon: message.sender_avatar_url || (profile.status === "connected" ? profile.avatarUrl : null),
     tag: `announcement-${dispatchId}`,
   });
   // Page through subscriptions; bounded concurrency avoids opening a socket per visitor.

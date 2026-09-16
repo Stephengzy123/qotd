@@ -268,3 +268,26 @@ body.dialog-open { overflow: hidden; }
   .composer-dialog .template-grid { grid-template-columns: 1fr; }
   .hero-button { width: 100%; }
 }
+
+/* Account manager */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.account-manage { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .55rem; }
+.account-manage select { width: auto; padding: .4rem .6rem; }
+.account-manage input { width: min(260px, 100%); padding: .4rem .6rem; }
+.account-manage button { padding: .4rem .8rem; }
+
+/* Logs page */
+.log-filters { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: .75rem; align-items: end; margin-bottom: 1.5rem; padding: 1rem; }
+.log-filter-actions { display: flex; gap: .5rem; }
+.log-clear { display: inline-flex; align-items: center; text-decoration: none; }
+.log-list time { white-space: nowrap; }
+.pagination { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1rem; }
+.pagination a { display: inline-flex; align-items: center; text-decoration: none; }
+.section-title a.secondary { min-height: 32px; padding: .3rem .7rem; font-size: .85rem; text-decoration: none; }
+@media (max-width: 760px) { .log-filters { grid-template-columns: 1fr; } }
+.quick-announcement { margin-bottom: 1rem; }
+.quick-announcement summary { cursor: pointer; font-weight: 650; }
+.quick-announcement fieldset { border: 0; padding: 1rem 0 0; display: grid; gap: .65rem; min-width: 0; }
+.quick-announcement .quick-ping input { width: auto; margin-right: .4rem; }
+.quick-identity { display: flex; gap: .5rem; align-items: center; margin-bottom: .8rem; }
+.quick-identity img { border-radius: 50%; }

@@ -207,6 +207,13 @@ const migrations = [
       `alter table dispatches add column if not exists destination text not null default 'discord' check (destination in ('discord', 'live'))`,
     ],
   },
+  {
+    version: 13,
+    statements: [
+      `alter table dispatches add column if not exists sender_name text`,
+      `alter table dispatches add column if not exists sender_avatar_url text`,
+    ],
+  },
 ] as const;
 
 export function db() {
