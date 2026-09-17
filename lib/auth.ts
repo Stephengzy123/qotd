@@ -5,7 +5,13 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { redirect } from "next/navigation";
 import { findAccount } from "@/lib/accounts";
 
-export type Role = "contributor" | "admin";
+export type Role = "contributor" | "admin" | "club_leader";
+const ROLES: Role[] = ["contributor", "admin", "club_leader"];
+
+// Where each role lands after signing in.
+export function homePath(role: Role) {
+  return role === "admin" ? "/admin" : role === "club_leader" ? "/club" : "/contribute";
+}
 type Session = { role: Role; username: string; expires: number; accountId?: string };
 const COOKIE_NAME = "qotd_session";
 
@@ -37,7 +43,8 @@ export async function verifyCredentials(username: string, password: string): Pro
   // Accounts created from the admin page live in the database.
   try {
     const account = await findAccount(username);
-    if (account && (await bcrypt.compare(password, account.password_hash))) return account.role;
+    // Accounts without a password have not finished their setup link yet.
+    if (account?.password_hash && (await bcrypt.compare(password, account.password_hash))) return account.role;
   } catch (error) {
     console.error(`[activity] account lookup failed: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -70,7 +77,7 @@ export async function getSession(): Promise<Session | null> {
   if (!payload || !signature || !safeEqual(signature, sign(payload))) return null;
   try {
     const session = JSON.parse(Buffer.from(payload, "base64url").toString()) as Session;
-    if (session.expires < Date.now() || !["admin", "contributor"].includes(session.role)) return null;
+    if (session.expires < Date.now() || !ROLES.includes(session.role)) return null;
     const configured = (session.role === "admin" && session.username === process.env.ADMIN_USERNAME) || (session.role === "contributor" && session.username === process.env.CONTRIBUTOR_USERNAME);
     if (!configured) {
       const account = await findAccount(session.username);

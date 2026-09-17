@@ -59,8 +59,8 @@ create index if not exists questions_scheduled_date_idx on questions(status, sch
 create table if not exists accounts (
   id uuid primary key default gen_random_uuid(),
   username text not null check (char_length(username) between 2 and 64),
-  password_hash text not null,
-  role text not null check (role in ('contributor', 'admin')),
+  password_hash text,
+  role text not null check (role in ('contributor', 'admin', 'club_leader')),
   created_by text,
   created_at timestamptz not null default now()
 );
@@ -87,3 +87,36 @@ create table if not exists push_subscriptions (
   created_at timestamptz not null default now()
 );
 create index if not exists push_subscriptions_address_idx on push_subscriptions(address_hash, created_at);
+
+create table if not exists password_setup_tokens (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references accounts(id) on delete cascade,
+  token_hash text not null unique,
+  token_encrypted text not null,
+  created_by text,
+  expires_at timestamptz not null,
+  used_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists password_setup_tokens_account_idx on password_setup_tokens(account_id, created_at desc);
+
+create table if not exists club_channels (
+  account_id uuid primary key references accounts(id) on delete cascade,
+  webhook_url_encrypted text,
+  updated_by text,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists club_posts (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid references accounts(id) on delete set null,
+  username text not null,
+  message text not null,
+  success boolean not null,
+  response_status integer,
+  error text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists club_posts_account_idx on club_posts(account_id, created_at desc);

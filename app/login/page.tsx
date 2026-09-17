@@ -1,4 +1,4 @@
-import { getSession } from "@/lib/auth";
+import { getSession, homePath } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { loginAction } from "@/app/actions";
 import { Notice } from "@/components/notice";
@@ -6,7 +6,7 @@ import { PendingButton } from "@/components/pending-button";
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const session = await getSession();
-  if (session) redirect(session.role === "admin" ? "/admin" : "/contribute");
+  if (session) redirect(homePath(session.role));
   const params = await searchParams;
   return (
     <main className="login-shell">

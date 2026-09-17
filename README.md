@@ -27,7 +27,13 @@ RATE_LIMIT_SECRET=
 
 Generate password hashes with `npm run hash-password -- "your password"`. Generate random secrets with `openssl rand -base64 32`.
 
-The two environment-variable logins are built in. Admins can create additional contributor or admin accounts from the **Accounts** section of the admin page; those are stored in the `accounts` table with bcrypt-hashed passwords and can be deleted from the same section.
+The two environment-variable logins are built in. Admins create additional accounts from the **Accounts** section of the admin page through a two-step overlay: pick the account type, then the username. No password is entered. The account page that opens next shows a single-use **setup link** (valid for 7 days) to send to the person; whoever opens it chooses the password and is signed in. Generating a new link from the account page invalidates the old one and doubles as a password reset. Accounts and bcrypt-hashed passwords live in the `accounts` table; link tokens are stored hashed (plus encrypted for display) in `password_setup_tokens`.
+
+## Account types
+
+- **Contributor** — writes announcements and events that an admin reviews before they go out.
+- **Admin** — reviews submissions, changes settings, and manages accounts.
+- **Club leader** — posts free-form messages straight to one Discord channel, with no review step. The admin connects that channel by saving a webhook URL on the club leader's account page (`/admin/accounts/<id>`); it is encrypted with `WEBHOOK_ENCRYPTION_KEY` like the other webhooks. Club leaders sign in to `/club`, where they see the connected channel, write a post with the same Discord editor and preview, and see their post history. Posts are recorded in `club_posts` and never appear in the public live feed. Explicit user and role mentions are allowed; `@everyone` and `@here` are not.
 
 ## Activity log
 

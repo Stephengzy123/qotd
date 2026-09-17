@@ -221,6 +221,43 @@ const migrations = [
       `create unique index if not exists dispatches_calendar_fallback_date on dispatches(calendar_fallback_date)`,
     ],
   },
+  {
+    version: 15,
+    statements: [
+      // Accounts are created without a password; the person sets one through a setup link.
+      `alter table accounts alter column password_hash drop not null`,
+      `alter table accounts drop constraint if exists accounts_role_check`,
+      `alter table accounts add constraint accounts_role_check check (role in ('contributor', 'admin', 'club_leader'))`,
+      `create table if not exists password_setup_tokens (
+        id uuid primary key default gen_random_uuid(),
+        account_id uuid not null references accounts(id) on delete cascade,
+        token_hash text not null unique,
+        token_encrypted text not null,
+        created_by text,
+        expires_at timestamptz not null,
+        used_at timestamptz,
+        created_at timestamptz not null default now()
+      )`,
+      `create index if not exists password_setup_tokens_account_idx on password_setup_tokens(account_id, created_at desc)`,
+      `create table if not exists club_channels (
+        account_id uuid primary key references accounts(id) on delete cascade,
+        webhook_url_encrypted text,
+        updated_by text,
+        updated_at timestamptz not null default now()
+      )`,
+      `create table if not exists club_posts (
+        id uuid primary key default gen_random_uuid(),
+        account_id uuid references accounts(id) on delete set null,
+        username text not null,
+        message text not null,
+        success boolean not null,
+        response_status integer,
+        error text,
+        created_at timestamptz not null default now()
+      )`,
+      `create index if not exists club_posts_account_idx on club_posts(account_id, created_at desc)`,
+    ],
+  },
 ] as const;
 
 export function db() {
@@ -285,7 +322,10 @@ async function migrateSchema() {
           where table_schema = current_schema() and table_name = 'questions' and column_name = 'days_early'
         ) and
         to_regclass('accounts') is not null and
-        to_regclass('activity_log') is not null as complete
+        to_regclass('activity_log') is not null and
+        to_regclass('password_setup_tokens') is not null and
+        to_regclass('club_channels') is not null and
+        to_regclass('club_posts') is not null as complete
     `)[0];
     for (const migration of migrations) {
       // Never replay historical data-changing migrations to repair schema drift.
@@ -337,7 +377,10 @@ async function coreSchemaExists() {
         where table_schema = current_schema() and table_name = 'questions' and column_name = 'days_early'
       ) and
       to_regclass('accounts') is not null and
-      to_regclass('activity_log') is not null as complete
+      to_regclass('activity_log') is not null and
+      to_regclass('password_setup_tokens') is not null and
+      to_regclass('club_channels') is not null and
+      to_regclass('club_posts') is not null as complete
   `;
   return Boolean(rows[0]?.complete);
 }

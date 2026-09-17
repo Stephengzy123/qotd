@@ -4,8 +4,9 @@ export type WebhookDetails =
   | { status: "missing" | "unavailable" | "invalid" }
   | { status: "connected"; name: string; avatarUrl: string | null; channelUrl: string | null };
 
-// Called only by the admin Server Component. Never return Discord's raw
-// response: it includes the webhook token as well as public profile details.
+// Called only from Server Components (admin pages and a club leader's own
+// channel card). Never return Discord's raw response: it includes the webhook
+// token as well as public profile details.
 export async function getWebhookDetails(encryptedUrl?: string | null): Promise<WebhookDetails> {
   if (!encryptedUrl) return { status: "missing" };
   try {
