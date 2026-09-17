@@ -1,3 +1,4 @@
+import { resolveWebhooks, deliverWebhooks } from "@/lib/webhook-destinations";
 import { errorDetail, logEvent } from "@/lib/log";
 import { removePings } from "@/lib/live-text";
 import { dbReady } from "@/lib/db";
@@ -95,14 +96,14 @@ export function formatAnnouncement(template: string, announcement: string, sched
 
 type Mode = "scheduled" | "manual_selected";
 
-export async function sendAnnouncement(announcementId: string, mode: Mode, localDate?: string, actor?: string, options: { destination?: "discord" | "live"; removePings?: boolean } = {}) {
+export async function sendAnnouncement(announcementId: string, mode: Mode, localDate?: string, actor?: string, options: { destination?: "discord" | "live"; removePings?: boolean; webhookIds?: string[] } = {}) {
   const destination = options.destination ?? "discord";
   if (destination !== "discord" && destination !== "live") return { error: "Invalid destination." } as const;
   const stripPings = destination === "live" || options.removePings === true;
   const logBase = { action: "dispatch_announcement", actor: actor ?? (mode === "scheduled" ? "scheduler" : null), role: mode === "scheduled" ? "system" : "admin" } as const;
   const sql = await dbReady();
   const announcements = await sql`
-      select id, question, scheduled_date, question_type, event_title from questions
+      select id, question, scheduled_date, question_type, event_title, discord_webhook_ids from questions
       where id = ${announcementId} and status = 'approved' and scheduled_date is not null
       limit 1
     `;
@@ -113,7 +114,11 @@ export async function sendAnnouncement(announcementId: string, mode: Mode, local
       from settings where singleton = true
     `)[0];
   if (!settings) return { error: "Announcement settings are unavailable." } as const;
-  if (destination === "discord" && !settings.webhook_url_encrypted) return { error: "Set a Discord webhook before sending." } as const;
+  let targets: Awaited<ReturnType<typeof resolveWebhooks>> = [];
+  if (destination === "discord") {
+    try { targets = await resolveWebhooks(options.webhookIds ?? (announcement.discord_webhook_ids as string[] | null) ?? ["primary"]); }
+    catch (error) { return { error: errorDetail(error) } as const; }
+  }
   const roleId = (settings.mention_role_id as string | null) || "0";
   if (destination === "discord" && !stripPings && !settings.mention_role_id) return { error: "Set a Discord role ID before sending." } as const;
   const scheduledDate = scheduledDateValue(announcement.scheduled_date);
@@ -160,31 +165,23 @@ export async function sendAnnouncement(announcementId: string, mode: Mode, local
     await logEvent({ ...logBase, success: true, details: { announcementId, dispatchId: claimed.dispatchId, destination, removePings: true, mode } });
     return { success: true, message, dispatchId: claimed.dispatchId };
   }
-  try {
-    const response = await fetch(decryptSecret(settings.webhook_url_encrypted as string), {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ content: message, allowed_mentions: { parse: [], roles: stripPings ? [] : [roleId], users: [], replied_user: false } }),
-      redirect: "manual",
-      signal: AbortSignal.timeout(10_000),
-    });
-    responseStatus = response.status;
-    if (!response.ok) errorMessage = `Discord returned HTTP ${response.status}.`;
-  } catch (error) {
-    errorMessage = error instanceof Error ? error.message : "The Discord request failed.";
-  }
-
-  const success = !errorMessage;
+  const results = await deliverWebhooks(targets, { content: message, allowed_mentions: { parse: [], roles: stripPings ? [] : [roleId], users: [], replied_user: false } });
+  responseStatus = results.length === 1 ? results[0].status : null;
+  const failed = results.filter(result => !result.success);
+  errorMessage = failed.length ? failed.map(result => `${result.name}: ${result.error}`).join(" ") : null;
+  // A partial send must not automatically resend to channels that succeeded.
+  const success = results.some(result => result.success);
+  const uncertain = results.some(result => result.status === null);
   await sql.begin(async (tx) => {
     await tx`update dispatches set success = ${success}, response_status = ${responseStatus}, error = ${errorMessage} where id = ${claimed.dispatchId}`;
     if (success) {
       await tx`update questions set sent_at = now(), updated_at = now() where id = ${announcement.id} and status = 'sent'`;
-    } else {
+    } else if (!uncertain) {
       await tx`update questions set status = 'approved', updated_at = now() where id = ${announcement.id} and status = 'sent' and sent_at is null`;
     }
   });
-  await logEvent({ ...logBase, success, details: { announcementId, dispatchId: claimed.dispatchId, destination, removePings: stripPings, mode, localDate, type, scheduledDate, responseStatus, error: errorMessage ?? undefined, messageLength: message.length } });
-  return success ? { success: true, message, dispatchId: claimed.dispatchId } : { error: errorMessage || "Send failed." };
+  await logEvent({ ...logBase, success, details: { announcementId, dispatchId: claimed.dispatchId, destination, removePings: stripPings, mode, localDate, type, scheduledDate, destinations: results, responseStatus, error: errorMessage ?? undefined, messageLength: message.length } });
+  return success ? { success: true, message, dispatchId: claimed.dispatchId, warning: errorMessage } : { error: errorMessage || "Send failed." };
 }
 
 export async function sendPendingNotification(announcement: string, scheduledDate: string, type: AnnouncementType, title?: string | null) {

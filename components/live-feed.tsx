@@ -6,6 +6,7 @@ import { setLiveMessageHidden } from "@/app/live/actions";
 import { LiveNotifications } from "@/components/live-notifications";
 import { LiveInstall } from "@/components/live-install";
 import { QuickAnnouncement } from "@/components/quick-announcement";
+import type { WebhookOption } from "@/lib/webhook-destinations";
 
 type Message = { id: string; message: string; type: string | null; sentAt: string; cursor: string; hidden: boolean; senderName?: string | null; senderAvatarUrl?: string | null };
 type Page = { messages: Message[]; hasMore: boolean };
@@ -16,7 +17,7 @@ function timestamp(value: string) {
   return `${day} at ${date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
 }
 
-export function LiveFeed({ isAdmin = false, botName = "Announcements", avatarUrl = null, roleId = null }: { isAdmin?: boolean; botName?: string; avatarUrl?: string | null; roleId?: string | null }) {
+export function LiveFeed({ isAdmin = false, botName = "Announcements", avatarUrl = null, roleId = null, destinations = [] }: { destinations?: WebhookOption[]; isAdmin?: boolean; botName?: string; avatarUrl?: string | null; roleId?: string | null }) {
   const [showHidden, setShowHidden] = useState(false), [changing, setChanging] = useState<string | null>(null);
   const [filter, setFilter] = useState("all"), [theme, setTheme] = useState("system");
   const [messages, setMessages] = useState<Message[]>([]), [hasOlder, setHasOlder] = useState(false);
@@ -106,6 +107,6 @@ export function LiveFeed({ isAdmin = false, botName = "Announcements", avatarUrl
       </article>)}
     </div></div>
     {newMessages && <button type="button" className="live-jump" onClick={() => { stickBottom.current = true; if (viewport.current) viewport.current.scrollTop = viewport.current.scrollHeight; setNewMessages(false); }}>New messages ↓</button>}
-    {isAdmin && <QuickAnnouncement compact roleId={roleId} avatarUrl={avatarUrl} onSent={() => { setFilter("all"); setShowHidden(false); stickBottom.current = true; if (filter === "all" && !showHidden) void load("newer"); }} />}
+    {isAdmin && <QuickAnnouncement destinations={destinations} compact roleId={roleId} avatarUrl={avatarUrl} onSent={() => { setFilter("all"); setShowHidden(false); stickBottom.current = true; if (filter === "all" && !showHidden) void load("newer"); }} />}
   </main>;
 }

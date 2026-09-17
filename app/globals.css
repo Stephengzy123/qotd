@@ -359,3 +359,7 @@ body.dialog-open { overflow: hidden; }
   .setup-link-row { flex-direction: column; }
   .account-dialog { width: 100%; max-height: 100dvh; border-radius: 0; }
 }
+/* Shared, compact per-post Discord destination controls. */
+.webhook-picker { display: grid; gap: .5rem; padding: .75rem; margin: .5rem 0; border: 1px solid currentColor; border-radius: 6px; }
+.webhook-picker label { display: flex; align-items: center; gap: .5rem; }
+.webhook-picker input[type="checkbox"] { width: auto; }

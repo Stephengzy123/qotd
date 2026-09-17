@@ -1,5 +1,6 @@
 import { LiveFeed } from "@/components/live-feed";
 import { getSession } from "@/lib/auth";
+import { webhookOptions } from "@/lib/webhook-destinations";
 import { dbReady } from "@/lib/db";
 import { getWebhookDetails } from "@/lib/webhook-details";
 import "./live.css";
@@ -18,5 +19,6 @@ export default async function LivePage() {
   const sql = await dbReady();
   const settings = (await sql`select webhook_url_encrypted, mention_role_id from settings where singleton = true`)[0];
   const profile = await getWebhookDetails(settings?.webhook_url_encrypted as string | undefined);
-  return <LiveFeed isAdmin={session?.role === "admin"} roleId={session?.role === "admin" ? settings?.mention_role_id : null} botName={profile.status === "connected" ? profile.name : "Announcements"} avatarUrl={profile.status === "connected" ? profile.avatarUrl : null} />;
+  const destinations = session?.role === "admin" ? await webhookOptions() : [];
+  return <LiveFeed destinations={destinations} isAdmin={session?.role === "admin"} roleId={session?.role === "admin" ? settings?.mention_role_id : null} botName={profile.status === "connected" ? profile.name : "Announcements"} avatarUrl={profile.status === "connected" ? profile.avatarUrl : null} />;
 }

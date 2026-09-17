@@ -13,7 +13,7 @@ function load(file, deps) {
 }
 const text = load('lib/live-text.ts', {});
 const qotd = load('lib/qotd.ts', {
-  '@/lib/log': {}, '@/lib/live-text': text, '@/lib/db': {}, '@/lib/security': {}, '@/lib/calendar': {},
+  '@/lib/webhook-destinations': {}, '@/lib/log': {}, '@/lib/live-text': text, '@/lib/db': {}, '@/lib/security': {}, '@/lib/calendar': {},
 });
 async function fallbackCase({ existing = false, feed = true, titles = ['A B C D', 'Assembly'], race = false, outage = false } = {}) {
   const inserts = [], dates = [];

@@ -33,7 +33,31 @@ The two environment-variable logins are built in. Admins create additional accou
 
 - **Contributor** — writes announcements and events that an admin reviews before they go out.
 - **Admin** — reviews submissions, changes settings, and manages accounts.
-- **Club leader** — posts free-form messages straight to one Discord channel, with no review step. The admin connects that channel by saving a webhook URL on the club leader's account page (`/admin/accounts/<id>`); it is encrypted with `WEBHOOK_ENCRYPTION_KEY` like the other webhooks. Club leaders sign in to `/club`, where they see the connected channel, write a post with the same Discord editor and preview, and see their post history. Posts are recorded in `club_posts` and never appear in the public live feed. Explicit user and role mentions are allowed; `@everyone` and `@here` are not.
+- **Club leader** — posts free-form messages to their selected assigned Discord channels, without review. Admins connect the original channel on the account page (`/admin/accounts/<id>`) and assign additional saved destinations at `/admin/webhooks`. Club leaders sign in to `/club` to choose destinations, compose with a Discord preview, and see delivery history. Webhook URLs remain encrypted. Club posts never appear in the public live feed or trigger live push notifications. Explicit user and role mentions are allowed; `@everyone` and `@here` are not.
+
+## Saved Discord destinations
+
+Admins can name, save, replace, and assign secondary Discord webhooks at
+`/admin/webhooks`. Assignments make a webhook available to primary announcements,
+selected club leaders, or both. These are permissions, not automatic broadcasts:
+senders choose destinations for each post. Secondary destinations start unchecked.
+The original primary and per-account club webhooks remain available.
+
+Admins select destinations when creating/approving announcements; cron uses that
+saved selection. Older queued items continue using the original primary webhook.
+Manual and quick sends can select a different subset for that send. Live-only
+publication never calls Discord. Regular announcements still produce just one
+live-feed entry, even with multiple Discord destinations. Calendar fallback stays
+live-only. Club posts go only to selected assigned Discord channels, never `/live`
+or live push subscribers. Club history records each destination's result.
+
+Selections are revalidated server-side: empty, stale, unassigned, or more than ten
+destinations are rejected. Duplicate URLs for the same webhook are deduplicated.
+Club drafts have a single-use request ID to prevent repeat submissions. Partial
+announcement delivery is marked sent with failed-channel errors to avoid cron
+duplicating successful deliveries. Check Discord before retrying, and target only
+failed channels. Uncertain network outcomes are not automatically retried.
+Unassigning a webhook does not delete earlier posts.
 
 ## Activity log
 
