@@ -47,6 +47,15 @@ Overdue approved entries are included in the next run so a missed invocation doe
 Configure both encrypted webhooks and the Discord IDs from the admin page. The notification webhook is optional and pings the configured user whenever a contributor submission enters Pending.
 
 An optional `webcal://` or HTTPS iCalendar feed can also be saved from the admin page. Its URL is encrypted with `WEBHOOK_ENCRYPTION_KEY`. For regular announcements, `{calendar}` expands to one `## Event title` line for every all-day calendar event on the Announcement date. It disappears when that date has no matching event and is ignored by Event mode.
+
+During the same 6 PM Pacific send window, if tomorrow has all-day calendar entries
+but no approved or sent day announcement, the scheduler publishes a **Block Rotation
+for {date}** message to `/live` only, using the SGS emoji and one heading per entry.
+Pending/rejected submissions and event announcements do not suppress this fallback.
+It notifies live subscribers, never calls the Discord webhook, and has no pings.
+A unique database date prevents duplicate fallback posts from overlapping cron or
+page-load checks, including after a fallback is hidden. No calendar entries means
+no fallback post. Calendar failures are logged and leave the date available to retry.
 # Live browser notifications
 
 Admins can post immediately from the composer at the bottom of `/live` or the

@@ -47,6 +47,7 @@ create table if not exists dispatches (
   message text not null,
   sender_name text,
   sender_avatar_url text,
+  calendar_fallback_date date unique,
   success boolean not null,
   response_status integer,
   error text,

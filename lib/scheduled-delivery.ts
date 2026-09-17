@@ -2,7 +2,8 @@ import "server-only";
 import { scheduleLivePush } from "@/lib/web-push";
 import { dbReady } from "@/lib/db";
 import { addDays, pacificParts, sendAnnouncement } from "@/lib/qotd";
-import { logEvent } from "@/lib/log";
+import { errorDetail, logEvent } from "@/lib/log";
+import { sendCalendarFallback } from "@/lib/calendar-fallback";
 
 // Both entry points share eligibility and the atomic claim in sendAnnouncement.
 export async function sendDueAnnouncements(now = new Date(), trigger: "cron" | "page_load" = "cron") {
@@ -24,6 +25,17 @@ export async function sendDueAnnouncements(now = new Date(), trigger: "cron" | "
     const result = await sendAnnouncement(announcement.id, "scheduled", localDate);
     if ("error" in result) failures.push(result.error || "Scheduled delivery failed.");
     else { sent += 1; scheduleLivePush(result.dispatchId); }
+  }
+  try {
+    const fallback = await sendCalendarFallback(tomorrow, localDate);
+    if (fallback) {
+      sent += 1;
+      scheduleLivePush(fallback.dispatchId);
+      await logEvent({ action: "calendar_fallback", actor: trigger, role: "system", details: { scheduledDate: tomorrow, dispatchId: fallback.dispatchId, destination: "live" } });
+    }
+  } catch (error) {
+    failures.push("Calendar schedule fallback failed.");
+    await logEvent({ action: "calendar_fallback", actor: trigger, role: "system", success: false, details: { scheduledDate: tomorrow, error: errorDetail(error) } });
   }
   await logEvent({ action: "scheduled_delivery_run", actor: trigger, role: "system", success: failures.length === 0, details: { localDate, due: due.length, sent, failures } });
   return { success: failures.length === 0, localDate, tomorrow, sent, failures };
