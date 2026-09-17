@@ -258,6 +258,60 @@ const migrations = [
       `create index if not exists club_posts_account_idx on club_posts(account_id, created_at desc)`,
     ],
   },
+  {
+    version: 16,
+    statements: [
+      // Clubs become first-class: several accounts (a leader plus assistants)
+      // share one club and one channel webhook.
+      `create table if not exists clubs (
+        id uuid primary key default gen_random_uuid(),
+        name text not null check (char_length(name) between 2 and 80),
+        webhook_url_encrypted text,
+        created_by text,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now()
+      )`,
+      `create unique index if not exists clubs_name_lower_idx on clubs(lower(name))`,
+      `create table if not exists club_members (
+        account_id uuid primary key references accounts(id) on delete cascade,
+        club_id uuid not null references clubs(id) on delete cascade,
+        club_role text not null check (club_role in ('leader', 'assistant')),
+        created_at timestamptz not null default now()
+      )`,
+      `create index if not exists club_members_club_idx on club_members(club_id, club_role)`,
+      `alter table club_posts add column if not exists club_id uuid references clubs(id) on delete set null`,
+      `alter table club_posts add column if not exists status text not null default 'sent' check (status in ('pending', 'sent', 'failed', 'rejected'))`,
+      `alter table club_posts add column if not exists reviewed_by text`,
+      `alter table club_posts add column if not exists reviewed_at timestamptz`,
+      `alter table club_posts add column if not exists sent_at timestamptz`,
+      `update club_posts set status = case when success then 'sent' else 'failed' end, sent_at = coalesce(sent_at, created_at) where status = 'sent'`,
+      `create index if not exists club_posts_club_status_idx on club_posts(club_id, status, created_at desc)`,
+      // Migrate the one-webhook-per-account rows into clubs named after the account.
+      `insert into clubs (name, webhook_url_encrypted, created_by, created_at, updated_at)
+        select a.username, c.webhook_url_encrypted, c.updated_by, c.updated_at, c.updated_at
+        from club_channels c join accounts a on a.id = c.account_id
+        where not exists (select 1 from club_members m where m.account_id = c.account_id)
+        on conflict do nothing`,
+      `insert into club_members (account_id, club_id, club_role)
+        select c.account_id, k.id, 'leader' from club_channels c
+        join accounts a on a.id = c.account_id join clubs k on lower(k.name) = lower(a.username)
+        on conflict do nothing`,
+      `update club_posts p set club_id = m.club_id from club_members m where m.account_id = p.account_id and p.club_id is null`,
+      `create table if not exists passkeys (
+        id text primary key,
+        account_id uuid not null references accounts(id) on delete cascade,
+        public_key text not null,
+        counter bigint not null default 0,
+        transports text[],
+        device_type text,
+        backed_up boolean not null default false,
+        name text,
+        created_at timestamptz not null default now(),
+        last_used_at timestamptz
+      )`,
+      `create index if not exists passkeys_account_idx on passkeys(account_id)`,
+    ],
+  },
 ] as const;
 
 export function db() {
@@ -325,7 +379,10 @@ async function migrateSchema() {
         to_regclass('activity_log') is not null and
         to_regclass('password_setup_tokens') is not null and
         to_regclass('club_channels') is not null and
-        to_regclass('club_posts') is not null as complete
+        to_regclass('club_posts') is not null and
+        to_regclass('clubs') is not null and
+        to_regclass('club_members') is not null and
+        to_regclass('passkeys') is not null as complete
     `)[0];
     for (const migration of migrations) {
       // Never replay historical data-changing migrations to repair schema drift.
@@ -380,7 +437,10 @@ async function coreSchemaExists() {
       to_regclass('activity_log') is not null and
       to_regclass('password_setup_tokens') is not null and
       to_regclass('club_channels') is not null and
-      to_regclass('club_posts') is not null as complete
+      to_regclass('club_posts') is not null and
+      to_regclass('clubs') is not null and
+      to_regclass('club_members') is not null and
+      to_regclass('passkeys') is not null as complete
   `;
   return Boolean(rows[0]?.complete);
 }

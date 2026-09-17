@@ -10,7 +10,7 @@ import { encryptSecret, hashAddress, validateDiscordWebhook } from "@/lib/securi
 import { isValidAnnouncementDate, isValidFuturePacificDate, normalizeDiscordTemplate, sendAnnouncement, sendPendingNotification, validateAnnouncementTemplate, type AnnouncementType } from "@/lib/qotd";
 import { fetchCalendarByUrl, normalizeCalendarFeedUrl } from "@/lib/calendar";
 import { createAccount, createSetupLink, deleteAccount, getAccount, parseRole, ROLE_LABELS, updateAccountRole } from "@/lib/accounts";
-import { saveClubWebhook } from "@/lib/clubs";
+import { createClub, setMembership, type ClubRole } from "@/lib/clubs";
 import { logEvent } from "@/lib/log";
 import type { Role } from "@/lib/auth";
 
@@ -234,13 +234,39 @@ export async function createAccountAction(formData: FormData) {
   const session = await requireRole("admin");
   const username = String(formData.get("username") || "").trim();
   const role = parseRole(formData.get("role")) ?? await fail("/admin/accounts", session, "create_account", "Choose an account type.", { username });
+  // Club leaders and assistants belong to a club: an existing one or a new one named here.
+  const clubChoice = String(formData.get("club") || "");
+  const clubName = String(formData.get("clubName") || "").trim();
+  const clubRole: ClubRole = formData.get("clubRole") === "assistant" ? "assistant" : "leader";
+  let clubId: string | null = null;
+  let createdClub = false;
+  if (role === "club_leader") {
+    if (clubChoice === "new") {
+      const club = await createClub(clubName, session.username);
+      clubId = club.id ?? await fail("/admin/accounts", session, "create_club", club.error ?? "The club could not be created.", { clubName });
+      createdClub = true;
+      await logEvent({ action: "create_club", actor: session.username, role: session.role, details: { clubId, clubName } });
+    } else if (/^[0-9a-f-]{36}$/i.test(clubChoice)) {
+      clubId = clubChoice;
+    } else {
+      await fail("/admin/accounts", session, "create_account", "Choose a club for this account.", { username, role });
+    }
+  }
   const result = await createAccount(username, role, session.username);
   const accountId = result.id ?? await fail("/admin/accounts", session, "create_account", result.error ?? "The account could not be created.", { username, role });
-  await logEvent({ action: "create_account", actor: session.username, role: session.role, details: { id: accountId, username, accountRole: role } });
+  await logEvent({ action: "create_account", actor: session.username, role: session.role, details: { id: accountId, username, accountRole: role, clubId: clubId ?? undefined, clubRole: clubId ? clubRole : undefined } });
+  if (clubId) {
+    const membershipError = await setMembership(accountId, clubId, clubRole);
+    if (membershipError) {
+      await deleteAccount(accountId);
+      await fail("/admin/accounts", session, "create_account", membershipError, { username, clubId, clubRole });
+    }
+  }
   // The person chooses their own password through the setup link.
   await createSetupLink(accountId, session.username);
   await logEvent({ action: "create_setup_link", actor: session.username, role: session.role, details: { id: accountId, username } });
   revalidatePath("/admin", "layout");
+  if (createdClub) redirect(messageUrl(`/admin/clubs/${clubId}`, "ok", `“${clubName}” created with ${username} as leader. Connect the channel webhook, then share the setup link from the account page.`));
   redirect(messageUrl(`/admin/accounts/${accountId}`, "ok", `Account “${username}” created as ${ROLE_LABELS[role].toLowerCase()}. Share the setup link below.`));
 }
 
@@ -277,21 +303,4 @@ export async function regenerateSetupLinkAction(formData: FormData) {
   await logEvent({ action: "create_setup_link", actor: session.username, role: session.role, details: { id, username: account.username, replacesPassword: account.has_password } });
   revalidatePath(`/admin/accounts/${id}`);
   redirect(messageUrl(`/admin/accounts/${id}`, "ok", "New setup link ready. Earlier links no longer work."));
-}
-
-export async function saveClubWebhookAction(formData: FormData) {
-  const session = await requireRole("admin");
-  const id = String(formData.get("id") || "");
-  const webhook = String(formData.get("webhook") || "").trim();
-  const path = `/admin/accounts/${id}`;
-  if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin/accounts", session, "save_club_webhook", "Invalid account.", { id });
-  const account = (await getAccount(id)) ?? await fail("/admin/accounts", session, "save_club_webhook", "That account no longer exists.", { id });
-  if (account.role !== "club_leader") await fail(path, session, "save_club_webhook", "Only club leader accounts have a channel webhook.", { id, username: account.username });
-  if (!validateDiscordWebhook(webhook)) await fail(path, session, "save_club_webhook", "Enter a valid Discord webhook URL.", { id, username: account.username });
-  await saveClubWebhook(account.id, webhook, session.username);
-  // Never log the webhook itself.
-  await logEvent({ action: "save_club_webhook", actor: session.username, role: session.role, details: { id, username: account.username } });
-  revalidatePath(path);
-  revalidatePath("/club");
-  redirect(messageUrl(path, "ok", `Channel webhook saved for “${account.username}”.`));
 }

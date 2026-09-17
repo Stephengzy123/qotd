@@ -23,6 +23,7 @@ SESSION_SECRET=
 WEBHOOK_ENCRYPTION_KEY=
 CRON_SECRET=
 RATE_LIMIT_SECRET=
+PASSKEY_RP_ID=            # optional; defaults to the request hostname
 ```
 
 Generate password hashes with `npm run hash-password -- "your password"`. Generate random secrets with `openssl rand -base64 32`.
@@ -33,7 +34,11 @@ The two environment-variable logins are built in. Admins create additional accou
 
 - **Contributor** — writes announcements and events that an admin reviews before they go out.
 - **Admin** — reviews submissions, changes settings, and manages accounts.
-- **Club leader** — posts free-form messages straight to one Discord channel, with no review step. The admin connects that channel by saving a webhook URL on the club leader's account page (`/admin/accounts/<id>`); it is encrypted with `WEBHOOK_ENCRYPTION_KEY` like the other webhooks. Club leaders sign in to `/club`, where they see the connected channel, write a post with the same Discord editor and preview, and see their post history. Posts are recorded in `club_posts` and never appear in the public live feed. Explicit user and role mentions are allowed; `@everyone` and `@here` are not.
+- **Club member** — belongs to one club (`clubs` + `club_members`). A **leader** posts straight to the club's channel and approves assistants' drafts; an **assistant** submits drafts that wait for a leader. A club needs a leader before it can have an assistant. Admins manage clubs under **Clubs** (`/admin/clubs`): connect the channel webhook (encrypted with `WEBHOOK_ENCRYPTION_KEY`), add or re-permission members, approve pending drafts, and post to any club themselves. Members sign in to `/club`. Posts are recorded in `club_posts` with a status (`pending`, `sent`, `failed`, `rejected`) and never appear in the public live feed. Explicit user and role mentions are allowed; `@everyone` and `@here` are not.
+
+## Passkeys
+
+Anyone with an app-created account can add passkeys from **Your account** (`/account`) and then sign in with Face ID, Touch ID, Windows Hello, or a security key from the login page. Credentials live in the `passkeys` table (public key, counter, transports). The relying-party ID is the request hostname, so previews and production keep separate passkeys; set `PASSKEY_RP_ID` to pin it. Challenges are carried in a five-minute signed cookie, so no extra table is needed. Built-in environment-variable logins cannot use passkeys.
 
 ## Activity log
 
