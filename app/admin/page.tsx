@@ -17,18 +17,11 @@ import { WebhookProfile } from "@/components/webhook-profile";
 import { ComposerDialog } from "@/components/composer-dialog";
 import { QuickAnnouncement } from "@/components/quick-announcement";
 import { getWebhookDetails } from "@/lib/webhook-details";
+import { describeDetails } from "@/lib/log-details";
 
 type Announcement = { id: string; question: string; contributor_note: string | null; status: string; created_at: Date; scheduled_date: string | Date | null; question_type: "announcement" | "event"; event_title: string | null; days_early: number };
 type Dispatch = { id: string; message: string; success: boolean; mode: string; created_at: Date; error: string | null };
 type ActivityEntry = { id: string; action: string; actor: string | null; actor_role: string | null; success: boolean; details: Record<string, unknown> | null; created_at: Date };
-
-function describeDetails(details: Record<string, unknown> | null) {
-  if (!details) return "";
-  return Object.entries(details)
-    .filter(([, value]) => value !== undefined && value !== null && value !== "")
-    .map(([key, value]) => `${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`)
-    .join(" · ");
-}
 
 function relativeDate(date: Date) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" }).format(date);

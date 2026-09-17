@@ -20,7 +20,7 @@ export async function logEvent(entry: LogEntry) {
     const sql = db();
     await sql`
       insert into activity_log (action, actor, actor_role, success, details)
-      values (${record.action}, ${record.actor}, ${record.role}, ${success}, ${record.details ? JSON.stringify(record.details) : null}::jsonb)
+      values (${record.action}, ${record.actor}, ${record.role}, ${success}, ${record.details ? sql.json(record.details as Parameters<typeof sql.json>[0]) : null}::jsonb)
     `;
   } catch (error) {
     console.error(`[activity] failed to persist log entry: ${error instanceof Error ? error.message : String(error)}`);
