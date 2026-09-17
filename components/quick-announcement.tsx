@@ -4,8 +4,10 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { quickAnnounceAction } from "@/app/admin/quick-action";
 import { DiscordMarkdown } from "@/components/discord-preview";
 import { quickMessage } from "@/lib/quick-message";
+import { WebhookPicker } from "@/components/webhook-picker";
+import type { WebhookOption } from "@/lib/webhook-destinations";
 
-export function QuickAnnouncement({ avatarUrl, compact = false, onSent }: { roleId: string | null; avatarUrl: string | null; compact?: boolean; onSent?: () => void }) {
+export function QuickAnnouncement({ avatarUrl, compact = false, onSent, destinations = [] }: { destinations?: WebhookOption[]; roleId: string | null; avatarUrl: string | null; compact?: boolean; onSent?: () => void }) {
   const [result, action, pending] = useActionState(quickAnnounceAction, {});
   const [nickname, setNickname] = useState("");
   const [message, setMessage] = useState("");
@@ -26,6 +28,7 @@ export function QuickAnnouncement({ avatarUrl, compact = false, onSent }: { role
         <input type="hidden" name="requestId" value={requestId} />
         <label htmlFor="quick-nickname">Post as</label><input id="quick-nickname" name="nickname" value={nickname} onChange={event => setNickname(event.target.value)} required maxLength={80} placeholder="Nickname" />
         <label htmlFor="quick-destination">Send to</label><select id="quick-destination" name="destination" value={destination} onChange={event => setDestination(event.target.value)}><option value="discord">Discord + /live</option><option value="live">/live only</option></select>
+        {destination === "discord" && <WebhookPicker options={destinations} />}
         <label htmlFor="quick-message">Message</label><textarea id="quick-message" name="message" rows={compact ? 2 : 5} required maxLength={2000} value={message} onChange={event => setMessage(event.target.value)} placeholder="Message #announcements — Discord Markdown supported" />
         <details open={compact ? undefined : true}><summary>Preview</summary><div className="discord-preview"><div className="quick-identity">{avatarUrl && <img src={avatarUrl} alt="" width={32} height={32} />}<strong>{nickname.trim() || "Nickname"}</strong></div><DiscordMarkdown value={preview} /></div></details>
         <small>{preview.length} / 2,000 characters · No pings, dates, or announcement template.</small>

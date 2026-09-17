@@ -1,10 +1,11 @@
 import "server-only";
 import { dbReady } from "@/lib/db";
 import { errorDetail, logEvent } from "@/lib/log";
-import { decryptSecret, encryptSecret } from "@/lib/security";
+import { encryptSecret } from "@/lib/security";
+import { resolveWebhooks, deliverWebhooks } from "@/lib/webhook-destinations";
 
 export type ClubChannel = { account_id: string; webhook_url_encrypted: string | null; updated_by: string | null; updated_at: Date };
-export type ClubPost = { id: string; username: string; message: string; success: boolean; error: string | null; created_at: Date };
+export type ClubPost = { id: string; username: string; message: string; success: boolean; error: string | null; created_at: Date; destination_name: string | null };
 
 // Discord rejects webhook messages longer than 2,000 characters.
 export const CLUB_POST_MAX_LENGTH = 2000;
@@ -15,7 +16,7 @@ export async function getClubChannel(accountId: string) {
   return rows[0] || null;
 }
 
-// Each club leader account posts to exactly one webhook, so one channel.
+// Original per-account webhook remains an optional destination alongside saved assignments.
 export async function saveClubWebhook(accountId: string, webhookUrl: string, updatedBy: string) {
   const sql = await dbReady();
   await sql`
@@ -27,35 +28,25 @@ export async function saveClubWebhook(accountId: string, webhookUrl: string, upd
 
 export async function listClubPosts(accountId: string, limit = 20) {
   const sql = await dbReady();
-  return sql<ClubPost[]>`select id, username, message, success, error, created_at from club_posts where account_id = ${accountId} order by created_at desc limit ${limit}`;
+  return sql<ClubPost[]>`select id, username, message, success, error, created_at, destination_name from club_posts where account_id = ${accountId} order by created_at desc limit ${limit}`;
 }
 
-export async function postClubMessage(account: { id: string; username: string }, message: string): Promise<{ error: string; success?: undefined } | { success: true; error?: undefined }> {
-  const channel = await getClubChannel(account.id);
-  if (!channel?.webhook_url_encrypted) return { error: "Your channel isn’t connected yet. Ask an admin to add your webhook." };
-  let responseStatus: number | null = null;
-  let errorMessage: string | null = null;
-  try {
-    const response = await fetch(decryptSecret(channel.webhook_url_encrypted), {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      // Explicit @user and @role mentions work; @everyone and @here do not.
-      body: JSON.stringify({ content: message, allowed_mentions: { parse: ["users", "roles"] } }),
-      redirect: "manual",
-      signal: AbortSignal.timeout(10_000),
-    });
-    responseStatus = response.status;
-    if (!response.ok) errorMessage = `Discord returned HTTP ${response.status}.`;
-  } catch (error) {
-    errorMessage = errorDetail(error) || "The Discord request failed.";
-  }
-  const success = !errorMessage;
+export async function postClubDestinations(account: { id: string; username: string }, message: string, ids: string[], requestId: string) {
+  if (!message.trim() || message.length > CLUB_POST_MAX_LENGTH) return { error: "Write a message of 1–2,000 characters." };
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId)) return { error: "Reload before posting." };
+  let targets;
+  try { targets = await resolveWebhooks(ids, account.id); }
+  catch (error) { return { error: errorDetail(error) }; }
   const sql = await dbReady();
-  const rows = await sql<{ id: string }[]>`
-    insert into club_posts (account_id, username, message, success, response_status, error)
-    values (${account.id}, ${account.username}, ${message}, ${success}, ${responseStatus}, ${errorMessage})
-    returning id
-  `;
-  await logEvent({ action: "club_post", actor: account.username, role: "club_leader", success, details: { postId: rows[0]?.id, responseStatus, error: errorMessage ?? undefined, messageLength: message.length } });
-  return success ? { success: true } : { error: errorMessage || "Send failed." };
+  const claimed = await sql`insert into club_send_requests (id, account_id) values (${requestId}, ${account.id}) on conflict do nothing returning id`;
+  if (!claimed.length) return { error: "This post was already attempted. Check post history before starting another." };
+  // This path intentionally never writes to dispatches or schedules live push.
+  const results = await deliverWebhooks(targets, { content: message, allowed_mentions: { parse: ["users", "roles"] } });
+  for (const result of results) {
+    await sql`insert into club_posts (account_id, username, message, success, response_status, error, destination_name)
+      values (${account.id}, ${account.username}, ${message}, ${result.success}, ${result.status}, ${result.error}, ${result.name})`;
+  }
+  const failures = results.filter(result => !result.success);
+  await logEvent({ action: "club_post", actor: account.username, role: "club_leader", success: !failures.length, details: { requestId, destinations: results } });
+  return failures.length ? { error: `Sent to ${results.length - failures.length}/${results.length} destinations. ${failures.map(r => `${r.name}: ${r.error}`).join(" ")} Check history; do not resend to successful destinations.` } : { success: true };
 }

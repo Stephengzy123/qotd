@@ -12,6 +12,7 @@ import { fetchCalendarByUrl, normalizeCalendarFeedUrl } from "@/lib/calendar";
 import { createAccount, createSetupLink, deleteAccount, getAccount, parseRole, ROLE_LABELS, updateAccountRole } from "@/lib/accounts";
 import { saveClubWebhook } from "@/lib/clubs";
 import { logEvent } from "@/lib/log";
+import { resolveWebhooks, selectedWebhookIds } from "@/lib/webhook-destinations";
 import type { Role } from "@/lib/auth";
 
 function messageUrl(path: string, kind: "ok" | "error", message: string) {
@@ -106,6 +107,11 @@ export async function reviewQuestionAction(formData: FormData) {
   const details = { id, type, scheduledDate, eventTitle: type === "event" ? eventTitle : undefined, daysEarly: requestedDaysEarly, length: announcement.length };
   if (!id || announcement.length < 8 || announcement.length > 1500) await fail("/admin", session, action, "Check the announcement length and try again.", details);
   const sql = await dbReady();
+  const webhookIds = selectedWebhookIds(formData);
+  if (status !== "rejected" && webhookIds) {
+    try { await resolveWebhooks(webhookIds); }
+    catch (error) { await fail("/admin", session, action, error instanceof Error ? error.message : "Invalid Discord destinations.", details); }
+  }
   let updated: { id: string }[];
   if (status === "rejected") {
     updated = await sql<{ id: string }[]>`update questions set question = ${announcement}, status = 'rejected', updated_at = now() where id = ${id} and status <> 'sent' returning id`;
@@ -114,7 +120,7 @@ export async function reviewQuestionAction(formData: FormData) {
     if (type === "announcement" && !isValidAnnouncementDate(scheduledDate, new Date(), daysEarly)) await fail("/admin", session, action, "Choose an announcement date whose calculated 6 PM publishing window has not passed.", details);
     if (type === "event" && !isValidFuturePacificDate(scheduledDate)) await fail("/admin", session, action, "Choose a valid future event publish date.", details);
     if (type === "event" && (eventTitle.length < 1 || eventTitle.length > 200)) await fail("/admin", session, action, "Event titles must be between 1 and 200 characters.", details);
-    updated = await sql<{ id: string }[]>`update questions set question = ${announcement}, scheduled_date = ${scheduledDate}, question_type = ${type}, event_title = ${type === "event" ? eventTitle : null}, days_early = ${daysEarly}, status = ${status}, updated_at = now() where id = ${id} and status <> 'sent' returning id`;
+    updated = await sql<{ id: string }[]>`update questions set question = ${announcement}, scheduled_date = ${scheduledDate}, question_type = ${type}, event_title = ${type === "event" ? eventTitle : null}, days_early = ${daysEarly}, discord_webhook_ids = coalesce(${webhookIds ?? null}::text[], discord_webhook_ids), status = ${status}, updated_at = now() where id = ${id} and status <> 'sent' returning id`;
   }
   await logEvent({ action, actor: session.username, role: session.role, success: updated.length > 0, details: { ...details, updated: updated.length > 0 } });
   revalidatePath("/admin");
@@ -129,6 +135,11 @@ export async function addApprovedQuestionAction(formData: FormData) {
   const scheduledDate = String(formData.get("scheduledDate") || "");
   const requestedDaysEarly = daysEarlyValue(formData);
   const action = "add_approved_announcement";
+  const webhookIds = selectedWebhookIds(formData);
+  if (webhookIds) {
+    try { await resolveWebhooks(webhookIds); }
+    catch (error) { await fail("/admin", session, action, error instanceof Error ? error.message : "Invalid Discord destinations."); }
+  }
   const details = { type, scheduledDate, eventTitle: type === "event" ? eventTitle : undefined, daysEarly: requestedDaysEarly, length: announcement.length };
   if (announcement.length < 8 || announcement.length > 1500) {
     await fail("/admin", session, action, "Announcements must be between 8 and 1,500 characters.", details);
@@ -139,8 +150,8 @@ export async function addApprovedQuestionAction(formData: FormData) {
   if (type === "event" && (eventTitle.length < 1 || eventTitle.length > 200)) await fail("/admin", session, action, "Event titles must be between 1 and 200 characters.", details);
   const sql = await dbReady();
   const inserted = await sql<{ id: string }[]>`
-    insert into questions (question, scheduled_date, question_type, event_title, days_early, status, submitter_ip_hash)
-    values (${announcement}, ${scheduledDate}, ${type}, ${type === "event" ? eventTitle : null}, ${daysEarly}, 'approved', ${hashAddress(`admin:${session.username}`)})
+    insert into questions (question, scheduled_date, question_type, event_title, days_early, status, submitter_ip_hash, discord_webhook_ids)
+    values (${announcement}, ${scheduledDate}, ${type}, ${type === "event" ? eventTitle : null}, ${daysEarly}, 'approved', ${hashAddress(`admin:${session.username}`)}, ${webhookIds ?? null}::text[])
     returning id
   `;
   await logEvent({ action, actor: session.username, role: session.role, details: { ...details, id: inserted[0]?.id } });
@@ -221,13 +232,13 @@ export async function sendQuestionAction(formData: FormData) {
   if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin", session, "send_announcement", "Select an announcement to send.", { id });
   const destination = String(formData.get("destination") || "discord");
   if (destination !== "discord" && destination !== "live") await fail("/admin", session, "send_announcement", "Choose a valid destination.", { id });
-  const result = await sendAnnouncement(id, "manual_selected", undefined, session.username, { destination: destination as "discord" | "live", removePings: formData.get("removePings") === "on" });
+  const result = await sendAnnouncement(id, "manual_selected", undefined, session.username, { destination: destination as "discord" | "live", removePings: formData.get("removePings") === "on", webhookIds: selectedWebhookIds(formData) });
   if (!("error" in result)) scheduleLivePush(result.dispatchId);
   await logEvent({ action: "send_announcement", actor: session.username, role: session.role, success: !("error" in result), details: { id, mode: "manual_selected", error: "error" in result ? result.error : undefined } });
   revalidatePath("/admin");
   revalidatePath("/live");
   revalidatePath("/contribute");
-  redirect(messageUrl("/admin", "error" in result ? "error" : "ok", "error" in result ? (result.error || "Send failed.") : destination === "live" ? "Announcement published to /live only." : "Announcement sent to Discord."));
+  redirect(messageUrl("/admin", "error" in result ? "error" : "ok", "error" in result ? (result.error || "Send failed.") : destination === "live" ? "Announcement published to /live only." : "warning" in result && result.warning ? `Partially sent. ${result.warning} Check Recent sends before retrying.` : "Announcement sent to Discord."));
 }
 
 export async function createAccountAction(formData: FormData) {

@@ -27,6 +27,10 @@ async function scenario(options, webhook, responseOk = true, claimed = true) {
   };
   sql.begin = callback => callback(sql);
   const mod = load('lib/qotd.ts', {
+    '@/lib/webhook-destinations': {
+      resolveWebhooks: async () => { if (!webhook) throw new Error('Set a Discord webhook before sending.'); return [{ id: 'primary', name: 'Primary' }]; },
+      deliverWebhooks: async (_, payload) => { requests.push(payload); return [{ name: 'Primary', success: responseOk, status: responseOk ? 204 : 500, error: responseOk ? null : 'Discord returned HTTP 500.' }]; },
+    },
     '@/lib/live-text': text,
     '@/lib/log': { logEvent: async () => {}, errorDetail: String },
     '@/lib/db': { dbReady: async () => sql },

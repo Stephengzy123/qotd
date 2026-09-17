@@ -258,6 +258,26 @@ const migrations = [
       `create index if not exists club_posts_account_idx on club_posts(account_id, created_at desc)`,
     ],
   },
+  {
+    version: 16,
+    statements: [
+      `create table if not exists saved_webhooks (
+        id uuid primary key default gen_random_uuid(), name text not null,
+        webhook_url_encrypted text not null, primary_enabled boolean not null default false
+      )`,
+      `create table if not exists webhook_assignments (
+        webhook_id uuid references saved_webhooks(id) on delete cascade,
+        account_id uuid references accounts(id) on delete cascade,
+        primary key (webhook_id, account_id)
+      )`,
+      `alter table questions add column if not exists discord_webhook_ids text[]`,
+      `alter table club_posts add column if not exists destination_name text`,
+      `create table if not exists club_send_requests (
+        id uuid primary key, account_id uuid references accounts(id) on delete set null,
+        created_at timestamptz not null default now()
+      )`,
+    ],
+  },
 ] as const;
 
 export function db() {

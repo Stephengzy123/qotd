@@ -34,6 +34,11 @@ async function harness({ admin = true, destination = 'discord', ping = true, fai
   const action = load('app/admin/quick-action.ts', {
     '@/lib/auth': { requireRole: async required => { assert.equal(required, 'admin'); if (!admin) throw new Error('Forbidden'); return { username: 'admin', role: 'admin' }; } },
     '@/lib/db': { dbReady: async () => sql },
+    '@/lib/webhook-destinations': {
+      selectedWebhookIds: () => undefined,
+      resolveWebhooks: async () => [{ id: 'primary', name: 'Primary' }],
+      deliverWebhooks: async (_, payload) => { requests.push({ url: 'https://discord.com/api/webhooks/123/token?wait=true', ...payload }); return [{ name: 'Primary', success: !fail, status: fail ? 400 : 200, error: fail ? 'Rejected' : null }]; },
+    },
     '@/lib/security': { decryptSecret: () => 'https://discord.com/api/webhooks/123/token', validateDiscordWebhook: () => true },
     '@/lib/webhook-details': { getWebhookDetails: async () => ({ status: 'connected', avatarUrl: 'https://cdn.discordapp.com/avatar.png' }) },
     '@/lib/quick-message': formatter,

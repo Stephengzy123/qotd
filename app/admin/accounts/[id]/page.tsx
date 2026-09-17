@@ -41,9 +41,9 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
       </section>
       <Notice ok={query.ok} error={query.error} />
 
-      {isClub && <section id="channel" className="section-block"><div className="section-title"><h2>Club channel</h2><span className={`status ${connected ? "ready" : "pending"}`}>{connected ? "Connected" : "Setup needed"}</span></div>
+      {isClub && <section id="channel" className="section-block"><div className="section-title"><h2>Club channel</h2><a href="/admin/webhooks">Manage additional webhooks and assignments</a><span className={`status ${connected ? "ready" : "pending"}`}>{connected ? "Connected" : "Setup needed"}</span></div>
         <form action={saveClubWebhookAction} className="panel settings-form"><input type="hidden" name="id" value={account.id} />
-          <p className="hint">Everything this club leader posts goes to this webhook, so it only ever reaches this one channel. In Discord: channel settings → Integrations → Webhooks → New webhook → Copy webhook URL.</p>
+          <p className="hint">This is the original club destination. The sender can choose it or any additional assigned webhook for each post. In Discord: channel settings → Integrations → Webhooks → New webhook → Copy webhook URL.</p>
           <div><label htmlFor="webhook">Channel webhook URL</label><input id="webhook" name="webhook" type="password" placeholder={connected ? "Saved securely — enter a new URL to replace it" : "https://discord.com/api/webhooks/…"} autoComplete="off" required={!connected} /><p className="hint">{connected ? "Leave blank to keep the saved webhook." : "Stored encrypted. Only the admin page can see which channel it points to."}</p></div>
           <Suspense fallback={<p className="hint" role="status">Loading saved webhook…</p>}><WebhookProfile encryptedUrl={channel?.webhook_url_encrypted} /></Suspense>
           <div className="align-right"><PendingButton className="primary" pendingText="Saving…">{connected ? "Replace webhook" : "Connect channel"}</PendingButton></div>
@@ -61,7 +61,7 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
       </section>
 
       {isClub && <section id="posts" className="section-block"><div className="section-title"><h2>Recent posts</h2><span className="count-badge">{posts.length}</span></div>
-        {posts.length ? <div className="activity-list">{posts.map((post) => <div key={post.id}><span className={`activity-dot ${post.success ? "success" : "failed"}`} /><div><strong>{post.success ? "Posted" : "Failed"}</strong>{post.error && <p className="send-error">{post.error}</p>}<p className="message-excerpt">{post.message}</p></div><div className="recent-actions"><time>{relativeDate(post.created_at)}</time><MessagePreview title={post.success ? "Posted message" : "Attempted message"}><div className="discord-preview"><DiscordMarkdown value={post.message} /></div></MessagePreview></div></div>)}</div> : <div className="empty-state compact"><p>Nothing posted yet.</p></div>}
+        {posts.length ? <div className="activity-list">{posts.map((post) => <div key={post.id}><span className={`activity-dot ${post.success ? "success" : "failed"}`} /><div><strong>{post.success ? "Posted" : "Failed"}{post.destination_name ? ` · ${post.destination_name}` : ""}</strong>{post.error && <p className="send-error">{post.error}</p>}<p className="message-excerpt">{post.message}</p></div><div className="recent-actions"><time>{relativeDate(post.created_at)}</time><MessagePreview title={post.success ? "Posted message" : "Attempted message"}><div className="discord-preview"><DiscordMarkdown value={post.message} /></div></MessagePreview></div></div>)}</div> : <div className="empty-state compact"><p>Nothing posted yet.</p></div>}
       </section>}
 
       <section id="manage" className="section-block"><div className="section-title"><h2>Manage</h2></div>

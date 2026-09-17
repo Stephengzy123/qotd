@@ -24,7 +24,7 @@ export async function sendDueAnnouncements(now = new Date(), trigger: "cron" | "
   for (const announcement of due) {
     const result = await sendAnnouncement(announcement.id, "scheduled", localDate);
     if ("error" in result) failures.push(result.error || "Scheduled delivery failed.");
-    else { sent += 1; scheduleLivePush(result.dispatchId); }
+    else { sent += 1; scheduleLivePush(result.dispatchId); if ("warning" in result && result.warning) failures.push(result.warning); }
   }
   try {
     const fallback = await sendCalendarFallback(tomorrow, localDate);
