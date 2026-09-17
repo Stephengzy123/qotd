@@ -214,6 +214,13 @@ const migrations = [
       `alter table dispatches add column if not exists sender_avatar_url text`,
     ],
   },
+  {
+    version: 14,
+    statements: [
+      `alter table dispatches add column if not exists calendar_fallback_date date`,
+      `create unique index if not exists dispatches_calendar_fallback_date on dispatches(calendar_fallback_date)`,
+    ],
+  },
 ] as const;
 
 export function db() {
