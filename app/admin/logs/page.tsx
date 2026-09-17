@@ -2,6 +2,7 @@ import { logoutAction } from "@/app/actions";
 import { requireRole } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
 import { PendingButton } from "@/components/pending-button";
+import { describeDetails } from "@/lib/log-details";
 
 type ActivityEntry = { id: string; action: string; actor: string | null; actor_role: string | null; success: boolean; details: Record<string, unknown> | null; created_at: Date };
 type Filters = { action?: string; actor?: string; status?: string; page?: string };
@@ -10,14 +11,6 @@ const PAGE_SIZE = 100;
 
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit", timeZone: "America/Los_Angeles" }).format(date);
-}
-
-function describeDetails(details: Record<string, unknown> | null) {
-  if (!details) return "";
-  return Object.entries(details)
-    .filter(([, value]) => value !== undefined && value !== null && value !== "")
-    .map(([key, value]) => `${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`)
-    .join(" · ");
 }
 
 function pageUrl(filters: Filters, page: number) {
