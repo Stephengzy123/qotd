@@ -14,7 +14,7 @@ export async function WebhookProfile({ encryptedUrl }: { encryptedUrl?: string |
         ? <img className="webhook-avatar" src={details.avatarUrl} width={40} height={40} alt={`${details.name} avatar`} referrerPolicy="no-referrer" />
         : <span className="webhook-avatar webhook-avatar-fallback" aria-hidden="true">{details.name.slice(0, 1).toUpperCase()}</span>}
       <div className="webhook-profile-copy"><strong>{details.name}</strong><span>Saved · Verified with Discord</span>
-        {details.channelUrl && <a href={details.channelUrl} target="_blank" rel="noreferrer">Open channel ↗</a>}
+        {details.channelUrl && <a href={details.channelUrl} target="_blank" rel="noreferrer" className="secondary small">Open channel ↗</a>}
       </div>
     </div>
   );

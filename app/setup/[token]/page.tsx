@@ -13,7 +13,7 @@ export default async function SetupPage({ params, searchParams }: { params: Prom
         <section className="login-card">
           <h1>This link isn’t valid</h1>
           <p className="hint">It may have expired, already been used, or been replaced by a newer link. Ask your admin to send a new one.</p>
-          <p><a href="/login">Go to sign in</a></p>
+          <p><a href="/login" className="primary">Go to sign in</a></p>
         </section>
       </main>
     );

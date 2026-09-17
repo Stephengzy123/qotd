@@ -27,7 +27,7 @@ RATE_LIMIT_SECRET=
 
 Generate password hashes with `npm run hash-password -- "your password"`. Generate random secrets with `openssl rand -base64 32`.
 
-The two environment-variable logins are built in. Admins create additional accounts from the **Accounts** section of the admin page through a two-step overlay: pick the account type, then the username. No password is entered. The account page that opens next shows a single-use **setup link** (valid for 7 days) to send to the person; whoever opens it chooses the password and is signed in. Generating a new link from the account page invalidates the old one and doubles as a password reset. Accounts and bcrypt-hashed passwords live in the `accounts` table; link tokens are stored hashed (plus encrypted for display) in `password_setup_tokens`.
+The two environment-variable logins are built in. Admins create additional accounts from the **Accounts** page of the admin area (`/admin/accounts`) through a two-step overlay: pick the account type, then the username. No password is entered. The account page that opens next shows a single-use **setup link** (valid for 7 days) to send to the person; whoever opens it chooses the password and is signed in. Generating a new link from the account page invalidates the old one and doubles as a password reset. Accounts and bcrypt-hashed passwords live in the `accounts` table; link tokens are stored hashed (plus encrypted for display) in `password_setup_tokens`.
 
 ## Account types
 
@@ -37,7 +37,7 @@ The two environment-variable logins are built in. Admins create additional accou
 
 ## Activity log
 
-Every action — sign-ins (including failed attempts), sign-outs, submissions, edits, approvals, rejections, deletions, settings changes, account changes, manual and scheduled sends, cron requests, pending notifications, and calendar lookups — is written to the `activity_log` table and printed to the server console as a `[activity]` JSON line (visible in Vercel runtime logs). The admin page shows the latest 50 entries under **Activity**. Secrets such as webhook URLs and passwords are never logged.
+Every action — sign-ins (including failed attempts), sign-outs, submissions, edits, approvals, rejections, deletions, settings changes, account changes, manual and scheduled sends, cron requests, pending notifications, and calendar lookups — is written to the `activity_log` table and printed to the server console as a `[activity]` JSON line (visible in Vercel runtime logs). The admin area has a dedicated **Logs** page (`/admin/logs`) that is searchable and filterable. Secrets such as webhook URLs and passwords are never logged.
 
 ## Deploy
 

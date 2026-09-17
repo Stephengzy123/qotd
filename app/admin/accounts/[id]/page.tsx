@@ -1,20 +1,17 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { deleteAccountAction, logoutAction, regenerateSetupLinkAction, saveClubWebhookAction, updateAccountAction } from "@/app/actions";
+import { deleteAccountAction, regenerateSetupLinkAction, saveClubWebhookAction, updateAccountAction } from "@/app/actions";
+import { AdminShell } from "@/components/admin-shell";
 import { getAccount, getPendingSetupLink, ROLE_LABELS, ROLES } from "@/lib/accounts";
 import { requireRole } from "@/lib/auth";
 import { getClubChannel, listClubPosts } from "@/lib/clubs";
 import { requestOrigin } from "@/lib/request-origin";
+import { relativeDate } from "@/lib/admin-data";
 import { CopyButton } from "@/components/copy-button";
 import { DiscordMarkdown } from "@/components/discord-preview";
 import { MessagePreview } from "@/components/message-preview";
-import { Notice } from "@/components/notice";
 import { PendingButton } from "@/components/pending-button";
 import { WebhookProfile } from "@/components/webhook-profile";
-
-function relativeDate(date: Date) {
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" }).format(date);
-}
 
 export default async function AccountPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; error?: string }> }) {
   const session = await requireRole("admin");
@@ -34,13 +31,9 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
   const connected = Boolean(channel?.webhook_url_encrypted);
 
   return (
-    <main className="app-shell">
-      <header className="topbar"><strong>Announcement admin</strong><nav className="admin-navigation" aria-label="Admin"><a href="/admin#inbox">Pending</a><a href="/admin#approved">Approved</a><a href="/admin#delivery">Settings</a><a href="/admin#accounts" aria-current="page">Accounts</a><a href="/live">Live feed</a><a href="/admin/logs">Logs</a></nav><div className="account"><span>{session.username}</span><form action={logoutAction}><PendingButton className="text-button" pendingText="Signing out…">Sign out</PendingButton></form></div></header>
-      <section className="admin-heading account-heading">
-        <div><p className="breadcrumb"><a href="/admin#accounts">← Accounts</a></p><h1>{account.username}</h1><p><span className="count-badge">{ROLE_LABELS[account.role]}</span> · added {relativeDate(account.created_at)}{account.created_by ? ` by ${account.created_by}` : ""} · <span className={`status ${account.has_password ? "ready" : "pending"}`}>{account.has_password ? "Password set" : "Awaiting password setup"}</span></p></div>
-      </section>
-      <Notice ok={query.ok} error={query.error} />
-
+    <AdminShell page="accounts" username={session.username} title={account.username} notice={query}
+      description={<><span className="count-badge">{ROLE_LABELS[account.role]}</span> · added {relativeDate(account.created_at)}{account.created_by ? ` by ${account.created_by}` : ""} · <span className={`status ${account.has_password ? "ready" : "pending"}`}>{account.has_password ? "Password set" : "Awaiting password setup"}</span></>}
+      actions={<a href="/admin/accounts" className="secondary">← All accounts</a>}>
       {isClub && <section id="channel" className="section-block"><div className="section-title"><h2>Club channel</h2><span className={`status ${connected ? "ready" : "pending"}`}>{connected ? "Connected" : "Setup needed"}</span></div>
         <form action={saveClubWebhookAction} className="panel settings-form"><input type="hidden" name="id" value={account.id} />
           <p className="hint">Everything this club leader posts goes to this webhook, so it only ever reaches this one channel. In Discord: channel settings → Integrations → Webhooks → New webhook → Copy webhook URL.</p>
@@ -75,6 +68,6 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
           <form action={deleteAccountAction} className="form-footer"><input type="hidden" name="id" value={account.id} /><p>Deleting removes the account, its setup links, and its channel connection. Past posts stay in the log.</p><PendingButton className="danger" pendingText="Deleting…" confirmMessage={`Delete “${account.username}”? This can’t be undone.`}>Delete account</PendingButton></form>
         </div>
       </section>
-    </main>
+    </AdminShell>
   );
 }

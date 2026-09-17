@@ -60,10 +60,20 @@ input:focus, select:focus, textarea:focus { border-color: #666; box-shadow: 0 0 
 .app-shell { width: min(100%, 1440px); margin: 0 auto; padding: 0 1.5rem 4rem; }
 .topbar { min-height: 58px; display: flex; align-items: center; gap: 1.5rem; border-bottom: 1px solid var(--border); }
 .topbar > strong { margin-right: auto; }
-.topbar nav { display: flex; gap: 1.25rem; font-size: .9rem; }
+.topbar nav { display: flex; flex-wrap: wrap; gap: .3rem; }
 .account { display: flex; align-items: center; gap: .8rem; color: var(--muted); font-size: .85rem; }
-.text-button { padding: 0; border: 0; background: transparent; color: var(--text); text-decoration: underline; }
+/* Every link and text action renders as a button: no underlined links. */
+.text-button { min-height: 30px; padding: .25rem .6rem; border: 1px solid var(--border); border-radius: 5px; background: white; color: var(--text); font-size: .85rem; font-weight: 600; text-decoration: none; }
+.text-button:hover { border-color: #999; }
+a.primary, a.secondary, a.danger, a.nav-button { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+a.secondary.small { min-height: 30px; padding: .25rem .6rem; font-size: .8rem; }
+.nav-button { min-height: 34px; padding: .35rem .75rem; border: 1px solid transparent; border-radius: 6px; color: var(--muted); font-size: .88rem; font-weight: 600; }
+.nav-button:hover { border-color: var(--border); background: white; color: var(--text); }
+.nav-button[aria-current="page"] { background: var(--primary); color: white; }
 .page-heading, .admin-heading { padding: 2.2rem 0 1.4rem; }
+.admin-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; }
+.heading-actions { display: flex; align-items: center; gap: .6rem; flex-shrink: 0; padding-top: .35rem; }
+.count-badge.large { font-size: .9rem; padding: .35rem .8rem; }
 .admin-heading p { color: var(--muted); margin: 0; }
 
 .primary, .secondary, .danger, .send-button {
@@ -117,6 +127,8 @@ input:focus, select:focus, textarea:focus { border-color: #666; box-shadow: 0 0 
 .card-actions { justify-content: flex-end; margin-top: .8rem; }
 .empty-state { padding: 1.25rem; color: var(--muted); text-align: center; }
 .empty-state p { margin: 0; }
+.empty-state a { margin-top: .9rem; }
+.empty-state.compact a { display: none; }
 
 .approved-list, .activity-list { overflow: hidden; }
 .quick-add-form { margin-bottom: .75rem; padding: 1rem; }
@@ -176,7 +188,7 @@ input:focus, select:focus, textarea:focus { border-color: #666; box-shadow: 0 0 
 .webhook-profile-copy { min-width: 0; overflow-wrap: anywhere; }
 .webhook-profile-copy strong, .webhook-profile-copy span, .webhook-profile-copy a { display: block; }
 .webhook-profile-copy span { color: var(--success); font-size: .8rem; }
-.webhook-profile-copy a { margin-top: .2rem; font-size: .8rem; }
+.webhook-profile-copy a { display: inline-flex; margin-top: .4rem; }
 .webhook-profile-message { margin: 0; }
 .fixed-format { margin: 0; padding: .75rem; border: 1px solid var(--border); border-radius: 5px; background: #f3f3f3; white-space: pre-wrap; }
 
@@ -358,4 +370,22 @@ body.dialog-open { overflow: hidden; }
 @media (max-width: 700px) {
   .setup-link-row { flex-direction: column; }
   .account-dialog { width: 100%; max-height: 100dvh; border-radius: 0; }
+}
+
+/* Admin overview */
+.feature-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .85rem; }
+.feature-card { display: grid; gap: .5rem; align-content: start; padding: 1.1rem 1.2rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); text-decoration: none; transition: border-color .12s, box-shadow .12s, transform .12s; }
+.feature-card:hover { border-color: #999; box-shadow: 0 6px 20px rgb(0 0 0 / 8%); transform: translateY(-1px); }
+.feature-card:focus-visible { outline: 2px solid #666; outline-offset: 2px; }
+.feature-card-top { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.feature-card h3 { margin: 0; font-size: 1.05rem; }
+.feature-card p { margin: 0; color: var(--muted); font-size: .85rem; }
+.feature-card .status { justify-self: start; }
+.feature-card-cta { margin-top: .3rem; font-size: .85rem; font-weight: 650; }
+.settings-pages { display: block; }
+.settings-save { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 0 -1.5rem; padding: .9rem 1.5rem; border-top: 1px solid var(--border); background: var(--surface); }
+@media (max-width: 900px) { .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) {
+  .feature-grid { grid-template-columns: 1fr; }
+  .settings-save { margin: 0 -.8rem; padding: .8rem; }
 }

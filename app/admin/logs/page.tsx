@@ -1,7 +1,6 @@
-import { logoutAction } from "@/app/actions";
+import { AdminShell } from "@/components/admin-shell";
 import { requireRole } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
-import { PendingButton } from "@/components/pending-button";
 import { describeDetails } from "@/lib/log-details";
 
 type ActivityEntry = { id: string; action: string; actor: string | null; actor_role: string | null; success: boolean; details: Record<string, unknown> | null; created_at: Date };
@@ -46,9 +45,7 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
   const current: Filters = { action, actor, status };
 
   return (
-    <main className="app-shell">
-      <header className="topbar"><strong>Announcement admin</strong><nav className="admin-navigation" aria-label="Admin"><a href="/admin#inbox">Pending</a><a href="/admin#approved">Approved</a><a href="/admin#delivery">Settings</a><a href="/admin#accounts">Accounts</a><a href="/live">Live feed</a><a href="/admin/logs" aria-current="page">Logs</a></nav><div className="account"><span>{session.username}</span><form action={logoutAction}><PendingButton className="text-button" pendingText="Signing out…">Sign out</PendingButton></form></div></header>
-      <section className="admin-heading"><div><h1>Activity log</h1><p>Every sign-in, submission, review decision, settings change, account change, send, and cron run. Newest first.</p></div></section>
+    <AdminShell page="logs" username={session.username} title="Logs" description="Every sign-in, submission, review decision, settings change, account change, send, and cron run. Newest first.">
 
       <form method="get" className="panel log-filters">
         <div><label htmlFor="filter-action">Action</label><select id="filter-action" name="action" defaultValue={action}><option value="">All actions</option>{actionRows.map((row) => <option key={row.action} value={row.action}>{row.action.replaceAll("_", " ")}</option>)}</select></div>
@@ -66,6 +63,6 @@ export default async function LogsPage({ searchParams }: { searchParams: Promise
           {page < pageCount ? <a href={pageUrl(current, page + 1)} className="secondary">Older →</a> : <span />}
         </nav>}
       </section>
-    </main>
+    </AdminShell>
   );
 }

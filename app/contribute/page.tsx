@@ -21,7 +21,7 @@ export default async function ContributePage({ searchParams }: { searchParams: P
   return (
     <main className="app-shell">
       <ScheduledDeliveryCheck />
-      <header className="topbar"><strong>Announcements</strong><a href="/live">Live feed</a><div className="account"><span>{session.username}</span><form action={logoutAction}><PendingButton className="text-button" pendingText="Signing out…">Sign out</PendingButton></form></div></header>
+      <header className="topbar"><strong>Announcements</strong><nav className="admin-navigation" aria-label="Contributor"><a href="/live" className="nav-button">Live feed</a></nav><div className="account"><span>{session.username}</span><form action={logoutAction}><PendingButton className="text-button" pendingText="Signing out…">Sign out</PendingButton></form></div></header>
       <section className="page-heading hero">
         <div><h1>Announcements</h1><p>Write it once, see exactly how it lands in Discord, and send it for review.</p></div>
         <ComposerDialog buttonLabel="＋ New announcement" title="New announcement" description="Daily announcements publish the previous evening; events publish on their chosen date, during the 6 PM Pacific hour." className="primary hero-button">
