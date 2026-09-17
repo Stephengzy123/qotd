@@ -25,7 +25,7 @@ export function ComposerDialog({ buttonLabel, title, description, className = "p
 
   function close() {
     const form = dialog.current?.querySelector("form");
-    const dirty = form && Array.from(form.querySelectorAll<HTMLTextAreaElement | HTMLInputElement>("textarea[name=announcement], input[name=eventTitle]")).some((field) => field.value.trim());
+    const dirty = form && Array.from(form.querySelectorAll<HTMLTextAreaElement | HTMLInputElement>("textarea[name=announcement], textarea[name=message], input[name=eventTitle]")).some((field) => field.value.trim());
     if (dirty && !window.confirm("Discard this announcement?")) return;
     dialog.current?.close();
   }

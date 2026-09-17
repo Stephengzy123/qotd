@@ -4,12 +4,13 @@ import { scheduleLivePush } from "@/lib/web-push";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { clearSession, createSession, getSession, requireRole, verifyCredentials } from "@/lib/auth";
+import { clearSession, createSession, getSession, homePath, requireRole, verifyCredentials } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
 import { encryptSecret, hashAddress, validateDiscordWebhook } from "@/lib/security";
 import { isValidAnnouncementDate, isValidFuturePacificDate, normalizeDiscordTemplate, sendAnnouncement, sendPendingNotification, validateAnnouncementTemplate, type AnnouncementType } from "@/lib/qotd";
 import { fetchCalendarByUrl, normalizeCalendarFeedUrl } from "@/lib/calendar";
-import { createAccount, deleteAccount, updateAccount } from "@/lib/accounts";
+import { createAccount, createSetupLink, deleteAccount, getAccount, parseRole, ROLE_LABELS, updateAccountRole } from "@/lib/accounts";
+import { saveClubWebhook } from "@/lib/clubs";
 import { logEvent } from "@/lib/log";
 import type { Role } from "@/lib/auth";
 
@@ -48,7 +49,7 @@ export async function loginAction(formData: FormData) {
   }
   await createSession(role, username);
   await logEvent({ action: "login", actor: username, role });
-  redirect(role === "admin" ? "/admin" : "/contribute");
+  redirect(homePath(role));
 }
 
 export async function logoutAction() {
@@ -232,13 +233,15 @@ export async function sendQuestionAction(formData: FormData) {
 export async function createAccountAction(formData: FormData) {
   const session = await requireRole("admin");
   const username = String(formData.get("username") || "").trim();
-  const password = String(formData.get("password") || "");
-  const role: Role = formData.get("role") === "admin" ? "admin" : "contributor";
-  const result = await createAccount(username, password, role, session.username);
-  if (result.error !== undefined) await fail("/admin", session, "create_account", result.error, { username, role });
-  await logEvent({ action: "create_account", actor: session.username, role: session.role, details: { id: result.id, username, accountRole: role } });
+  const role = parseRole(formData.get("role")) ?? await fail("/admin", session, "create_account", "Choose an account type.", { username });
+  const result = await createAccount(username, role, session.username);
+  const accountId = result.id ?? await fail("/admin", session, "create_account", result.error ?? "The account could not be created.", { username, role });
+  await logEvent({ action: "create_account", actor: session.username, role: session.role, details: { id: accountId, username, accountRole: role } });
+  // The person chooses their own password through the setup link.
+  await createSetupLink(accountId, session.username);
+  await logEvent({ action: "create_setup_link", actor: session.username, role: session.role, details: { id: accountId, username } });
   revalidatePath("/admin");
-  redirect(messageUrl("/admin", "ok", `Account “${username}” created as ${role}.`));
+  redirect(messageUrl(`/admin/accounts/${accountId}`, "ok", `Account “${username}” created as ${ROLE_LABELS[role].toLowerCase()}. Share the setup link below.`));
 }
 
 export async function deleteAccountAction(formData: FormData) {
@@ -254,12 +257,41 @@ export async function deleteAccountAction(formData: FormData) {
 export async function updateAccountAction(formData: FormData) {
   const session = await requireRole("admin");
   const id = String(formData.get("id") || "");
-  const role: Role = formData.get("role") === "admin" ? "admin" : "contributor";
-  const password = String(formData.get("password") || "");
   if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin", session, "update_account", "Invalid account.", { id });
-  const result = await updateAccount(id, role, password || null);
-  if (result.error !== undefined) await fail("/admin", session, "update_account", result.error, { id, role, passwordReset: Boolean(password) });
-  await logEvent({ action: "update_account", actor: session.username, role: session.role, details: { id, username: result.username, accountRole: role, passwordReset: Boolean(password) } });
+  const role = parseRole(formData.get("role")) ?? await fail("/admin", session, "update_account", "Choose an account type.", { id });
+  const username = (await updateAccountRole(id, role)) ?? await fail("/admin", session, "update_account", "That account no longer exists.", { id, role });
+  await logEvent({ action: "update_account", actor: session.username, role: session.role, details: { id, username, accountRole: role } });
   revalidatePath("/admin");
-  redirect(messageUrl("/admin", "ok", password ? `Account “${result.username}” updated and password reset.` : `Account “${result.username}” updated.`));
+  revalidatePath(`/admin/accounts/${id}`);
+  redirect(messageUrl("/admin", "ok", `Account “${username}” is now a ${ROLE_LABELS[role].toLowerCase()}.`));
+}
+
+// Issues a new setup link. Also the way to reset a password: the old link
+// (if any) stops working and the person picks a new password from the new one.
+export async function regenerateSetupLinkAction(formData: FormData) {
+  const session = await requireRole("admin");
+  const id = String(formData.get("id") || "");
+  if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin", session, "create_setup_link", "Invalid account.", { id });
+  const account = (await getAccount(id)) ?? await fail("/admin", session, "create_setup_link", "That account no longer exists.", { id });
+  await createSetupLink(account.id, session.username);
+  await logEvent({ action: "create_setup_link", actor: session.username, role: session.role, details: { id, username: account.username, replacesPassword: account.has_password } });
+  revalidatePath(`/admin/accounts/${id}`);
+  redirect(messageUrl(`/admin/accounts/${id}`, "ok", "New setup link ready. Earlier links no longer work."));
+}
+
+export async function saveClubWebhookAction(formData: FormData) {
+  const session = await requireRole("admin");
+  const id = String(formData.get("id") || "");
+  const webhook = String(formData.get("webhook") || "").trim();
+  const path = `/admin/accounts/${id}`;
+  if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin", session, "save_club_webhook", "Invalid account.", { id });
+  const account = (await getAccount(id)) ?? await fail("/admin", session, "save_club_webhook", "That account no longer exists.", { id });
+  if (account.role !== "club_leader") await fail(path, session, "save_club_webhook", "Only club leader accounts have a channel webhook.", { id, username: account.username });
+  if (!validateDiscordWebhook(webhook)) await fail(path, session, "save_club_webhook", "Enter a valid Discord webhook URL.", { id, username: account.username });
+  await saveClubWebhook(account.id, webhook, session.username);
+  // Never log the webhook itself.
+  await logEvent({ action: "save_club_webhook", actor: session.username, role: session.role, details: { id, username: account.username } });
+  revalidatePath(path);
+  revalidatePath("/club");
+  redirect(messageUrl(path, "ok", `Channel webhook saved for “${account.username}”.`));
 }

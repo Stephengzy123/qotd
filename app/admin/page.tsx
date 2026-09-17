@@ -1,5 +1,5 @@
-import { addApprovedQuestionAction, createAccountAction, deleteAccountAction, logoutAction, updateAccountAction, reviewQuestionAction, saveSettingsAction, sendQuestionAction } from "@/app/actions";
-import { listAccounts } from "@/lib/accounts";
+import { addApprovedQuestionAction, deleteAccountAction, logoutAction, reviewQuestionAction, saveSettingsAction, sendQuestionAction } from "@/app/actions";
+import { listAccounts, ROLE_LABELS } from "@/lib/accounts";
 import { requireRole } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
 import { addDays, DEFAULT_ANNOUNCEMENT_TEMPLATE, DEFAULT_EVENT_TEMPLATE, displayScheduledDate, minimumAnnouncementDate, pacificParts, scheduledDateValue } from "@/lib/qotd";
@@ -18,6 +18,7 @@ import { ComposerDialog } from "@/components/composer-dialog";
 import { QuickAnnouncement } from "@/components/quick-announcement";
 import { getWebhookDetails } from "@/lib/webhook-details";
 import { describeDetails } from "@/lib/log-details";
+import { CreateAccountDialog } from "@/components/create-account-dialog";
 
 type Announcement = { id: string; question: string; contributor_note: string | null; status: string; created_at: Date; scheduled_date: string | Date | null; question_type: "announcement" | "event"; event_title: string | null; days_early: number };
 type Dispatch = { id: string; message: string; success: boolean; mode: string; created_at: Date; error: string | null };
@@ -88,22 +89,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </form>
       </section>
 
-      <section id="accounts" className="section-block"><div className="section-title"><h2>Accounts</h2><span className="count-badge">{envAccounts.length + accounts.length}</span></div>
-        <form action={createAccountAction} className="panel settings-form"><h3>Create an account</h3>
-          <div><label htmlFor="new-username">Username</label><input id="new-username" name="username" autoComplete="off" pattern="[A-Za-z0-9._\-]{2,64}" minLength={2} maxLength={64} required /><p className="hint">2–64 letters, numbers, dots, underscores, or dashes.</p></div>
-          <div><label htmlFor="new-password">Password</label><input id="new-password" name="password" type="password" autoComplete="new-password" minLength={12} maxLength={72} required /><p className="hint">At least 12 characters (maximum 72 bytes). Share it with the person directly; it is stored hashed and cannot be shown again.</p></div>
-          <div><label htmlFor="new-role">Role</label><select id="new-role" name="role" defaultValue="contributor"><option value="contributor">Contributor</option><option value="admin">Admin</option></select></div>
-          <div className="align-right"><PendingButton className="primary" pendingText="Creating…">Create account</PendingButton></div>
-        </form>
+      <section id="accounts" className="section-block"><div className="section-title"><h2>Accounts</h2><CreateAccountDialog /></div>
+        <p className="hint">Accounts are created without a password. Each one gets a setup link to share; the person picks their password there. Club leaders also need their channel webhook connected on their account page.</p>
         <div className="activity-list">
           {envAccounts.map((account) => <div key={`env-${account.username}`}><span className="activity-dot success" /><div><strong>{account.username}</strong><p>{account.role} · configured in environment variables</p></div><div className="recent-actions"><span className="hint">Built in</span></div></div>)}
-          {accounts.map((account) => <div key={account.id} className="account-row"><span className="activity-dot success" /><div><strong>{account.username}</strong><p>{account.role}{account.created_by ? ` · created by ${account.created_by}` : ""} · added {relativeDate(account.created_at)}</p>
-            <form action={updateAccountAction} className="account-manage"><input type="hidden" name="id" value={account.id} />
-              <label className="sr-only" htmlFor={`role-${account.id}`}>Role</label><select id={`role-${account.id}`} name="role" defaultValue={account.role}><option value="contributor">Contributor</option><option value="admin">Admin</option></select>
-              <label className="sr-only" htmlFor={`password-${account.id}`}>New password</label><input id={`password-${account.id}`} name="password" type="password" autoComplete="new-password" minLength={12} maxLength={72} placeholder="New password (optional)" />
-              <PendingButton className="secondary" pendingText="Saving…">Save</PendingButton>
-            </form></div>
-            <div className="recent-actions"><form action={deleteAccountAction}><input type="hidden" name="id" value={account.id} /><PendingButton className="danger" pendingText="Deleting…">Delete</PendingButton></form></div></div>)}
+          {accounts.map((account) => <div key={account.id} className="account-row"><span className={`activity-dot ${account.has_password ? "success" : "pending"}`} /><div><strong><a href={`/admin/accounts/${account.id}`}>{account.username}</a></strong><p>{ROLE_LABELS[account.role]}{account.created_by ? ` · created by ${account.created_by}` : ""} · added {relativeDate(account.created_at)}{account.has_password ? "" : " · awaiting password setup"}</p></div>
+            <div className="recent-actions"><a href={`/admin/accounts/${account.id}`} className="secondary">{account.role === "club_leader" ? "Manage & channel" : "Manage"}</a><form action={deleteAccountAction}><input type="hidden" name="id" value={account.id} /><PendingButton className="danger" pendingText="Deleting…" confirmMessage={`Delete “${account.username}”?`}>Delete</PendingButton></form></div></div>)}
         </div>
       </section>
 
