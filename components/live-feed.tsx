@@ -29,7 +29,7 @@ function timestamp(value: string) {
   return `${day} at ${date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
 }
 
-export function LiveFeed({ isAdmin = false, botName = "Announcements", avatarUrl = null, roleId = null, destinations = [] }: { destinations?: WebhookOption[]; isAdmin?: boolean; botName?: string; avatarUrl?: string | null; roleId?: string | null }) {
+export function LiveFeed({ isAdmin = false, botName = "Announcements", channelName = "Announcements", avatarUrl = null, roleId = null, destinations = [] }: { destinations?: WebhookOption[]; isAdmin?: boolean; botName?: string; channelName?: string; avatarUrl?: string | null; roleId?: string | null }) {
   const [showHidden, setShowHidden] = useState(false), [changing, setChanging] = useState<string | null>(null);
   const [filter, setFilter] = useState("all"), [theme, setTheme] = useState("system"), [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
   const [messages, setMessages] = useState<Message[]>([]), [hasOlder, setHasOlder] = useState(false);
@@ -110,7 +110,7 @@ export function LiveFeed({ isAdmin = false, botName = "Announcements", avatarUrl
       <div className="live-header-row">
         <div className="live-identity">
           {avatarUrl ? <img className="live-avatar live-avatar-lg" src={avatarUrl} alt="" width={44} height={44} referrerPolicy="no-referrer" /> : <div className="live-avatar live-avatar-lg" aria-hidden="true">{botName.slice(0, 1).toUpperCase()}</div>}
-          <div><h1>{botName}</h1><p className="live-sub"><span className="live-dot" aria-hidden="true" />Live · {loading && !messages.length ? "loading" : `${messages.length} loaded${todayCount ? ` · ${todayCount} today` : ""}`}</p></div>
+          <div><h1>{channelName}</h1><p className="live-sub"><span className="live-dot" aria-hidden="true" />Live · {loading && !messages.length ? "loading" : `${messages.length} loaded${todayCount ? ` · ${todayCount} today` : ""}`}</p></div>
         </div>
         <div className="live-actions">
           <LiveNotifications />

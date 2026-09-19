@@ -33,6 +33,7 @@ create table if not exists settings (
   calendar_feed_url_encrypted text,
   notification_webhook_url_encrypted text,
   notification_user_id text check (notification_user_id is null or notification_user_id ~ '^[0-9]{15,22}$'),
+  live_channel_name text check (live_channel_name is null or char_length(live_channel_name) between 1 and 60),
   updated_at timestamptz not null default now()
 );
 

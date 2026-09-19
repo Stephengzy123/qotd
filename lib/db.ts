@@ -355,6 +355,13 @@ const migrations = [
       `alter table questions add column if not exists remove_pings boolean not null default false`,
     ],
   },
+  {
+    version: 19,
+    statements: [
+      `alter table settings add column if not exists live_channel_name text
+        check (live_channel_name is null or char_length(live_channel_name) between 1 and 60)`,
+    ],
+  },
 ] as const;
 
 export function db() {

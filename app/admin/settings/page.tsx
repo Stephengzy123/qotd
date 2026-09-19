@@ -8,7 +8,7 @@ import { AnnouncementTemplateEditor } from "@/components/announcement-template-e
 import { PendingButton } from "@/components/pending-button";
 import { WebhookProfile } from "@/components/webhook-profile";
 
-type Settings = { message_template: string | null; event_message_template: string | null; mention_role_id: string | null; webhook_url_encrypted: string | null; notification_webhook_url_encrypted: string | null; has_webhook: boolean; notification_user_id: string | null; has_notification_webhook: boolean; has_calendar_feed: boolean };
+type Settings = { message_template: string | null; event_message_template: string | null; mention_role_id: string | null; webhook_url_encrypted: string | null; notification_webhook_url_encrypted: string | null; has_webhook: boolean; notification_user_id: string | null; has_notification_webhook: boolean; has_calendar_feed: boolean; live_channel_name: string | null };
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
   const session = await requireRole("admin");
@@ -16,9 +16,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const sql = await dbReady();
   const rows = await sql<Settings[]>`select message_template, event_message_template, mention_role_id, webhook_url_encrypted, notification_webhook_url_encrypted, webhook_url_encrypted is not null as has_webhook,
     notification_user_id, notification_webhook_url_encrypted is not null as has_notification_webhook,
-    calendar_feed_url_encrypted is not null as has_calendar_feed
+    calendar_feed_url_encrypted is not null as has_calendar_feed, live_channel_name
     from settings where singleton = true`;
-  const settings: Settings = rows[0] || { message_template: null, event_message_template: null, mention_role_id: null, webhook_url_encrypted: null, notification_webhook_url_encrypted: null, has_webhook: false, notification_user_id: null, has_notification_webhook: false, has_calendar_feed: false };
+  const settings: Settings = rows[0] || { message_template: null, event_message_template: null, mention_role_id: null, webhook_url_encrypted: null, notification_webhook_url_encrypted: null, has_webhook: false, notification_user_id: null, has_notification_webhook: false, has_calendar_feed: false, live_channel_name: null };
   const ready = Boolean(settings.has_webhook && settings.mention_role_id);
 
   return (
@@ -43,6 +43,11 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <div><label htmlFor="notificationWebhook">Pending notification webhook URL</label><input id="notificationWebhook" name="notificationWebhook" type="password" placeholder={settings.has_notification_webhook ? "Saved securely — enter a new URL to replace it" : "https://discord.com/api/webhooks/…"} autoComplete="off" /><p className="hint">Optional. Sends a notice when a contributor adds a pending announcement.</p></div>
             <Suspense fallback={<p className="hint" role="status">Loading saved notification webhook…</p>}><WebhookProfile encryptedUrl={settings.notification_webhook_url_encrypted} /></Suspense>
             <div><label htmlFor="notificationUserId">Discord user ID to notify</label><input id="notificationUserId" name="notificationUserId" inputMode="numeric" pattern="[0-9]{15,22}" defaultValue={settings.notification_user_id || ""} placeholder="123456789012345678" /><p className="hint">The notification begins with <code>{"<@user-id>"}</code> so Discord pings you.</p></div>
+          </div>
+        </section>
+        <section className="section-block"><div className="section-title"><h2>Live channel</h2></div>
+          <div className="panel settings-form">
+            <div><label htmlFor="liveChannelName">Channel name</label><input id="liveChannelName" name="liveChannelName" defaultValue={settings.live_channel_name || "Announcements"} minLength={1} maxLength={60} required /><p className="hint">Shown at the top of <code>/live</code>. It does not change message author names.</p></div>
           </div>
         </section>
         <div className="settings-save"><p className="hint">One save covers all three sections.</p><PendingButton className="primary" pendingText="Saving…">Save settings</PendingButton></div>
