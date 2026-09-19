@@ -97,18 +97,18 @@ export function formatAnnouncement(template: string, announcement: string, sched
 type Mode = "scheduled" | "manual_selected";
 
 export async function sendAnnouncement(announcementId: string, mode: Mode, localDate?: string, actor?: string, options: { destination?: "discord" | "live"; removePings?: boolean; webhookIds?: string[] } = {}) {
-  const destination = options.destination ?? "discord";
-  if (destination !== "discord" && destination !== "live") return { error: "Invalid destination." } as const;
-  const stripPings = destination === "live" || options.removePings === true;
   const logBase = { action: "dispatch_announcement", actor: actor ?? (mode === "scheduled" ? "scheduler" : null), role: mode === "scheduled" ? "system" : "admin" } as const;
   const sql = await dbReady();
   const announcements = await sql`
-      select id, question, scheduled_date, question_type, event_title, discord_webhook_ids from questions
+      select id, question, scheduled_date, question_type, event_title, discord_webhook_ids, delivery_destination, remove_pings, updated_at::text as settings_version from questions
       where id = ${announcementId} and status = 'approved' and scheduled_date is not null
       limit 1
     `;
   const announcement = announcements[0];
   if (!announcement) return { error: "There are no approved announcements ready to send." } as const;
+  const destination = options.destination ?? announcement.delivery_destination ?? "discord";
+  if (destination !== "discord" && destination !== "live") return { error: "Invalid destination." } as const;
+  const stripPings = destination === "live" || (options.removePings ?? announcement.remove_pings) === true;
   const settings = (await sql`
       select webhook_url_encrypted, mention_role_id, message_template, event_message_template, calendar_feed_url_encrypted
       from settings where singleton = true
@@ -142,10 +142,10 @@ export async function sendAnnouncement(announcementId: string, mode: Mode, local
   const claimed = await sql.begin(async (tx) => {
     const claim = await tx`
       update questions set status = 'sent', updated_at = now()
-      where id = ${announcement.id} and status = 'approved'
+      where id = ${announcement.id} and status = 'approved' and updated_at = ${announcement.settings_version}::timestamptz
       returning id
     `;
-    if (!claim[0]) return { error: "That announcement is already being handled." } as const;
+    if (!claim[0]) return { error: "That announcement changed or is already being handled. Reload before retrying." } as const;
     const rows = await tx`
       insert into dispatches (question_id, local_date, mode, message, success, question_type, destination)
       values (${announcement.id}, ${localDate || null}, ${mode}, ${message}, ${destination === "live"}, ${type}, ${destination})

@@ -10,9 +10,9 @@ import { encryptSecret, hashAddress, validateDiscordWebhook } from "@/lib/securi
 import { isValidAnnouncementDate, isValidFuturePacificDate, normalizeDiscordTemplate, sendAnnouncement, sendPendingNotification, validateAnnouncementTemplate, type AnnouncementType } from "@/lib/qotd";
 import { fetchCalendarByUrl, normalizeCalendarFeedUrl } from "@/lib/calendar";
 import { createAccount, createSetupLink, deleteAccount, getAccount, parseRole, ROLE_LABELS, updateAccountRole } from "@/lib/accounts";
-import { saveClubWebhook } from "@/lib/clubs";
+import { createClub, setMembership, type ClubRole } from "@/lib/clubs";
 import { logEvent } from "@/lib/log";
-import { resolveWebhooks, selectedWebhookIds } from "@/lib/webhook-destinations";
+import { readDeliverySettings } from "@/lib/delivery-settings";
 import type { Role } from "@/lib/auth";
 
 function messageUrl(path: string, kind: "ok" | "error", message: string) {
@@ -89,7 +89,7 @@ export async function submitQuestionAction(formData: FormData) {
   const inserted = await sql<{ id: string }[]>`insert into questions (question, contributor_note, scheduled_date, question_type, event_title, submitter_ip_hash) values (${announcement}, ${note || null}, ${scheduledDate}, ${type}, ${type === "event" ? eventTitle : null}, ${ipHash}) returning id`;
   await logEvent({ action, actor: session.username, role: session.role, details: { ...details, id: inserted[0]?.id, hasNote: Boolean(note) } });
   await sendPendingNotification(announcement, scheduledDate, type, type === "event" ? eventTitle : null);
-  revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
   redirect(messageUrl("/contribute", "ok", "Your announcement is ready for review."));
 }
 
@@ -105,26 +105,22 @@ export async function reviewQuestionAction(formData: FormData) {
   const status = intent === "approve" ? "approved" : intent === "reject" ? "rejected" : "pending";
   const action = intent === "approve" ? "approve_announcement" : intent === "reject" ? "reject_announcement" : "edit_announcement";
   const details = { id, type, scheduledDate, eventTitle: type === "event" ? eventTitle : undefined, daysEarly: requestedDaysEarly, length: announcement.length };
-  if (!id || announcement.length < 8 || announcement.length > 1500) await fail("/admin", session, action, "Check the announcement length and try again.", details);
+  if (!id || announcement.length < 8 || announcement.length > 1500) await fail("/admin/pending", session, action, "Check the announcement length and try again.", details);
   const sql = await dbReady();
-  const webhookIds = selectedWebhookIds(formData);
-  if (status !== "rejected" && webhookIds) {
-    try { await resolveWebhooks(webhookIds); }
-    catch (error) { await fail("/admin", session, action, error instanceof Error ? error.message : "Invalid Discord destinations.", details); }
-  }
+  const delivery = status !== "rejected" ? await readDeliverySettings(formData).catch(error => fail("/admin/pending", session, action, error.message)) : null;
   let updated: { id: string }[];
   if (status === "rejected") {
     updated = await sql<{ id: string }[]>`update questions set question = ${announcement}, status = 'rejected', updated_at = now() where id = ${id} and status <> 'sent' returning id`;
   } else {
-    const daysEarly = type === "announcement" ? (requestedDaysEarly ?? await fail("/admin", session, action, "Days early must be between 0 and 365.", details)) : 0;
-    if (type === "announcement" && !isValidAnnouncementDate(scheduledDate, new Date(), daysEarly)) await fail("/admin", session, action, "Choose an announcement date whose calculated 6 PM publishing window has not passed.", details);
-    if (type === "event" && !isValidFuturePacificDate(scheduledDate)) await fail("/admin", session, action, "Choose a valid future event publish date.", details);
-    if (type === "event" && (eventTitle.length < 1 || eventTitle.length > 200)) await fail("/admin", session, action, "Event titles must be between 1 and 200 characters.", details);
-    updated = await sql<{ id: string }[]>`update questions set question = ${announcement}, scheduled_date = ${scheduledDate}, question_type = ${type}, event_title = ${type === "event" ? eventTitle : null}, days_early = ${daysEarly}, discord_webhook_ids = coalesce(${webhookIds ?? null}::text[], discord_webhook_ids), status = ${status}, updated_at = now() where id = ${id} and status <> 'sent' returning id`;
+    const daysEarly = type === "announcement" ? (requestedDaysEarly ?? await fail("/admin/pending", session, action, "Days early must be between 0 and 365.", details)) : 0;
+    if (type === "announcement" && !isValidAnnouncementDate(scheduledDate, new Date(), daysEarly)) await fail("/admin/pending", session, action, "Choose an announcement date whose calculated 6 PM publishing window has not passed.", details);
+    if (type === "event" && !isValidFuturePacificDate(scheduledDate)) await fail("/admin/pending", session, action, "Choose a valid future event publish date.", details);
+    if (type === "event" && (eventTitle.length < 1 || eventTitle.length > 200)) await fail("/admin/pending", session, action, "Event titles must be between 1 and 200 characters.", details);
+    updated = await sql<{ id: string }[]>`update questions set question = ${announcement}, scheduled_date = ${scheduledDate}, question_type = ${type}, event_title = ${type === "event" ? eventTitle : null}, days_early = ${daysEarly}, delivery_destination = ${delivery!.destination}, remove_pings = ${delivery!.removePings}, discord_webhook_ids = ${delivery!.webhookIds}::text[], status = ${status}, updated_at = now() where id = ${id} and status <> 'sent' returning id`;
   }
   await logEvent({ action, actor: session.username, role: session.role, success: updated.length > 0, details: { ...details, updated: updated.length > 0 } });
-  revalidatePath("/admin");
-  redirect(messageUrl("/admin", "ok", status === "approved" ? "Announcement approved." : status === "rejected" ? "Announcement rejected." : "Changes saved."));
+  revalidatePath("/admin", "layout");
+  redirect(messageUrl("/admin/pending", "ok", status === "approved" ? "Announcement approved." : status === "rejected" ? "Announcement rejected." : "Changes saved."));
 }
 
 export async function addApprovedQuestionAction(formData: FormData) {
@@ -135,50 +131,46 @@ export async function addApprovedQuestionAction(formData: FormData) {
   const scheduledDate = String(formData.get("scheduledDate") || "");
   const requestedDaysEarly = daysEarlyValue(formData);
   const action = "add_approved_announcement";
-  const webhookIds = selectedWebhookIds(formData);
-  if (webhookIds) {
-    try { await resolveWebhooks(webhookIds); }
-    catch (error) { await fail("/admin", session, action, error instanceof Error ? error.message : "Invalid Discord destinations."); }
-  }
+  const delivery = await readDeliverySettings(formData).catch(error => fail("/admin/approved", session, action, error.message));
   const details = { type, scheduledDate, eventTitle: type === "event" ? eventTitle : undefined, daysEarly: requestedDaysEarly, length: announcement.length };
   if (announcement.length < 8 || announcement.length > 1500) {
-    await fail("/admin", session, action, "Announcements must be between 8 and 1,500 characters.", details);
+    await fail("/admin/approved", session, action, "Announcements must be between 8 and 1,500 characters.", details);
   }
-  const daysEarly = type === "announcement" ? (requestedDaysEarly ?? await fail("/admin", session, action, "Days early must be between 0 and 365.", details)) : 0;
-  if (type === "announcement" && !isValidAnnouncementDate(scheduledDate, new Date(), daysEarly)) await fail("/admin", session, action, "Choose an announcement date whose calculated 6 PM publishing window has not passed.", details);
-  if (type === "event" && !isValidFuturePacificDate(scheduledDate)) await fail("/admin", session, action, "Choose a valid future event publish date.", details);
-  if (type === "event" && (eventTitle.length < 1 || eventTitle.length > 200)) await fail("/admin", session, action, "Event titles must be between 1 and 200 characters.", details);
+  const daysEarly = type === "announcement" ? (requestedDaysEarly ?? await fail("/admin/approved", session, action, "Days early must be between 0 and 365.", details)) : 0;
+  if (type === "announcement" && !isValidAnnouncementDate(scheduledDate, new Date(), daysEarly)) await fail("/admin/approved", session, action, "Choose an announcement date whose calculated 6 PM publishing window has not passed.", details);
+  if (type === "event" && !isValidFuturePacificDate(scheduledDate)) await fail("/admin/approved", session, action, "Choose a valid future event publish date.", details);
+  if (type === "event" && (eventTitle.length < 1 || eventTitle.length > 200)) await fail("/admin/approved", session, action, "Event titles must be between 1 and 200 characters.", details);
   const sql = await dbReady();
   const inserted = await sql<{ id: string }[]>`
-    insert into questions (question, scheduled_date, question_type, event_title, days_early, status, submitter_ip_hash, discord_webhook_ids)
-    values (${announcement}, ${scheduledDate}, ${type}, ${type === "event" ? eventTitle : null}, ${daysEarly}, 'approved', ${hashAddress(`admin:${session.username}`)}, ${webhookIds ?? null}::text[])
+    insert into questions (question, scheduled_date, question_type, event_title, days_early, status, submitter_ip_hash, delivery_destination, remove_pings, discord_webhook_ids)
+    values (${announcement}, ${scheduledDate}, ${type}, ${type === "event" ? eventTitle : null}, ${daysEarly}, 'approved', ${hashAddress(`admin:${session.username}`)}, ${delivery.destination}, ${delivery.removePings}, ${delivery.webhookIds}::text[])
     returning id
   `;
   await logEvent({ action, actor: session.username, role: session.role, details: { ...details, id: inserted[0]?.id } });
-  revalidatePath("/admin");
-  redirect(messageUrl("/admin", "ok", "Announcement added to Approved."));
+  revalidatePath("/admin", "layout");
+  redirect(messageUrl("/admin/approved", "ok", "Announcement added to Approved."));
 }
 
 export async function unapproveQuestionAction(formData: FormData) {
   const session = await requireRole("admin");
   const id = String(formData.get("id") || "");
-  if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin", session, "unapprove_announcement", "Invalid announcement.", { id });
+  if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin/approved", session, "unapprove_announcement", "Invalid announcement.", { id });
   const sql = await dbReady();
   const updated = await sql`update questions set status = 'pending', updated_at = now() where id = ${id} and status = 'approved' returning id`;
   await logEvent({ action: "unapprove_announcement", actor: session.username, role: session.role, success: updated.length > 0, details: { id, updated: updated.length > 0 } });
-  revalidatePath("/admin");
-  redirect(messageUrl("/admin", "ok", "Announcement moved back to Pending."));
+  revalidatePath("/admin", "layout");
+  redirect(messageUrl("/admin/approved", "ok", "Announcement moved back to Pending."));
 }
 
 export async function deleteApprovedQuestionAction(formData: FormData) {
   const session = await requireRole("admin");
   const id = String(formData.get("id") || "");
-  if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin", session, "delete_announcement", "Invalid announcement.", { id });
+  if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin/approved", session, "delete_announcement", "Invalid announcement.", { id });
   const sql = await dbReady();
   const deleted = await sql<{ question: string }[]>`delete from questions where id = ${id} and status = 'approved' returning question`;
   await logEvent({ action: "delete_announcement", actor: session.username, role: session.role, success: deleted.length > 0, details: { id, deleted: deleted.length > 0, excerpt: deleted[0]?.question.slice(0, 120) } });
-  revalidatePath("/admin");
-  redirect(messageUrl("/admin", "ok", "Announcement deleted."));
+  revalidatePath("/admin", "layout");
+  redirect(messageUrl("/admin/approved", "ok", "Announcement deleted."));
 }
 
 export async function saveSettingsAction(formData: FormData) {
@@ -195,19 +187,19 @@ export async function saveSettingsAction(formData: FormData) {
   const eventTemplateError = validateAnnouncementTemplate(eventTemplate, "event");
   // Never log secret values; record only which settings changed.
   const details = { roleId, notificationUserId: notificationUserId || null, webhookChanged: Boolean(webhook), notificationWebhookChanged: Boolean(notificationWebhook), calendarFeedChanged: Boolean(calendarFeed) };
-  if (announcementTemplateError) await fail("/admin", session, action, announcementTemplateError, details);
-  if (eventTemplateError) await fail("/admin", session, action, eventTemplateError, details);
-  if (!/^\d{15,22}$/.test(roleId)) await fail("/admin", session, action, "The announcement role ID must contain 15–22 digits.", details);
-  if (notificationUserId && !/^\d{15,22}$/.test(notificationUserId)) await fail("/admin", session, action, "The notification user ID must contain 15–22 digits.", details);
-  if (webhook && !validateDiscordWebhook(webhook)) await fail("/admin", session, action, "Enter a valid Discord webhook URL.", details);
-  if (notificationWebhook && !validateDiscordWebhook(notificationWebhook)) await fail("/admin", session, action, "Enter a valid notification webhook URL.", details);
+  if (announcementTemplateError) await fail("/admin/settings", session, action, announcementTemplateError, details);
+  if (eventTemplateError) await fail("/admin/settings", session, action, eventTemplateError, details);
+  if (!/^\d{15,22}$/.test(roleId)) await fail("/admin/settings", session, action, "The announcement role ID must contain 15–22 digits.", details);
+  if (notificationUserId && !/^\d{15,22}$/.test(notificationUserId)) await fail("/admin/settings", session, action, "The notification user ID must contain 15–22 digits.", details);
+  if (webhook && !validateDiscordWebhook(webhook)) await fail("/admin/settings", session, action, "Enter a valid Discord webhook URL.", details);
+  if (notificationWebhook && !validateDiscordWebhook(notificationWebhook)) await fail("/admin/settings", session, action, "Enter a valid notification webhook URL.", details);
   const normalizedCalendarFeed = calendarFeed ? normalizeCalendarFeedUrl(calendarFeed) : null;
-  if (calendarFeed && !normalizedCalendarFeed) await fail("/admin", session, action, "Enter a valid HTTPS or webcal calendar feed URL.", details);
+  if (calendarFeed && !normalizedCalendarFeed) await fail("/admin/settings", session, action, "Enter a valid HTTPS or webcal calendar feed URL.", details);
   if (normalizedCalendarFeed) {
     try {
       await fetchCalendarByUrl(normalizedCalendarFeed);
     } catch {
-      await fail("/admin", session, action, "The calendar feed could not be read. Check its URL and try again.", { ...details, error: "calendar_feed_unreadable" });
+      await fail("/admin/settings", session, action, "The calendar feed could not be read. Check its URL and try again.", { ...details, error: "calendar_feed_unreadable" });
     }
   }
   const sql = await dbReady();
@@ -222,59 +214,86 @@ export async function saveSettingsAction(formData: FormData) {
     updated_at = now()
     where singleton = true`;
   await logEvent({ action, actor: session.username, role: session.role, details });
-  revalidatePath("/admin");
-  redirect(messageUrl("/admin", "ok", "Delivery settings saved."));
+  revalidatePath("/admin", "layout");
+  redirect(messageUrl("/admin/settings", "ok", "Delivery settings saved."));
 }
 
 export async function sendQuestionAction(formData: FormData) {
   const session = await requireRole("admin");
   const id = String(formData.get("id") || "");
-  if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin", session, "send_announcement", "Select an announcement to send.", { id });
-  const destination = String(formData.get("destination") || "discord");
-  if (destination !== "discord" && destination !== "live") await fail("/admin", session, "send_announcement", "Choose a valid destination.", { id });
-  const result = await sendAnnouncement(id, "manual_selected", undefined, session.username, { destination: destination as "discord" | "live", removePings: formData.get("removePings") === "on", webhookIds: selectedWebhookIds(formData) });
+  if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin/approved", session, "send_announcement", "Select an announcement to send.", { id });
+  const delivery = await persistDeliverySettings(id, formData);
+  if ("error" in delivery) await fail("/admin/approved", session, "send_announcement", delivery.error || "Save failed.", { id });
+  const result = await sendAnnouncement(id, "manual_selected", undefined, session.username);
   if (!("error" in result)) scheduleLivePush(result.dispatchId);
   await logEvent({ action: "send_announcement", actor: session.username, role: session.role, success: !("error" in result), details: { id, mode: "manual_selected", error: "error" in result ? result.error : undefined } });
-  revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
   revalidatePath("/live");
   revalidatePath("/contribute");
-  redirect(messageUrl("/admin", "error" in result ? "error" : "ok", "error" in result ? (result.error || "Send failed.") : destination === "live" ? "Announcement published to /live only." : "warning" in result && result.warning ? `Partially sent. ${result.warning} Check Recent sends before retrying.` : "Announcement sent to Discord."));
+  redirect(messageUrl("/admin/approved", "error" in result ? "error" : "ok", "error" in result ? (result.error || "Send failed.") : "warning" in result && result.warning ? `Partially sent. ${result.warning}` : "Announcement sent using its saved delivery settings."));
 }
 
 export async function createAccountAction(formData: FormData) {
   const session = await requireRole("admin");
   const username = String(formData.get("username") || "").trim();
-  const role = parseRole(formData.get("role")) ?? await fail("/admin", session, "create_account", "Choose an account type.", { username });
+  const role = parseRole(formData.get("role")) ?? await fail("/admin/accounts", session, "create_account", "Choose an account type.", { username });
+  // Club managers belong to an existing club or a new one named here.
+  const clubChoice = String(formData.get("club") || "");
+  const clubName = String(formData.get("clubName") || "").trim();
+  const clubRole: ClubRole = "leader";
+  if (formData.get("clubRole") === "assistant") await fail("/admin/accounts", session, "create_account", "Club assistant accounts are no longer supported.");
+  let clubId: string | null = null;
+  let createdClub = false;
+  if (role === "club_leader") {
+    if (clubChoice === "new") {
+      const club = await createClub(clubName, session.username);
+      clubId = club.id ?? await fail("/admin/accounts", session, "create_club", club.error ?? "The club could not be created.", { clubName });
+      createdClub = true;
+      await logEvent({ action: "create_club", actor: session.username, role: session.role, details: { clubId, clubName } });
+    } else if (/^[0-9a-f-]{36}$/i.test(clubChoice)) {
+      clubId = clubChoice;
+    } else {
+      await fail("/admin/accounts", session, "create_account", "Choose a club for this account.", { username, role });
+    }
+  }
   const result = await createAccount(username, role, session.username);
-  const accountId = result.id ?? await fail("/admin", session, "create_account", result.error ?? "The account could not be created.", { username, role });
-  await logEvent({ action: "create_account", actor: session.username, role: session.role, details: { id: accountId, username, accountRole: role } });
+  const accountId = result.id ?? await fail("/admin/accounts", session, "create_account", result.error ?? "The account could not be created.", { username, role });
+  await logEvent({ action: "create_account", actor: session.username, role: session.role, details: { id: accountId, username, accountRole: role, clubId: clubId ?? undefined, clubRole: clubId ? clubRole : undefined } });
+  if (clubId) {
+    const membershipError = await setMembership(accountId, clubId, clubRole);
+    if (membershipError) {
+      await deleteAccount(accountId);
+      await fail("/admin/accounts", session, "create_account", membershipError, { username, clubId, clubRole });
+    }
+  }
   // The person chooses their own password through the setup link.
   await createSetupLink(accountId, session.username);
   await logEvent({ action: "create_setup_link", actor: session.username, role: session.role, details: { id: accountId, username } });
-  revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
+  if (createdClub) redirect(messageUrl(`/admin/clubs/${clubId}`, "ok", `“${clubName}” created with ${username} as leader. Connect the channel webhook, then share the setup link from the account page.`));
   redirect(messageUrl(`/admin/accounts/${accountId}`, "ok", `Account “${username}” created as ${ROLE_LABELS[role].toLowerCase()}. Share the setup link below.`));
 }
 
 export async function deleteAccountAction(formData: FormData) {
   const session = await requireRole("admin");
   const id = String(formData.get("id") || "");
-  if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin", session, "delete_account", "Invalid account.", { id });
-  const deleted = (await deleteAccount(id)) ?? await fail("/admin", session, "delete_account", "That account no longer exists.", { id });
+  if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin/accounts", session, "delete_account", "Invalid account.", { id });
+  const deleted = (await deleteAccount(id)) ?? await fail("/admin/accounts", session, "delete_account", "That account no longer exists.", { id });
   await logEvent({ action: "delete_account", actor: session.username, role: session.role, details: { id, username: deleted.username, accountRole: deleted.role } });
-  revalidatePath("/admin");
-  redirect(messageUrl("/admin", "ok", `Account “${deleted.username}” deleted.`));
+  revalidatePath("/admin", "layout");
+  redirect(messageUrl("/admin/accounts", "ok", `Account “${deleted.username}” deleted.`));
 }
 
 export async function updateAccountAction(formData: FormData) {
   const session = await requireRole("admin");
   const id = String(formData.get("id") || "");
-  if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin", session, "update_account", "Invalid account.", { id });
-  const role = parseRole(formData.get("role")) ?? await fail("/admin", session, "update_account", "Choose an account type.", { id });
-  const username = (await updateAccountRole(id, role)) ?? await fail("/admin", session, "update_account", "That account no longer exists.", { id, role });
+  if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin/accounts", session, "update_account", "Invalid account.", { id });
+  const role = parseRole(formData.get("role")) ?? await fail("/admin/accounts", session, "update_account", "Choose an account type.", { id });
+  const username = (await updateAccountRole(id, role)) ?? await fail("/admin/accounts", session, "update_account", "That account no longer exists.", { id, role });
   await logEvent({ action: "update_account", actor: session.username, role: session.role, details: { id, username, accountRole: role } });
-  revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
   revalidatePath(`/admin/accounts/${id}`);
-  redirect(messageUrl("/admin", "ok", `Account “${username}” is now a ${ROLE_LABELS[role].toLowerCase()}.`));
+  redirect(messageUrl("/admin/accounts", "ok", `Account “${username}” is now a ${ROLE_LABELS[role].toLowerCase()}.`));
 }
 
 // Issues a new setup link. Also the way to reset a password: the old link
@@ -282,27 +301,29 @@ export async function updateAccountAction(formData: FormData) {
 export async function regenerateSetupLinkAction(formData: FormData) {
   const session = await requireRole("admin");
   const id = String(formData.get("id") || "");
-  if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin", session, "create_setup_link", "Invalid account.", { id });
-  const account = (await getAccount(id)) ?? await fail("/admin", session, "create_setup_link", "That account no longer exists.", { id });
+  if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin/accounts", session, "create_setup_link", "Invalid account.", { id });
+  const account = (await getAccount(id)) ?? await fail("/admin/accounts", session, "create_setup_link", "That account no longer exists.", { id });
   await createSetupLink(account.id, session.username);
   await logEvent({ action: "create_setup_link", actor: session.username, role: session.role, details: { id, username: account.username, replacesPassword: account.has_password } });
   revalidatePath(`/admin/accounts/${id}`);
   redirect(messageUrl(`/admin/accounts/${id}`, "ok", "New setup link ready. Earlier links no longer work."));
 }
 
-export async function saveClubWebhookAction(formData: FormData) {
+async function persistDeliverySettings(id: string, form: FormData) {
+  try {
+    const settings = await readDeliverySettings(form);
+    const sql = await dbReady();
+    const rows = await sql`update questions set delivery_destination = ${settings.destination}, remove_pings = ${settings.removePings}, discord_webhook_ids = ${settings.webhookIds}::text[], updated_at = now() where id = ${id} and status in ('pending', 'approved') returning id`;
+    return rows.length ? { success: "Delivery settings saved." } : { error: "This item has already been sent or removed." };
+  } catch (error) { return { error: error instanceof Error ? error.message : "Could not save delivery settings." }; }
+}
+
+export async function saveDeliverySettingsAction(_previous: { success?: string; error?: string }, form: FormData) {
   const session = await requireRole("admin");
-  const id = String(formData.get("id") || "");
-  const webhook = String(formData.get("webhook") || "").trim();
-  const path = `/admin/accounts/${id}`;
-  if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin", session, "save_club_webhook", "Invalid account.", { id });
-  const account = (await getAccount(id)) ?? await fail("/admin", session, "save_club_webhook", "That account no longer exists.", { id });
-  if (account.role !== "club_leader") await fail(path, session, "save_club_webhook", "Only club leader accounts have a channel webhook.", { id, username: account.username });
-  if (!validateDiscordWebhook(webhook)) await fail(path, session, "save_club_webhook", "Enter a valid Discord webhook URL.", { id, username: account.username });
-  await saveClubWebhook(account.id, webhook, session.username);
-  // Never log the webhook itself.
-  await logEvent({ action: "save_club_webhook", actor: session.username, role: session.role, details: { id, username: account.username } });
-  revalidatePath(path);
-  revalidatePath("/club");
-  redirect(messageUrl(path, "ok", `Channel webhook saved for “${account.username}”.`));
+  const id = String(form.get("id") || "");
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { error: "Invalid announcement." };
+  const result = await persistDeliverySettings(id, form);
+  await logEvent({ action: "save_delivery_settings", actor: session.username, role: session.role, success: !result.error, details: { id } });
+  revalidatePath("/admin", "layout");
+  return result;
 }

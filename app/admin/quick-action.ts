@@ -50,6 +50,6 @@ export async function quickAnnounceAction(_previous: Result, form: FormData): Pr
   }
   await logEvent({ action: "quick_announcement", actor: session.username, role: session.role, success: !error, details: { dispatchId: requestId, nickname, destination, ping: false, destinations: results, responseStatus: status } });
   if (published) scheduleLivePush(requestId);
-  revalidatePath("/admin"); revalidatePath("/live"); revalidatePath("/contribute");
+  revalidatePath("/admin"); revalidatePath("/admin/sends"); revalidatePath("/live"); revalidatePath("/contribute");
   return error ? { error: `${error} Check Recent sends; do not resend to successful destinations.` } : { success: destination === "live" ? "Published to /live." : "Sent to Discord and /live." };
 }

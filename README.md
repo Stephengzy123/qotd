@@ -23,45 +23,26 @@ SESSION_SECRET=
 WEBHOOK_ENCRYPTION_KEY=
 CRON_SECRET=
 RATE_LIMIT_SECRET=
+PASSKEY_RP_ID=            # optional; defaults to the request hostname
 ```
 
 Generate password hashes with `npm run hash-password -- "your password"`. Generate random secrets with `openssl rand -base64 32`.
 
-The two environment-variable logins are built in. Admins create additional accounts from the **Accounts** section of the admin page through a two-step overlay: pick the account type, then the username. No password is entered. The account page that opens next shows a single-use **setup link** (valid for 7 days) to send to the person; whoever opens it chooses the password and is signed in. Generating a new link from the account page invalidates the old one and doubles as a password reset. Accounts and bcrypt-hashed passwords live in the `accounts` table; link tokens are stored hashed (plus encrypted for display) in `password_setup_tokens`.
+The two environment-variable logins are built in. Admins create additional accounts from the **Accounts** page of the admin area (`/admin/accounts`) through a two-step overlay: pick the account type, then the username. No password is entered. The account page that opens next shows a single-use **setup link** (valid for 7 days) to send to the person; whoever opens it chooses the password and is signed in. Generating a new link from the account page invalidates the old one and doubles as a password reset. Accounts and bcrypt-hashed passwords live in the `accounts` table; link tokens are stored hashed (plus encrypted for display) in `password_setup_tokens`.
 
 ## Account types
 
 - **Contributor** — writes announcements and events that an admin reviews before they go out.
 - **Admin** — reviews submissions, changes settings, and manages accounts.
-- **Club leader** — posts free-form messages to their selected assigned Discord channels, without review. Admins connect the original channel on the account page (`/admin/accounts/<id>`) and assign additional saved destinations at `/admin/webhooks`. Club leaders sign in to `/club` to choose destinations, compose with a Discord preview, and see delivery history. Webhook URLs remain encrypted. Club posts never appear in the public live feed or trigger live push notifications. Explicit user and role mentions are allowed; `@everyone` and `@here` are not.
+- **Club manager** — belongs to a club and posts directly to selected assigned Discord destinations. Only managers and admins can post; there is no club contributor or draft-approval flow. Admins manage clubs at `/admin/clubs` and secondary webhook assignments at `/admin/webhooks`. Club posts never appear on `/live` or trigger its push notifications. Existing assistant memberships remain inactive until an admin explicitly assigns manager access. Explicit user/role mentions work; `@everyone` and `@here` do not.
 
-## Saved Discord destinations
+## Passkeys
 
-Admins can name, save, replace, and assign secondary Discord webhooks at
-`/admin/webhooks`. Assignments make a webhook available to primary announcements,
-selected club leaders, or both. These are permissions, not automatic broadcasts:
-senders choose destinations for each post. Secondary destinations start unchecked.
-The original primary and per-account club webhooks remain available.
-
-Admins select destinations when creating/approving announcements; cron uses that
-saved selection. Older queued items continue using the original primary webhook.
-Manual and quick sends can select a different subset for that send. Live-only
-publication never calls Discord. Regular announcements still produce just one
-live-feed entry, even with multiple Discord destinations. Calendar fallback stays
-live-only. Club posts go only to selected assigned Discord channels, never `/live`
-or live push subscribers. Club history records each destination's result.
-
-Selections are revalidated server-side: empty, stale, unassigned, or more than ten
-destinations are rejected. Duplicate URLs for the same webhook are deduplicated.
-Club drafts have a single-use request ID to prevent repeat submissions. Partial
-announcement delivery is marked sent with failed-channel errors to avoid cron
-duplicating successful deliveries. Check Discord before retrying, and target only
-failed channels. Uncertain network outcomes are not automatically retried.
-Unassigning a webhook does not delete earlier posts.
+Anyone with an app-created account can add passkeys from **Your account** (`/account`) and then sign in with Face ID, Touch ID, Windows Hello, or a security key from the login page. Credentials live in the `passkeys` table (public key, counter, transports). The relying-party ID is the request hostname, so previews and production keep separate passkeys; set `PASSKEY_RP_ID` to pin it. Challenges are carried in a five-minute signed cookie, so no extra table is needed. Built-in environment-variable logins cannot use passkeys.
 
 ## Activity log
 
-Every action — sign-ins (including failed attempts), sign-outs, submissions, edits, approvals, rejections, deletions, settings changes, account changes, manual and scheduled sends, cron requests, pending notifications, and calendar lookups — is written to the `activity_log` table and printed to the server console as a `[activity]` JSON line (visible in Vercel runtime logs). The admin page shows the latest 50 entries under **Activity**. Secrets such as webhook URLs and passwords are never logged.
+Every action — sign-ins (including failed attempts), sign-outs, submissions, edits, approvals, rejections, deletions, settings changes, account changes, manual and scheduled sends, cron requests, pending notifications, and calendar lookups — is written to the `activity_log` table and printed to the server console as a `[activity]` JSON line (visible in Vercel runtime logs). The admin area has a dedicated **Logs** page (`/admin/logs`) that is searchable and filterable. Secrets such as webhook URLs and passwords are never logged.
 
 ## Deploy
 
