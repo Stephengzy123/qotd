@@ -20,5 +20,5 @@ export default async function LivePage() {
   const settings = (await sql`select webhook_url_encrypted, mention_role_id, live_channel_name from settings where singleton = true`)[0];
   const profile = await getWebhookDetails(settings?.webhook_url_encrypted as string | undefined);
   const destinations = session?.role === "admin" ? await webhookOptions() : [];
-  return <LiveFeed destinations={destinations} isAdmin={session?.role === "admin"} roleId={session?.role === "admin" ? settings?.mention_role_id : null} botName={profile.status === "connected" ? profile.name : "Announcements"} channelName={settings?.live_channel_name || "Announcements"} avatarUrl={profile.status === "connected" ? profile.avatarUrl : null} />;
+  return <LiveFeed destinations={destinations} isAdmin={session?.role === "admin"} canRunScheduledBackup={Boolean(session)} roleId={session?.role === "admin" ? settings?.mention_role_id : null} botName={profile.status === "connected" ? profile.name : "Announcements"} channelName={settings?.live_channel_name || "Announcements"} avatarUrl={profile.status === "connected" ? profile.avatarUrl : null} />;
 }
