@@ -31,7 +31,7 @@ function timestamp(value: string) {
 
 export function LiveFeed({ isAdmin = false, botName = "Announcements", avatarUrl = null, roleId = null, destinations = [] }: { destinations?: WebhookOption[]; isAdmin?: boolean; botName?: string; avatarUrl?: string | null; roleId?: string | null }) {
   const [showHidden, setShowHidden] = useState(false), [changing, setChanging] = useState<string | null>(null);
-  const [filter, setFilter] = useState("all"), [theme, setTheme] = useState("system");
+  const [filter, setFilter] = useState("all"), [theme, setTheme] = useState("system"), [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
   const [messages, setMessages] = useState<Message[]>([]), [hasOlder, setHasOlder] = useState(false);
   const [loading, setLoading] = useState(true), [error, setError] = useState(""), [newMessages, setNewMessages] = useState(false);
   const viewport = useRef<HTMLDivElement>(null), content = useRef<HTMLDivElement>(null);
@@ -40,6 +40,13 @@ export function LiveFeed({ isAdmin = false, botName = "Announcements", avatarUrl
   const retryDirection = useRef<"initial" | "older" | "newer">("initial");
 
   useEffect(() => { try { const saved = localStorage.getItem("announcement-live-theme"); if (saved && ["system", "light", "dark"].includes(saved)) setTheme(saved); } catch {} }, []);
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const applyTheme = () => setResolvedTheme(theme === "system" ? (mediaQuery.matches ? "dark" : "light") : theme as "light" | "dark");
+    applyTheme();
+    mediaQuery.addEventListener("change", applyTheme);
+    return () => mediaQuery.removeEventListener("change", applyTheme);
+  }, [theme]);
   const load = useCallback(async (direction: "initial" | "older" | "newer") => {
     if (busy.current) return;
     busy.current = true;
@@ -98,7 +105,7 @@ export function LiveFeed({ isAdmin = false, botName = "Announcements", avatarUrl
     return list;
   }, []);
 
-  return <main className="live-shell" data-theme={theme}>
+  return <main className="live-shell" data-theme={resolvedTheme}>
     <header className="live-header">
       <div className="live-header-row">
         <div className="live-identity">
