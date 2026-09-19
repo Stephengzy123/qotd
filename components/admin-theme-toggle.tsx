@@ -9,15 +9,32 @@ export function AdminThemeToggle() {
 
   useEffect(() => {
     const saved = window.localStorage.getItem("announcement-admin-theme");
-    const next: Theme = saved === "light" || saved === "dark" ? saved : "system";
-    setTheme(next);
-    document.querySelector<HTMLElement>(".admin-frame")?.setAttribute("data-theme", next);
+    setTheme(saved === "light" || saved === "dark" ? saved : "system");
   }, []);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const applyTheme = (preference: Theme) => {
+      const resolved = preference === "system" ? (mediaQuery.matches ? "dark" : "light") : preference;
+      document.querySelector<HTMLElement>(".admin-frame")?.setAttribute("data-theme", resolved);
+    };
+
+    applyTheme(theme);
+
+    const onSystemThemeChange = () => {
+      if (theme === "system") applyTheme("system");
+    };
+    mediaQuery.addEventListener("change", onSystemThemeChange);
+    return () => mediaQuery.removeEventListener("change", onSystemThemeChange);
+  }, [theme]);
 
   function choose(next: Theme) {
     setTheme(next);
     window.localStorage.setItem("announcement-admin-theme", next);
-    document.querySelector<HTMLElement>(".admin-frame")?.setAttribute("data-theme", next);
+    const resolved = next === "system"
+      ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+      : next;
+    document.querySelector<HTMLElement>(".admin-frame")?.setAttribute("data-theme", resolved);
   }
 
   return <div className="admin-theme-toggle" role="group" aria-label="Color theme">
