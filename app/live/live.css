@@ -38,6 +38,7 @@
 .live-message-meta strong { font-weight: 800; }
 .live-message-meta time { color: var(--live-faint); font-size: .74rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .live-bot { padding: .05rem .3rem; border-radius: 4px; background: var(--live-accent); color: white; font-size: .58rem; font-weight: 800; letter-spacing: .04em; }
+.live-human { padding: .05rem .3rem; border-radius: 4px; background: var(--live-daily-bg); color: var(--live-daily); font-size: .58rem; font-weight: 800; letter-spacing: .04em; }
 .live-shell[data-theme="dark"] .live-bot { color: #0d1330; }
 .live-type { padding: .08rem .45rem; border-radius: 999px; font-size: .68rem; font-weight: 800; }
 .live-type-event { background: var(--live-event-bg); color: var(--live-event); }
