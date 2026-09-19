@@ -278,6 +278,8 @@ export async function deleteAccountAction(formData: FormData) {
   const session = await requireRole("admin");
   const id = String(formData.get("id") || "");
   if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin/accounts", session, "delete_account", "Invalid account.", { id });
+  const target = (await getAccount(id)) ?? await fail("/admin/accounts", session, "delete_account", "That account no longer exists.", { id });
+  if (target.role === "admin" && session.username !== process.env.ADMIN_USERNAME) await fail("/admin/accounts", session, "delete_account", "Only the original configured admin can delete an admin account.", { id });
   const deleted = (await deleteAccount(id)) ?? await fail("/admin/accounts", session, "delete_account", "That account no longer exists.", { id });
   await logEvent({ action: "delete_account", actor: session.username, role: session.role, details: { id, username: deleted.username, accountRole: deleted.role } });
   revalidatePath("/admin", "layout");
@@ -289,6 +291,8 @@ export async function updateAccountAction(formData: FormData) {
   const id = String(formData.get("id") || "");
   if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin/accounts", session, "update_account", "Invalid account.", { id });
   const role = parseRole(formData.get("role")) ?? await fail("/admin/accounts", session, "update_account", "Choose an account type.", { id });
+  const target = (await getAccount(id)) ?? await fail("/admin/accounts", session, "update_account", "That account no longer exists.", { id });
+  if (target.role === "admin" && session.username !== process.env.ADMIN_USERNAME) await fail("/admin/accounts", session, "update_account", "Only the original configured admin can change another admin account.", { id });
   const username = (await updateAccountRole(id, role)) ?? await fail("/admin/accounts", session, "update_account", "That account no longer exists.", { id, role });
   await logEvent({ action: "update_account", actor: session.username, role: session.role, details: { id, username, accountRole: role } });
   revalidatePath("/admin", "layout");

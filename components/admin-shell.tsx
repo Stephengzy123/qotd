@@ -5,6 +5,7 @@ import { AdminRail } from "@/components/admin-rail";
 import { Notice } from "@/components/notice";
 import { PendingButton } from "@/components/pending-button";
 import { ScheduledDeliveryCheck } from "@/components/scheduled-delivery-check";
+import { AdminThemeToggle } from "@/components/admin-theme-toggle";
 
 export type AdminPage = "overview" | "pending" | "approved" | "sends" | "clubs" | "settings" | "accounts" | "logs" | "webhooks";
 
@@ -54,7 +55,7 @@ export async function AdminShell({ page, username, title, description, actions, 
           <a href="/live" className="rail-link">Live feed</a>
           <a href="/account" className="rail-link">Your account</a>
         </div>
-        <div className="rail-account"><span title={username}>{username}</span><form action={logoutAction}><PendingButton className="text-button" pendingText="…">Sign out</PendingButton></form></div>
+        <div className="rail-account"><span title={username}>{username}</span><AdminThemeToggle /><form action={logoutAction}><PendingButton className="text-button" pendingText="…">Sign out</PendingButton></form></div>
       </AdminRail>
       <main className="admin-main">
         <ScheduledDeliveryCheck />

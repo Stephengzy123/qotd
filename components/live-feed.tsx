@@ -8,7 +8,7 @@ import { LiveInstall } from "@/components/live-install";
 import { QuickAnnouncement } from "@/components/quick-announcement";
 import type { WebhookOption } from "@/lib/webhook-destinations";
 
-type Message = { id: string; message: string; type: string | null; sentAt: string; cursor: string; hidden: boolean; senderName?: string | null; senderAvatarUrl?: string | null };
+type Message = { id: string; message: string; type: string | null; human: boolean; sentAt: string; cursor: string; hidden: boolean; senderName?: string | null; senderAvatarUrl?: string | null };
 type Page = { messages: Message[]; hasMore: boolean };
 function dayOf(value: string) {
   const date = new Date(value), today = new Date(), yesterday = new Date();
@@ -20,7 +20,7 @@ function dayOf(value: string) {
 function clock(value: string) {
   return new Date(value).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
-const FILTERS = [{ value: "all", label: "Everything" }, { value: "announcement", label: "Daily" }, { value: "event", label: "Events" }];
+const FILTERS = [{ value: "all", label: "Everything" }, { value: "announcement", label: "Daily" }, { value: "event", label: "Events" }, { value: "human", label: "Human posts" }];
 const THEMES = [{ value: "system", label: "Auto" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }];
 function timestamp(value: string) {
   const date = new Date(value), today = new Date(), yesterday = new Date();
@@ -140,7 +140,7 @@ export function LiveFeed({ isAdmin = false, botName = "Announcements", avatarUrl
         {group.items.map(message => <article className={`live-message${message.hidden ? " is-hidden" : ""}`} key={message.id}>
           {(message.senderAvatarUrl || avatarUrl) ? <img className="live-avatar" src={message.senderAvatarUrl || avatarUrl!} alt="" width={40} height={40} referrerPolicy="no-referrer" /> : <div className="live-avatar" aria-hidden="true">{(message.senderName || botName).slice(0, 1).toUpperCase()}</div>}
           <div className="live-message-body">
-            <div className="live-message-meta"><strong>{message.senderName || botName}</strong>{message.senderName ? null : <span className="live-bot">BOT</span>}{message.type && <span className={`live-type live-type-${message.type}`}>{message.type === "event" ? "Event" : "Daily"}</span>}<time dateTime={message.sentAt} title={timestamp(message.sentAt)}>{clock(message.sentAt)}</time>
+            <div className="live-message-meta"><strong>{message.senderName || botName}</strong>{message.human ? <span className="live-human">HUMAN</span> : <span className="live-bot">BOT</span>}{message.type && <span className={`live-type live-type-${message.type}`}>{message.type === "event" ? "Event" : "Daily"}</span>}<time dateTime={message.sentAt} title={timestamp(message.sentAt)}>{clock(message.sentAt)}</time>
               {isAdmin && <button type="button" className="live-pill live-pill-sm" disabled={changing !== null} onClick={async () => {
                 setChanging(message.id);
                 try { await setLiveMessageHidden(message.id, !message.hidden); records.current = records.current.filter(item => item.id !== message.id); setMessages(records.current); }

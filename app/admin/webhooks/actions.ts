@@ -36,3 +36,16 @@ export async function saveWebhookAction(form: FormData) {
   revalidatePath("/admin"); revalidatePath("/admin/webhooks"); revalidatePath("/club"); revalidatePath("/live");
   redirect("/admin/webhooks?ok=Webhook%20saved.");
 }
+
+export async function deleteWebhookAction(form: FormData) {
+  const session = await requireRole("admin");
+  const id = String(form.get("id") || "");
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuid.test(id)) redirect("/admin/webhooks?error=Invalid+webhook.");
+  const sql = await dbReady();
+  const rows = await sql<{ name: string }[]>`delete from saved_webhooks where id = ${id} returning name`;
+  if (!rows[0]) redirect("/admin/webhooks?error=That+webhook+no+longer+exists.");
+  await logEvent({ action: "delete_webhook", actor: session.username, role: session.role, details: { webhookId: id, name: rows[0].name } });
+  revalidatePath("/admin"); revalidatePath("/admin/webhooks"); revalidatePath("/club"); revalidatePath("/live");
+  redirect("/admin/webhooks?ok=Webhook%20deleted.");
+}

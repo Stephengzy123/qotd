@@ -1,6 +1,6 @@
 import { requireRole } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
-import { saveWebhookAction } from "./actions";
+import { deleteWebhookAction, saveWebhookAction } from "./actions";
 import { PendingButton } from "@/components/pending-button";
 import { WebhookProfile } from "@/components/webhook-profile";
 import { AdminShell } from "@/components/admin-shell";
@@ -25,7 +25,7 @@ export default async function WebhooksPage({ searchParams }: { searchParams: Pro
       <fieldset className="webhook-picker"><legend>Available to</legend>
         <label><input type="checkbox" name="primary" defaultChecked={webhook.primary_enabled} /> Primary announcements (admins)</label>
         {leaders.map(leader => <label key={leader.id}><input type="checkbox" name="accounts" value={leader.id} defaultChecked={assignments.some(a => a.webhook_id === webhook.id && a.account_id === leader.id)} /> {leader.username}</label>)}
-      </fieldset><PendingButton className="primary" pendingText="Saving…">Save webhook and assignments</PendingButton>
+      </fieldset><div className="row-buttons"><PendingButton className="primary" pendingText="Saving…">Save webhook and assignments</PendingButton>{webhook.id && <PendingButton formAction={deleteWebhookAction} formNoValidate className="danger" pendingText="Deleting…" confirmMessage={`Delete “${webhook.name}”? It will be removed from all assignments.`}>Delete webhook</PendingButton>}</div>
     </form>)}
   </AdminShell>;
 }
