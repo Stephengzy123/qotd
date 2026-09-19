@@ -20,7 +20,7 @@ export async function saveWebhookAction(form: FormData) {
   if (accounts.length > 100 || accounts.some(value => !uuid.test(value))) fail("Invalid account selection.");
   const sql = await dbReady();
   const result = await sql.begin(async tx => {
-    const leaders = accounts.length ? await tx`select id from accounts where id = any(${accounts}::uuid[]) and role = 'club_leader' for share` : [];
+    const leaders = accounts.length ? await tx`select a.id from accounts a join club_members m on m.account_id = a.id where a.id = any(${accounts}::uuid[]) and a.role = 'club_leader' and m.club_role = 'leader' for share` : [];
     if (leaders.length !== accounts.length) return null;
     const rows = id
       ? await tx`update saved_webhooks set name = ${name}, primary_enabled = ${primary}, webhook_url_encrypted = coalesce(${url ? encryptSecret(url) : null}, webhook_url_encrypted) where id = ${id} returning id`

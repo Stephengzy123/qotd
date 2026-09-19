@@ -15,6 +15,7 @@ const hook = (id, name, discordId) => ({ id, name, webhook_url_encrypted: `https
 const primary = hook('primary', 'Primary', '111');
 const secondary = hook('secondary', 'Secondary', '222');
 const club = hook('club', 'Club', '333');
+let memberRole = "leader";
 let revoked = false, stored = [], claimed = new Set(), requests = [];
 const sql = async (parts, ...values) => {
   const query = parts.join('?');
@@ -23,7 +24,8 @@ const sql = async (parts, ...values) => {
     return values[0] === 'leader-a' && !revoked ? [club, hook('duplicate', 'Same channel', '333')] : [];
   }
   if (query.includes('from saved_webhooks')) { assert.match(query, /primary_enabled = true/); return [secondary]; }
-  if (query.includes('from club_channels')) return [];
+  if (query.includes('select c.*, m.club_role')) return [{ id: 'club-id', name: 'Club', club_role: memberRole }];
+  if (query.includes('from clubs c')) return [];
   if (query.includes('from settings')) return [primary];
   if (query.includes('insert into club_send_requests')) {
     if (claimed.has(values[0])) return [];
@@ -65,12 +67,17 @@ const clubs = load('lib/clubs.ts', {
   assert.equal(results[0].success, true); assert.equal(results[1].success, false);
   assert.equal(JSON.stringify(results).includes('secret'), false);
   const id = '00000000-0000-4000-8000-000000000001';
-  const account = { id: 'leader-a', username: 'leader' };
-  assert.equal((await clubs.postClubDestinations(account, 'Hello', ['club', 'duplicate'], id)).success, true);
+  const account = { accountId: 'leader-a', username: 'leader', role: 'club_leader' };
+  const clubInfo = { id: 'club-id', name: 'Club' };
+  memberRole = 'assistant';
+  assert.match((await clubs.postClubMessage(clubInfo, account, 'Hello', ['club'], id)).error, /managers/);
+  assert.equal(stored.length, 0);
+  memberRole = 'leader';
+  assert.equal((await clubs.postClubMessage(clubInfo, account, 'Hello', ['club', 'duplicate'], id)).success, true);
   const count = requests.length;
-  assert.match((await clubs.postClubDestinations(account, 'Hello', ['club'], id)).error, /already attempted/);
+  assert.match((await clubs.postClubMessage(clubInfo, account, 'Hello', ['club'], id)).error, /already submitted/);
   assert.equal(requests.length, count);
-  assert.equal(stored.length, 1); assert.equal(stored[0][6], 'Club');
+  assert.equal(stored.length, 1); assert.equal(stored[0][8], 'Club');
   assert.deepEqual(requests.at(-1).payload.allowed_mentions, { parse: ['users', 'roles'] });
   revoked = true;
   await assert.rejects(() => mod.resolveWebhooks(['club'], 'leader-a'), /no longer assigned/);

@@ -278,6 +278,83 @@ const migrations = [
       )`,
     ],
   },
+  {
+    version: 17,
+    statements: [
+      `create table if not exists saved_webhooks (
+        id uuid primary key default gen_random_uuid(), name text not null,
+        webhook_url_encrypted text not null, primary_enabled boolean not null default false
+      )`,
+      `create table if not exists webhook_assignments (
+        webhook_id uuid references saved_webhooks(id) on delete cascade,
+        account_id uuid references accounts(id) on delete cascade,
+        primary key (webhook_id, account_id)
+      )`,
+      `alter table questions add column if not exists discord_webhook_ids text[]`,
+      `alter table club_posts add column if not exists destination_name text`,
+      `create table if not exists club_send_requests (
+        id uuid primary key, account_id uuid references accounts(id) on delete set null,
+        created_at timestamptz not null default now()
+      )`,
+
+      // Reconcile PR #15 with the released saved-webhook migration.
+      // Preserve legacy assistant records without granting them posting access.
+      `create table if not exists clubs (
+        id uuid primary key default gen_random_uuid(),
+        name text not null check (char_length(name) between 2 and 80),
+        webhook_url_encrypted text,
+        created_by text,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now()
+      )`,
+      `create unique index if not exists clubs_name_lower_idx on clubs(lower(name))`,
+      `create table if not exists club_members (
+        account_id uuid primary key references accounts(id) on delete cascade,
+        club_id uuid not null references clubs(id) on delete cascade,
+        club_role text not null check (club_role in ('leader', 'assistant')),
+        created_at timestamptz not null default now()
+      )`,
+      `create index if not exists club_members_club_idx on club_members(club_id, club_role)`,
+      `alter table club_posts add column if not exists club_id uuid references clubs(id) on delete set null`,
+      `alter table club_posts add column if not exists status text not null default 'sent' check (status in ('pending', 'sent', 'failed', 'rejected'))`,
+      `alter table club_posts add column if not exists reviewed_by text`,
+      `alter table club_posts add column if not exists reviewed_at timestamptz`,
+      `alter table club_posts add column if not exists sent_at timestamptz`,
+      `update club_posts set status = case when success then 'sent' else 'failed' end, sent_at = coalesce(sent_at, created_at) where status = 'sent'`,
+      `create index if not exists club_posts_club_status_idx on club_posts(club_id, status, created_at desc)`,
+      // Migrate the one-webhook-per-account rows into clubs named after the account.
+      `insert into clubs (name, webhook_url_encrypted, created_by, created_at, updated_at)
+        select a.username, c.webhook_url_encrypted, c.updated_by, coalesce(c.updated_at, now()), coalesce(c.updated_at, now())
+        from accounts a left join club_channels c on c.account_id = a.id
+        where a.role = 'club_leader' and not exists (select 1 from club_members m where m.account_id = a.id)
+        on conflict do nothing`,
+      `insert into club_members (account_id, club_id, club_role)
+        select a.id, k.id, 'leader' from accounts a
+        join clubs k on lower(k.name) = lower(a.username) where a.role = 'club_leader'
+        on conflict do nothing`,
+      `update club_posts p set club_id = m.club_id from club_members m where m.account_id = p.account_id and p.club_id is null`,
+      `create table if not exists passkeys (
+        id text primary key,
+        account_id uuid not null references accounts(id) on delete cascade,
+        public_key text not null,
+        counter bigint not null default 0,
+        transports text[],
+        device_type text,
+        backed_up boolean not null default false,
+        name text,
+        created_at timestamptz not null default now(),
+        last_used_at timestamptz
+      )`,
+      `create index if not exists passkeys_account_idx on passkeys(account_id)`,
+    ],
+  },
+  {
+    version: 18,
+    statements: [
+      `alter table questions add column if not exists delivery_destination text not null default 'discord' check (delivery_destination in ('discord', 'live'))`,
+      `alter table questions add column if not exists remove_pings boolean not null default false`,
+    ],
+  },
 ] as const;
 
 export function db() {

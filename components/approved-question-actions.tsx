@@ -1,32 +1,17 @@
 "use client";
-
-import { deleteApprovedQuestionAction, sendQuestionAction, unapproveQuestionAction } from "@/app/actions";
+import { useActionState } from "react";
+import { deleteApprovedQuestionAction, saveDeliverySettingsAction, sendQuestionAction, unapproveQuestionAction } from "@/app/actions";
 import { PendingButton } from "@/components/pending-button";
-import { useState } from "react";
-import { WebhookPicker } from "@/components/webhook-picker";
-import type { WebhookOption } from "@/lib/webhook-destinations";
+import { DeliverySettingsFields, type DeliveryFieldsProps } from "@/components/delivery-settings-fields";
 
-export function ApprovedQuestionActions({ id, question, destinations, selected }: { id: string; question: string; destinations: WebhookOption[]; selected?: string[] }) {
-  const [destination, setDestination] = useState("discord");
-  return (
-    <div className="approved-actions">
-      <form action={sendQuestionAction} className="send-options">
-        <input type="hidden" name="id" value={id} />
-        <label>Send to<select name="destination" value={destination} onChange={event => setDestination(event.target.value)}>
-          <option value="discord">Discord + /live</option><option value="live">/live only</option>
-        </select></label>
-        <WebhookPicker options={destinations} selected={selected} disabled={destination === "live"} />
-        <label><input type="checkbox" name="removePings" disabled={destination === "live"} /> Remove all pings{destination === "live" ? " (automatic)" : ""}</label>
-        <PendingButton className="send-button" aria-label={`Send: ${question}`} pendingText="Sending…" confirmMessage={destination === "live" ? "Publish to /live only and notify subscribers? This marks it as sent; it will not be sent to Discord later." : undefined}>{destination === "live" ? "Publish to /live" : "Send"}</PendingButton>
-      </form>
-      <form action={unapproveQuestionAction}>
-        <input type="hidden" name="id" value={id} />
-        <PendingButton className="send-button" pendingText="Moving…">Unapprove</PendingButton>
-      </form>
-      <form action={deleteApprovedQuestionAction}>
-        <input type="hidden" name="id" value={id} />
-        <PendingButton className="send-button delete-link" pendingText="Deleting…" confirmMessage="Permanently delete this announcement?">Delete</PendingButton>
-      </form>
-    </div>
-  );
+export function ApprovedQuestionActions({ id, question, ...delivery }: DeliveryFieldsProps & { id: string; question: string }) {
+  const [result, save] = useActionState<{ success?: string; error?: string }, FormData>(saveDeliverySettingsAction, {});
+  return <details className="item-manage"><summary className="secondary">Manage</summary><div className="item-manage-panel">
+    <form action={save} className="stack"><input type="hidden" name="id" value={id} /><DeliverySettingsFields {...delivery} />
+      <div className="row-buttons"><PendingButton className="primary" pendingText="Saving…">Save settings</PendingButton><PendingButton formAction={sendQuestionAction} className="secondary" pendingText="Sending…" confirmMessage="Save these settings and send this announcement now?">Save & send now</PendingButton></div>
+      {result.success && <p role="status" className="inline-feedback">{result.success}</p>}{result.error && <p role="alert" className="send-error">{result.error}</p>}
+    </form><div className="row-buttons item-other-actions">
+      <form action={unapproveQuestionAction}><input type="hidden" name="id" value={id} /><PendingButton className="secondary" pendingText="Moving…">Unapprove</PendingButton></form>
+      <form action={deleteApprovedQuestionAction}><input type="hidden" name="id" value={id} /><PendingButton className="danger" pendingText="Deleting…" confirmMessage="Permanently delete this announcement?">Delete</PendingButton></form>
+    </div></div></details>;
 }

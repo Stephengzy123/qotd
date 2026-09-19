@@ -11,10 +11,11 @@ export async function availableWebhooks(accountId?: string): Promise<Target[]> {
     ? await sql<Target[]>`select w.id, w.name, w.webhook_url_encrypted from saved_webhooks w
         join webhook_assignments a on a.webhook_id = w.id
         join accounts u on u.id = a.account_id
-        where a.account_id = ${accountId} and u.role = 'club_leader' order by w.name, w.id`
+        join club_members m on m.account_id = u.id
+        where a.account_id = ${accountId} and u.role = 'club_leader' and m.club_role = 'leader' order by w.name, w.id`
     : await sql<Target[]>`select id, name, webhook_url_encrypted from saved_webhooks where primary_enabled = true order by name, id`;
   const legacy = accountId
-    ? (await sql`select c.webhook_url_encrypted from club_channels c join accounts a on a.id = c.account_id where c.account_id = ${accountId} and a.role = 'club_leader'`)[0]
+    ? (await sql`select c.webhook_url_encrypted from clubs c join club_members m on m.club_id = c.id join accounts a on a.id = m.account_id where m.account_id = ${accountId} and m.club_role = 'leader' and a.role = 'club_leader'`)[0]
     : (await sql`select webhook_url_encrypted from settings where singleton = true`)[0];
   return legacy?.webhook_url_encrypted
     ? [{ id: accountId ? "club-default" : "primary", name: accountId ? "Original club channel" : "Primary announcements", webhook_url_encrypted: legacy.webhook_url_encrypted }, ...saved]

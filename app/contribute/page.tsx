@@ -1,4 +1,5 @@
-import { logoutAction, submitQuestionAction } from "@/app/actions";
+import { submitQuestionAction } from "@/app/actions";
+import { AppTopbar } from "@/components/app-topbar";
 import { requireRole } from "@/lib/auth";
 import { ScheduledDeliveryCheck } from "@/components/scheduled-delivery-check";
 import { Notice } from "@/components/notice";
@@ -21,7 +22,7 @@ export default async function ContributePage({ searchParams }: { searchParams: P
   return (
     <main className="app-shell">
       <ScheduledDeliveryCheck />
-      <header className="topbar"><strong>Announcements</strong><a href="/live">Live feed</a><div className="account"><span>{session.username}</span><form action={logoutAction}><PendingButton className="text-button" pendingText="Signing out…">Sign out</PendingButton></form></div></header>
+      <AppTopbar mode="contributor" username={session.username} links={[{ href: "/live", label: "Live feed" }]} />
       <section className="page-heading hero">
         <div><h1>Announcements</h1><p>Write it once, see exactly how it lands in Discord, and send it for review.</p></div>
         <ComposerDialog buttonLabel="＋ New announcement" title="New announcement" description="Daily announcements publish the previous evening; events publish on their chosen date, during the 6 PM Pacific hour." className="primary hero-button">

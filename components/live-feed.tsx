@@ -10,6 +10,18 @@ import type { WebhookOption } from "@/lib/webhook-destinations";
 
 type Message = { id: string; message: string; type: string | null; sentAt: string; cursor: string; hidden: boolean; senderName?: string | null; senderAvatarUrl?: string | null };
 type Page = { messages: Message[]; hasMore: boolean };
+function dayOf(value: string) {
+  const date = new Date(value), today = new Date(), yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (date.toDateString() === today.toDateString()) return "Today";
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: date.getFullYear() === today.getFullYear() ? undefined : "numeric" });
+}
+function clock(value: string) {
+  return new Date(value).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+const FILTERS = [{ value: "all", label: "Everything" }, { value: "announcement", label: "Daily" }, { value: "event", label: "Events" }];
+const THEMES = [{ value: "system", label: "Auto" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }];
 function timestamp(value: string) {
   const date = new Date(value), today = new Date(), yesterday = new Date();
   yesterday.setDate(today.getDate() - 1);
@@ -78,33 +90,67 @@ export function LiveFeed({ isAdmin = false, botName = "Announcements", avatarUrl
     return () => observer.disconnect();
   }, []);
 
+  const todayCount = messages.filter(message => dayOf(message.sentAt) === "Today").length;
+  const groups = messages.reduce<{ day: string; items: Message[] }[]>((list, message) => {
+    const day = dayOf(message.sentAt);
+    const last = list[list.length - 1];
+    if (last && last.day === day) last.items.push(message); else list.push({ day, items: [message] });
+    return list;
+  }, []);
+
   return <main className="live-shell" data-theme={theme}>
-    <header className="live-header"><h1># announcements</h1>
-      <div className="live-controls"><label>Show<select value={filter} onChange={event => setFilter(event.target.value)}><option value="all">All messages</option><option value="announcement">Day announcements</option><option value="event">Events</option></select></label>
-        <label>Appearance<select value={theme} onChange={event => { setTheme(event.target.value); try { localStorage.setItem("announcement-live-theme", event.target.value); } catch {} }}><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
-        {isAdmin && <label>Visibility<select value={showHidden ? "hidden" : "visible"} onChange={event => setShowHidden(event.target.value === "hidden")}><option value="visible">Visible</option><option value="hidden">Hidden</option></select></label>}</div>
-      <LiveNotifications />
-      <LiveInstall />
+    <header className="live-header">
+      <div className="live-header-row">
+        <div className="live-identity">
+          {avatarUrl ? <img className="live-avatar live-avatar-lg" src={avatarUrl} alt="" width={44} height={44} referrerPolicy="no-referrer" /> : <div className="live-avatar live-avatar-lg" aria-hidden="true">{botName.slice(0, 1).toUpperCase()}</div>}
+          <div><h1>{botName}</h1><p className="live-sub"><span className="live-dot" aria-hidden="true" />Live · {loading && !messages.length ? "loading" : `${messages.length} loaded${todayCount ? ` · ${todayCount} today` : ""}`}</p></div>
+        </div>
+        <div className="live-actions">
+          <LiveNotifications />
+          <LiveInstall />
+          {isAdmin && <a href="/admin" className="live-pill live-pill-link">Admin</a>}
+        </div>
+      </div>
+      <div className="live-header-row live-toolbar">
+        <div className="live-segmented" role="radiogroup" aria-label="Show">
+          {FILTERS.map(item => <button key={item.value} type="button" role="radio" aria-checked={filter === item.value} className={filter === item.value ? "active" : undefined} onClick={() => setFilter(item.value)}>{item.label}</button>)}
+        </div>
+        <div className="live-toolbar-right">
+          {isAdmin && <div className="live-segmented" role="radiogroup" aria-label="Visibility">
+            <button type="button" role="radio" aria-checked={!showHidden} className={!showHidden ? "active" : undefined} onClick={() => setShowHidden(false)}>Visible</button>
+            <button type="button" role="radio" aria-checked={showHidden} className={showHidden ? "active" : undefined} onClick={() => setShowHidden(true)}>Hidden</button>
+          </div>}
+          <div className="live-segmented" role="radiogroup" aria-label="Appearance">
+            {THEMES.map(item => <button key={item.value} type="button" role="radio" aria-checked={theme === item.value} className={theme === item.value ? "active" : undefined} onClick={() => { setTheme(item.value); try { localStorage.setItem("announcement-live-theme", item.value); } catch {} }}>{item.label}</button>)}
+          </div>
+        </div>
+      </div>
     </header>
     <div ref={viewport} className="live-scroll" tabIndex={0} aria-label="Sent messages, oldest first" onScroll={() => {
       const el = viewport.current!; stickBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
       if (stickBottom.current) setNewMessages(false);
       if (el.scrollTop < 100 && hasOlder && !busy.current) void load("older");
     }}><div ref={content} className="live-content">
-      {hasOlder && <button type="button" className="live-load" disabled={loading} onClick={() => void load("older")}>Load older messages</button>}
-      {loading && <p className="live-status" role="status">Loading messages…</p>}
-      {error && <p className="live-status" role="alert">{error} <button type="button" onClick={() => void load(retryDirection.current)}>Retry</button></p>}
-      {!loading && !error && !messages.length && <p className="live-status">No sent messages in this category yet.</p>}
-      {messages.map(message => <article className="live-message" key={message.id}>
-        {(message.senderAvatarUrl || avatarUrl) ? <img className="live-avatar" src={message.senderAvatarUrl || avatarUrl!} alt="" width={38} height={38} referrerPolicy="no-referrer" /> : <div className="live-avatar" aria-hidden="true">{(message.senderName || botName).slice(0, 1).toUpperCase()}</div>}<div className="live-message-body"><div className="live-message-meta"><strong>{message.senderName || botName}</strong>{message.senderName ? null : <span className="live-bot">BOT</span>}<time dateTime={message.sentAt} title={new Date(message.sentAt).toLocaleString()}>{timestamp(message.sentAt)}</time>
-          {isAdmin && <button type="button" disabled={changing !== null} onClick={async () => {
-            setChanging(message.id);
-            try { await setLiveMessageHidden(message.id, !message.hidden); records.current = records.current.filter(item => item.id !== message.id); setMessages(records.current); }
-            catch { setError("Could not change message visibility. Please try again."); }
-            finally { setChanging(null); }
-          }}>{changing === message.id ? "Saving…" : message.hidden ? "Restore" : "Hide"}</button>}</div>
-          <div className="discord-preview"><DiscordMarkdown value={message.message} /></div></div>
-      </article>)}
+      {hasOlder && <button type="button" className="live-load live-pill" disabled={loading} onClick={() => void load("older")}>Load older messages</button>}
+      {loading && !messages.length && <div className="live-skeleton" role="status" aria-label="Loading messages">{[0, 1, 2].map(index => <div key={index}><span /><div><i /><i /><i /></div></div>)}</div>}
+      {error && <p className="live-status" role="alert">{error} <button type="button" className="live-pill" onClick={() => void load(retryDirection.current)}>Retry</button></p>}
+      {!loading && !error && !messages.length && <div className="live-empty"><strong>Nothing here yet</strong><p>{filter === "all" ? "Announcements appear the moment they’re sent." : "No messages in this category yet. Try Everything."}</p></div>}
+      {groups.map(group => <section key={group.day} className="live-day">
+        <div className="live-day-divider"><span>{group.day}</span></div>
+        {group.items.map(message => <article className={`live-message${message.hidden ? " is-hidden" : ""}`} key={message.id}>
+          {(message.senderAvatarUrl || avatarUrl) ? <img className="live-avatar" src={message.senderAvatarUrl || avatarUrl!} alt="" width={40} height={40} referrerPolicy="no-referrer" /> : <div className="live-avatar" aria-hidden="true">{(message.senderName || botName).slice(0, 1).toUpperCase()}</div>}
+          <div className="live-message-body">
+            <div className="live-message-meta"><strong>{message.senderName || botName}</strong>{message.senderName ? null : <span className="live-bot">BOT</span>}{message.type && <span className={`live-type live-type-${message.type}`}>{message.type === "event" ? "Event" : "Daily"}</span>}<time dateTime={message.sentAt} title={timestamp(message.sentAt)}>{clock(message.sentAt)}</time>
+              {isAdmin && <button type="button" className="live-pill live-pill-sm" disabled={changing !== null} onClick={async () => {
+                setChanging(message.id);
+                try { await setLiveMessageHidden(message.id, !message.hidden); records.current = records.current.filter(item => item.id !== message.id); setMessages(records.current); }
+                catch { setError("Could not change message visibility. Please try again."); }
+                finally { setChanging(null); }
+              }}>{changing === message.id ? "Saving…" : message.hidden ? "Restore" : "Hide"}</button>}</div>
+            <div className="discord-preview"><DiscordMarkdown value={message.message} /></div>
+          </div>
+        </article>)}
+      </section>)}
     </div></div>
     {newMessages && <button type="button" className="live-jump" onClick={() => { stickBottom.current = true; if (viewport.current) viewport.current.scrollTop = viewport.current.scrollHeight; setNewMessages(false); }}>New messages ↓</button>}
     {isAdmin && <QuickAnnouncement destinations={destinations} compact roleId={roleId} avatarUrl={avatarUrl} onSent={() => { setFilter("all"); setShowHidden(false); stickBottom.current = true; if (filter === "all" && !showHidden) void load("newer"); }} />}

@@ -15,11 +15,11 @@ function load(file, dependencies, fetch) {
 const text = load('lib/live-text.ts', {});
 assert.equal(text.removePings('# News\n<@123> <@!456> <@&789> @everyone @here\n-# <@&789>'), '# News');
 assert.equal(text.removePings('Email x@here.com and **bold**'), 'Email x@here.com and **bold**');
-async function scenario(options, webhook, responseOk = true, claimed = true) {
+async function scenario(options, webhook, responseOk = true, claimed = true, saved = {}) {
   const queries = [], requests = [];
   const sql = async (parts, ...values) => {
     const query = parts.join('?'); queries.push({ query, values });
-    if (query.includes('select id, question')) return [{ id: 'item', question: 'Hello <@123> @everyone', scheduled_date: '2026-09-20', question_type: 'announcement' }];
+    if (query.includes('select id, question')) return [{ id: 'item', question: 'Hello <@123> @everyone', scheduled_date: '2026-09-20', question_type: 'announcement', ...saved }];
     if (query.includes('from settings')) return [{ webhook_url_encrypted: webhook, mention_role_id: webhook ? '123456789012345' : null, message_template: '# News\n{announcement}\n-# {mention-role}' }];
     if (query.includes("update questions set status = 'sent'")) return claimed ? [{ id: 'item' }] : [];
     if (query.includes('insert into dispatches')) return [{ id: 'dispatch' }];
@@ -46,6 +46,13 @@ async function scenario(options, webhook, responseOk = true, claimed = true) {
   assert.equal(live.requests.length, 0);
   assert.equal(live.result.message.includes('@'), false);
   assert.ok(live.queries.some(x => x.query.includes('sent_at = now()')));
+  const savedLive = await scenario({}, null, true, true, { delivery_destination: 'live' });
+  assert.equal(savedLive.result.success, true);
+  assert.equal(savedLive.requests.length, 0);
+  const savedQuiet = await scenario({}, 'https://discord.test', true, true, { remove_pings: true });
+  assert.equal(savedQuiet.requests[0].content.includes('@'), false);
+  const override = await scenario({ removePings: false }, 'https://discord.test', true, true, { remove_pings: true });
+  assert.equal(override.requests[0].allowed_mentions.roles.length, 1);
   const quiet = await scenario({ removePings: true }, 'https://discord.test');
   assert.equal(quiet.requests.length, 1);
   assert.deepEqual(quiet.requests[0].allowed_mentions.roles, []);
