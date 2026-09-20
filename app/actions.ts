@@ -183,14 +183,16 @@ export async function saveSettingsAction(formData: FormData) {
   const roleId = String(formData.get("roleId") || "").trim();
   const notificationWebhook = String(formData.get("notificationWebhook") || "").trim();
   const notificationUserId = String(formData.get("notificationUserId") || "").trim();
+  const liveChannelName = String(formData.get("liveChannelName") || "").trim();
   const announcementTemplateError = validateAnnouncementTemplate(announcementTemplate, "announcement");
   const eventTemplateError = validateAnnouncementTemplate(eventTemplate, "event");
   // Never log secret values; record only which settings changed.
-  const details = { roleId, notificationUserId: notificationUserId || null, webhookChanged: Boolean(webhook), notificationWebhookChanged: Boolean(notificationWebhook), calendarFeedChanged: Boolean(calendarFeed) };
+  const details = { roleId, notificationUserId: notificationUserId || null, liveChannelName, webhookChanged: Boolean(webhook), notificationWebhookChanged: Boolean(notificationWebhook), calendarFeedChanged: Boolean(calendarFeed) };
   if (announcementTemplateError) await fail("/admin/settings", session, action, announcementTemplateError, details);
   if (eventTemplateError) await fail("/admin/settings", session, action, eventTemplateError, details);
   if (!/^\d{15,22}$/.test(roleId)) await fail("/admin/settings", session, action, "The announcement role ID must contain 15–22 digits.", details);
   if (notificationUserId && !/^\d{15,22}$/.test(notificationUserId)) await fail("/admin/settings", session, action, "The notification user ID must contain 15–22 digits.", details);
+  if (liveChannelName.length < 1 || liveChannelName.length > 60) await fail("/admin/settings", session, action, "The live channel name must be between 1 and 60 characters.", details);
   if (webhook && !validateDiscordWebhook(webhook)) await fail("/admin/settings", session, action, "Enter a valid Discord webhook URL.", details);
   if (notificationWebhook && !validateDiscordWebhook(notificationWebhook)) await fail("/admin/settings", session, action, "Enter a valid notification webhook URL.", details);
   const normalizedCalendarFeed = calendarFeed ? normalizeCalendarFeedUrl(calendarFeed) : null;
@@ -211,6 +213,7 @@ export async function saveSettingsAction(formData: FormData) {
     calendar_feed_url_encrypted = coalesce(${normalizedCalendarFeed ? encryptSecret(normalizedCalendarFeed) : null}, calendar_feed_url_encrypted),
     notification_webhook_url_encrypted = coalesce(${notificationWebhook ? encryptSecret(notificationWebhook) : null}, notification_webhook_url_encrypted),
     notification_user_id = ${notificationUserId || null},
+    live_channel_name = ${liveChannelName},
     updated_at = now()
     where singleton = true`;
   await logEvent({ action, actor: session.username, role: session.role, details });

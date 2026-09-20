@@ -437,6 +437,27 @@ body.dialog-open { overflow: hidden; }
 .feature-card p { margin: 0; color: var(--muted); font-size: .85rem; }
 .feature-card .status { justify-self: start; }
 .feature-card-cta { margin-top: .3rem; font-size: .85rem; font-weight: 700; color: var(--accent-ink); }
+.audience-section { margin-bottom: 1.5rem; }
+.audience-section .section-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.audience-section .section-title h2 { margin-bottom: .2rem; }
+.audience-section .section-title .hint { margin: 0; max-width: 65ch; }
+.audience-stats { margin-bottom: .85rem; }
+.audience-chart-panel { padding: 1rem 1.15rem .8rem; }
+.audience-chart-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.audience-chart-heading h3 { margin: 0; font-size: .92rem; }
+.audience-chart-heading p { margin: .15rem 0 0; color: var(--muted); font-size: .76rem; }
+.audience-legend { display: flex; gap: .75rem; color: var(--muted); font-size: .74rem; font-weight: 700; }
+.audience-legend span { display: inline-flex; align-items: center; gap: .3rem; }
+.audience-legend i { width: 8px; height: 8px; border-radius: 2px; }
+.audience-chart { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); align-items: end; gap: .3rem; height: 146px; margin-top: .75rem; padding-top: .5rem; border-bottom: 1px solid var(--border); }
+.audience-chart-day { position: relative; height: 100%; min-width: 0; display: grid; grid-template-rows: 1fr 17px; align-items: end; }
+.audience-chart-bars { display: flex; align-items: end; justify-content: center; gap: 2px; height: 100%; }
+.audience-chart-bars i { display: block; width: min(11px, 40%); min-height: 2px; border-radius: 3px 3px 0 0; transition: opacity .12s; }
+.audience-chart-day:hover .audience-chart-bars i { opacity: .75; }
+.audience-chart i.accounts, .audience-legend i.accounts { background: var(--accent); }
+.audience-chart i.subscriptions, .audience-legend i.subscriptions { background: var(--moss-ink); }
+.audience-chart time { overflow: hidden; color: var(--faint); font-size: .63rem; font-weight: 600; white-space: nowrap; text-align: center; }
+.audience-chart-note { margin: .6rem 0 0; }
 .settings-pages { display: block; }
 .settings-save { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 0 -2.5rem; padding: .9rem 2.5rem; border-top: 1px solid var(--border); background: rgb(243 245 249 / 92%); backdrop-filter: blur(6px); }
 .quick-announcement { margin-bottom: 1.5rem; padding: 1.25rem 1.4rem; }
