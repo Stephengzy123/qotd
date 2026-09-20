@@ -14,3 +14,14 @@ export async function setLiveMessageHidden(id: string, hidden: boolean) {
   if (!rows.length) throw new Error("Message not found");
   revalidatePath("/live");
 }
+
+export async function updateLiveChannelName(name: string) {
+  const session = await requireRole("admin");
+  const next = name.trim();
+  if (next.length < 1 || next.length > 60) throw new Error("Channel names must be between 1 and 60 characters.");
+  const sql = await dbReady();
+  await sql`update settings set live_channel_name = ${next}, updated_at = now() where singleton = true`;
+  await logEvent({ action: "update_live_channel_name", actor: session.username, role: session.role, details: { length: next.length } });
+  revalidatePath("/live");
+  return { name: next };
+}
