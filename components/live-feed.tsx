@@ -5,14 +5,15 @@ import { DiscordMarkdown } from "@/components/discord-preview";
 import { setLiveMessageHidden } from "@/app/live/actions";
 import { LiveNotifications } from "@/components/live-notifications";
 import { LiveInstall } from "@/components/live-install";
-import { QuickAnnouncement } from "@/components/quick-announcement";
+import { QuickAnnouncement, type QuickReplyTarget } from "@/components/quick-announcement";
 import { ScheduledDeliveryCheck } from "@/components/scheduled-delivery-check";
 import { LiveCalendar } from "@/components/live-calendar";
 import { LiveChannelName } from "@/components/live-channel-name";
 import type { WebhookOption } from "@/lib/webhook-destinations";
 import type { CalendarEvent } from "@/lib/calendar";
 
-type Message = { id: string; message: string; type: string | null; human: boolean; sentAt: string; cursor: string; hidden: boolean; senderName?: string | null; senderAvatarUrl?: string | null };
+type ReplyReference = { id: string; message: string | null; senderName: string | null; sentAt: string | null; unavailable: boolean };
+type Message = { id: string; message: string; type: string | null; human: boolean; sentAt: string; cursor: string; hidden: boolean; senderName?: string | null; senderAvatarUrl?: string | null; replyTo: ReplyReference | null };
 type Page = { messages: Message[]; hasMore: boolean };
 function dayOf(value: string) {
   const date = new Date(value), today = new Date(), yesterday = new Date();
@@ -32,15 +33,21 @@ function timestamp(value: string) {
   const day = date.toDateString() === today.toDateString() ? "Today" : date.toDateString() === yesterday.toDateString() ? "Yesterday" : date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
   return `${day} at ${date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
 }
+function replyExcerpt(value: string) {
+  const singleLine = value.replace(/\s+/g, " ").trim();
+  return singleLine.length > 170 ? `${singleLine.slice(0, 169)}…` : singleLine;
+}
 
 export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botName = "Announcements", channelName = "Announcements", avatarUrl = null, roleId = null, destinations = [], calendarEvents = [], calendarToday }: { destinations?: WebhookOption[]; isAdmin?: boolean; canRunScheduledBackup?: boolean; botName?: string; channelName?: string; avatarUrl?: string | null; roleId?: string | null; calendarEvents?: CalendarEvent[]; calendarToday: string }) {
   const [showHidden, setShowHidden] = useState(false), [changing, setChanging] = useState<string | null>(null);
   const [filter, setFilter] = useState("all"), [theme, setTheme] = useState("system"), [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
   const [messages, setMessages] = useState<Message[]>([]), [hasOlder, setHasOlder] = useState(false);
   const [loading, setLoading] = useState(true), [error, setError] = useState(""), [newMessages, setNewMessages] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<QuickReplyTarget | null>(null), [highlighted, setHighlighted] = useState<string | null>(null);
   const viewport = useRef<HTMLDivElement>(null), content = useRef<HTMLDivElement>(null);
   const records = useRef<Message[]>([]), busy = useRef(false), generation = useRef(0), stickBottom = useRef(true);
   const scrollChange = useRef<{ height: number; top: number } | "bottom" | null>(null);
+  const revealAfterRender = useRef<string | null>(null);
   const retryDirection = useRef<"initial" | "older" | "newer">("initial");
 
   useEffect(() => { try { const saved = localStorage.getItem("announcement-live-theme"); if (saved && ["system", "light", "dark"].includes(saved)) setTheme(saved); } catch {} }, []);
@@ -94,6 +101,16 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
     if (el && change) el.scrollTop = change === "bottom" ? el.scrollHeight : change.top + el.scrollHeight - change.height;
     scrollChange.current = null;
   }, [messages]);
+  useLayoutEffect(() => {
+    const id = revealAfterRender.current;
+    if (!id) return;
+    const element = document.getElementById(`live-message-${id}`);
+    if (!element) return;
+    revealAfterRender.current = null;
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    setHighlighted(id);
+    window.setTimeout(() => setHighlighted(current => current === id ? null : current), 1800);
+  }, [messages]);
   useEffect(() => {
     if (!content.current) return;
     const observer = new ResizeObserver(() => { if (stickBottom.current && viewport.current) viewport.current.scrollTop = viewport.current.scrollHeight; });
@@ -107,6 +124,25 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
     const last = list[list.length - 1];
     if (last && last.day === day) last.items.push(message); else list.push({ day, items: [message] });
     return list;
+  }, []);
+
+  const revealMessage = useCallback(async (id: string) => {
+    const existing = document.getElementById(`live-message-${id}`);
+    if (existing) {
+      existing.scrollIntoView({ behavior: "smooth", block: "center" });
+      setHighlighted(id);
+      window.setTimeout(() => setHighlighted(current => current === id ? null : current), 1800);
+      return;
+    }
+    try {
+      const response = await fetch(`/api/live?target=${encodeURIComponent(id)}`, { cache: "no-store" });
+      if (!response.ok) throw new Error();
+      const data: { message: Message } = await response.json();
+      const combined = [...records.current, data.message].sort((a, b) => a.sentAt.localeCompare(b.sentAt) || a.id.localeCompare(b.id));
+      records.current = [...new Map(combined.map(message => [message.id, message])).values()];
+      revealAfterRender.current = id;
+      setMessages(records.current);
+    } catch { setError("The original announcement could not be opened."); }
   }, []);
 
   return <main className="live-shell" data-theme={resolvedTheme}>
@@ -150,10 +186,17 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
       {!loading && !error && !messages.length && <div className="live-empty"><strong>Nothing here yet</strong><p>{filter === "all" ? "Announcements appear the moment they’re sent." : "No messages in this category yet. Try Everything."}</p></div>}
       {groups.map(group => <section key={group.day} className="live-day">
         <div className="live-day-divider"><span>{group.day}</span></div>
-        {group.items.map(message => <article className={`live-message${message.hidden ? " is-hidden" : ""}`} key={message.id}>
+        {group.items.map(message => <article id={`live-message-${message.id}`} className={`live-message${message.hidden ? " is-hidden" : ""}${highlighted === message.id ? " is-highlighted" : ""}`} key={message.id}>
           {(message.senderAvatarUrl || avatarUrl) ? <img className="live-avatar" src={message.senderAvatarUrl || avatarUrl!} alt="" width={40} height={40} referrerPolicy="no-referrer" /> : <div className="live-avatar" aria-hidden="true">{(message.senderName || botName).slice(0, 1).toUpperCase()}</div>}
           <div className="live-message-body">
+            {message.replyTo && <button type="button" className="live-reply-preview" disabled={message.replyTo.unavailable} onClick={() => void revealMessage(message.replyTo!.id)} aria-label={message.replyTo.unavailable ? "Original announcement unavailable" : `View announcement from ${message.replyTo.senderName || botName}`}>
+              <span aria-hidden="true">↪</span><strong>{message.replyTo.senderName || botName}</strong><span>{message.replyTo.message ? replyExcerpt(message.replyTo.message) : "Original announcement unavailable"}</span>
+            </button>}
             <div className="live-message-meta"><strong>{message.senderName || botName}</strong>{message.human ? <span className="live-human">HUMAN</span> : <span className="live-bot">BOT</span>}{message.type && <span className={`live-type live-type-${message.type}`}>{message.type === "event" ? "Event" : "Daily"}</span>}<time dateTime={message.sentAt} title={timestamp(message.sentAt)}>{clock(message.sentAt)}</time>
+              {isAdmin && !message.hidden && <button type="button" className="live-message-action" onClick={() => {
+                setReplyingTo({ id: message.id, message: message.message, senderName: message.senderName || botName });
+                window.requestAnimationFrame(() => document.getElementById("quick-message")?.focus());
+              }}>Reply</button>}
               {isAdmin && <button type="button" className="live-pill live-pill-sm" disabled={changing !== null} onClick={async () => {
                 setChanging(message.id);
                 try { await setLiveMessageHidden(message.id, !message.hidden); records.current = records.current.filter(item => item.id !== message.id); setMessages(records.current); }
@@ -166,6 +209,6 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
       </section>)}
     </div></div>
     {newMessages && <button type="button" className="live-jump" onClick={() => { stickBottom.current = true; if (viewport.current) viewport.current.scrollTop = viewport.current.scrollHeight; setNewMessages(false); }}>New messages ↓</button>}
-    {isAdmin && <QuickAnnouncement destinations={destinations} compact roleId={roleId} avatarUrl={avatarUrl} onSent={() => { setFilter("all"); setShowHidden(false); stickBottom.current = true; if (filter === "all" && !showHidden) void load("newer"); }} />}
+    {isAdmin && <QuickAnnouncement destinations={destinations} compact roleId={roleId} avatarUrl={avatarUrl} replyTo={replyingTo} onCancelReply={() => setReplyingTo(null)} onSent={() => { setReplyingTo(null); setFilter("all"); setShowHidden(false); stickBottom.current = true; if (filter === "all" && !showHidden) void load("newer"); }} />}
   </main>;
 }

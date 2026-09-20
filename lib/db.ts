@@ -377,6 +377,13 @@ const migrations = [
         on questions(send_at, created_at) where status = 'approved' and send_schedule_mode = 'exact'`,
     ],
   },
+  {
+    version: 21,
+    statements: [
+      `alter table dispatches add column if not exists reply_to_dispatch_id uuid references dispatches(id) on delete set null`,
+      `create index if not exists dispatches_reply_to_idx on dispatches(reply_to_dispatch_id) where reply_to_dispatch_id is not null`,
+    ],
+  },
 ] as const;
 
 export function db() {

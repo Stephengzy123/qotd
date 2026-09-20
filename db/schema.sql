@@ -42,6 +42,7 @@ insert into settings (singleton) values (true) on conflict (singleton) do nothin
 create table if not exists dispatches (
   id uuid primary key default gen_random_uuid(),
   question_id uuid references questions(id) on delete set null,
+  reply_to_dispatch_id uuid references dispatches(id) on delete set null,
   local_date date,
   mode text not null check (mode in ('scheduled', 'manual_random', 'manual_selected')),
   destination text not null default 'discord' check (destination in ('discord', 'live')),
@@ -182,6 +183,8 @@ alter table questions drop constraint if exists questions_exact_send_at_check;
 alter table questions add constraint questions_exact_send_at_check check (send_schedule_mode <> 'exact' or send_at is not null);
 create index if not exists questions_due_exact_idx on questions(send_at, created_at) where status = 'approved' and send_schedule_mode = 'exact';
 alter table club_posts add column if not exists destination_name text;
+alter table dispatches add column if not exists reply_to_dispatch_id uuid references dispatches(id) on delete set null;
+create index if not exists dispatches_reply_to_idx on dispatches(reply_to_dispatch_id) where reply_to_dispatch_id is not null;
 create table if not exists club_send_requests (
   id uuid primary key, account_id uuid references accounts(id) on delete set null,
   created_at timestamptz not null default now()
