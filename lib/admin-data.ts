@@ -35,7 +35,7 @@ export async function queueCounts() {
   return { pending: row?.pending ?? 0, approved: row?.approved ?? 0, sentWeek: row?.sent_week ?? 0, failedWeek: row?.failed_week ?? 0 };
 }
 
-export type AudienceTimelinePoint = { date: string; accountAdds: number; accountRemovals: number; totalAccounts: number };
+export type AudienceTimelinePoint = { date: string; accountAdds: number; accountRemovals: number; totalAccounts: number; notificationAdds: number; notificationRemovals: number; totalNotifications: number };
 
 // This intentionally returns only aggregate counts. Push endpoints and account
 // identifiers never leave this server-only module.
@@ -43,25 +43,28 @@ export async function audienceAnalytics(currentTotalAccounts: number, days = 14)
   const sql = await dbReady();
   const safeDays = Math.max(7, Math.min(31, Math.floor(days)));
   const startDate = addDays(pacificParts().localDate, -(safeDays - 1));
-  const [subscriptionRows, removalRows, notificationRemovalRows, accountEvents] = await Promise.all([
+  const [subscriptionRows, removalRows, notificationRemovalRows, events] = await Promise.all([
     sql<{ count: number }[]>`select count(*)::int as count from push_subscriptions`,
     sql<{ count: number }[]>`select count(*)::int as count from activity_log where action = 'delete_account' and success`,
     sql<{ count: number }[]>`select count(*)::int as count from activity_log where action = 'disable_notifications' and success`,
-    sql<{ date: string; action: "create_account" | "delete_account"; count: number }[]>`
+    sql<{ date: string; action: "create_account" | "delete_account" | "enable_notifications" | "disable_notifications"; count: number }[]>`
       select to_char(created_at at time zone 'America/Los_Angeles', 'YYYY-MM-DD') as date, action, count(*)::int as count
       from activity_log
-      where success and action in ('create_account', 'delete_account') and created_at >= (${startDate}::date at time zone 'America/Los_Angeles')
+      where success and action in ('create_account', 'delete_account', 'enable_notifications', 'disable_notifications') and created_at >= (${startDate}::date at time zone 'America/Los_Angeles')
       group by 1, 2`,
   ]);
-  const eventCounts = new Map(accountEvents.map((row) => [`${row.date}:${row.action}`, Number(row.count)]));
+  const eventCounts = new Map(events.map((row) => [`${row.date}:${row.action}`, Number(row.count)]));
   const timeline: AudienceTimelinePoint[] = Array.from({ length: safeDays }, (_, index) => {
     const date = addDays(startDate, index);
-    return { date, accountAdds: eventCounts.get(`${date}:create_account`) || 0, accountRemovals: eventCounts.get(`${date}:delete_account`) || 0, totalAccounts: 0 };
+    return { date, accountAdds: eventCounts.get(`${date}:create_account`) || 0, accountRemovals: eventCounts.get(`${date}:delete_account`) || 0, totalAccounts: 0, notificationAdds: eventCounts.get(`${date}:enable_notifications`) || 0, notificationRemovals: eventCounts.get(`${date}:disable_notifications`) || 0, totalNotifications: 0 };
   });
   let total = currentTotalAccounts;
+  let notifications = Number(subscriptionRows[0]?.count || 0);
   for (let index = timeline.length - 1; index >= 0; index--) {
     timeline[index].totalAccounts = total;
+    timeline[index].totalNotifications = notifications;
     total -= timeline[index].accountAdds - timeline[index].accountRemovals;
+    notifications -= timeline[index].notificationAdds - timeline[index].notificationRemovals;
   }
   return { notificationSubscriptions: Number(subscriptionRows[0]?.count || 0), accountRemovals: Number(removalRows[0]?.count || 0), notificationRemovals: Number(notificationRemovalRows[0]?.count || 0), timeline };
 }

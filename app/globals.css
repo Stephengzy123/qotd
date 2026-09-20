@@ -442,6 +442,7 @@ body.dialog-open { overflow: hidden; }
 .audience-section .section-title h2 { margin-bottom: .2rem; }
 .audience-section .section-title .hint { margin: 0; max-width: 65ch; }
 .audience-stats { grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); margin-bottom: .85rem; }
+.audience-chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
 .audience-chart-panel { padding: 1rem 1.15rem .8rem; }
 .audience-chart-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
 .audience-chart-heading h3 { margin: 0; font-size: .92rem; }
@@ -458,6 +459,7 @@ body.dialog-open { overflow: hidden; }
 .audience-chart-bars i { display: block; width: min(11px, 40%); min-height: 2px; border-radius: 3px 3px 0 0; transition: opacity .12s; }
 .audience-chart-day:hover .audience-chart-bars i { opacity: .75; }
 .audience-chart i.accounts, .audience-legend i.accounts { background: var(--accent); }
+.audience-chart i.notifications, .audience-legend i.notifications { background: var(--moss-ink); }
 .audience-chart i.removals, .audience-legend i.removals { background: var(--red-ink); }
 .audience-chart time { overflow: hidden; color: var(--faint); font-size: .63rem; font-weight: 600; white-space: nowrap; text-align: center; }
 .audience-chart-note { margin: .6rem 0 0; }
@@ -628,5 +630,5 @@ body.dialog-open { overflow: hidden; }
   .admin-frame .secondary:hover, .admin-frame .text-button:hover { background: var(--paper); }
   .admin-frame .settings-save { background: var(--surface); }
 }
-@media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .two-col, .audience-chart-grid { grid-template-columns: 1fr; } }
 @media (max-width: 700px) { .inline-create { width: 100%; } .inline-create input { flex: 1; width: auto; } .club-stats { width: 100%; } .club-stats > div { flex: 1; } }
