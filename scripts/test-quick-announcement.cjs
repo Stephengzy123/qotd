@@ -19,10 +19,11 @@ assert.equal(formatter.quickMessage('**Hello**'), '**Hello**');
 assert.equal(formatter.quickMessage(`Hi <@&${role}>`), 'Hi');
 assert.equal(formatter.quickMessage('Hello <@123> @everyone'), 'Hello');
 
-async function harness({ admin = true, destination = 'discord', ping = true, fail = false, nickname = 'Test Admin', body = '# Quick message' } = {}) {
+async function harness({ admin = true, destination = 'discord', ping = true, fail = false, nickname = 'Test Admin', body = '# Quick message', replyToId = '' } = {}) {
   const stored = new Map(), requests = [], notifications = [], writes = [];
   const sql = async (parts, ...values) => {
     const query = parts.join('?');
+    if (query.includes('select id from dispatches')) return replyToId === '00000000-0000-4000-8000-000000000099' ? [{ id: replyToId }] : [];
     if (query.includes('from settings')) return [{ webhook_url_encrypted: 'encrypted', mention_role_id: role }];
     if (query.includes('insert into dispatches')) {
       if (stored.has(values[0])) return [];
@@ -47,7 +48,7 @@ async function harness({ admin = true, destination = 'discord', ping = true, fai
     'next/cache': { revalidatePath: () => {} },
   }, async (url, options) => { requests.push({ url: String(url), ...JSON.parse(options.body) }); return { ok: !fail, status: fail ? 400 : 200 }; }).quickAnnounceAction;
   const form = new FormData();
-  Object.entries({ nickname, message: body, destination, requestId: '00000000-0000-4000-8000-000000000001', ...(ping ? { ping: 'on' } : {}) }).forEach(([key, value]) => form.set(key, value));
+  Object.entries({ nickname, message: body, destination, requestId: '00000000-0000-4000-8000-000000000001', ...(replyToId ? { replyToId } : {}), ...(ping ? { ping: 'on' } : {}) }).forEach(([key, value]) => form.set(key, value));
   return { action, form, requests, notifications, writes };
 }
 (async () => {
@@ -68,6 +69,13 @@ async function harness({ admin = true, destination = 'discord', ping = true, fai
   const live = await harness({ destination: 'live' });
   assert.ok((await live.action({}, live.form)).success);
   assert.equal(live.requests.length, 0); assert.equal(live.notifications.length, 1);
+  const replyId = '00000000-0000-4000-8000-000000000099';
+  const reply = await harness({ destination: 'live', replyToId: replyId });
+  assert.ok((await reply.action({}, reply.form)).success);
+  assert.equal(reply.writes[0].at(-1), replyId);
+  const missingReply = await harness({ destination: 'live', replyToId: '00000000-0000-4000-8000-000000000098' });
+  assert.ok((await missingReply.action({}, missingReply.form)).error);
+  assert.equal(missingReply.writes.length, 0);
   const defaults = await harness(); defaults.form.delete('destination');
   assert.ok((await defaults.action({}, defaults.form)).success);
   assert.equal(defaults.requests.length, 0);
@@ -80,5 +88,5 @@ async function harness({ admin = true, destination = 'discord', ping = true, fai
   for (const input of [{ nickname: '' }, { body: '' }, { body: 'x'.repeat(2001) }, { destination: 'invalid' }]) {
     const invalid = await harness(input); assert.ok((await invalid.action({}, invalid.form)).error); assert.equal(invalid.requests.length, 0);
   }
-  console.log('Quick announcement checks passed: admin authorization, nickname, raw Markdown, pings, length, live-only, failed sends, duplicate prevention.');
+  console.log('Quick announcement checks passed: admin authorization, nickname, raw Markdown, replies, pings, length, live-only, failed sends, duplicate prevention.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

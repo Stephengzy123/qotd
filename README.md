@@ -78,7 +78,11 @@ tokens and disable Discord pings server-side. No announcement-role ping is added
 The saved nickname is shown in the live feed and browser notifications. Anonymous
 visitors and contributors cannot use the send action. Failed/uncertain sends keep
 the draft; check Discord and Recent sends before choosing **Start new attempt**.
-Migration 13 stores sender identity on dispatches. Test without sending anything:
+Migration 13 stores sender identity on dispatches. Migration 21 adds optional quick-
+announcement replies; current messages remain non-replies. Admins can choose Reply on
+any visible live announcement, cancel from the composer, and use the context preview
+on a reply to jump back to the original—even when it must be loaded from older history.
+Test without sending anything:
 `node scripts/test-quick-announcement.cjs`.
 
 `/live` is installable as **Live Announcements** with a standalone window and

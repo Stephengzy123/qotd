@@ -7,7 +7,14 @@ import { quickMessage } from "@/lib/quick-message";
 import { WebhookPicker } from "@/components/webhook-picker";
 import type { WebhookOption } from "@/lib/webhook-destinations";
 
-export function QuickAnnouncement({ avatarUrl, compact = false, onSent, destinations = [] }: { destinations?: WebhookOption[]; roleId: string | null; avatarUrl: string | null; compact?: boolean; onSent?: () => void }) {
+export type QuickReplyTarget = { id: string; message: string; senderName: string };
+
+function replyExcerpt(value: string) {
+  const singleLine = value.replace(/\s+/g, " ").trim();
+  return singleLine.length > 140 ? `${singleLine.slice(0, 139)}…` : singleLine;
+}
+
+export function QuickAnnouncement({ avatarUrl, compact = false, onSent, destinations = [], replyTo = null, onCancelReply }: { destinations?: WebhookOption[]; roleId: string | null; avatarUrl: string | null; compact?: boolean; onSent?: () => void; replyTo?: QuickReplyTarget | null; onCancelReply?: () => void }) {
   const [result, action, pending] = useActionState(quickAnnounceAction, {});
   const [nickname, setNickname] = useState("");
   const [message, setMessage] = useState("");
@@ -26,6 +33,12 @@ export function QuickAnnouncement({ avatarUrl, compact = false, onSent, destinat
     }}>
       <fieldset disabled={pending}>
         <input type="hidden" name="requestId" value={requestId} />
+        <input type="hidden" name="replyToId" value={replyTo?.id || ""} />
+        {replyTo && <div className="quick-replying">
+          <span>Replying to <strong>{replyTo.senderName}</strong></span>
+          <button type="button" aria-label={`Cancel reply to ${replyTo.senderName}`} onClick={onCancelReply}>×</button>
+          <p>{replyExcerpt(replyTo.message)}</p>
+        </div>}
         <label htmlFor="quick-nickname">Post as</label><input id="quick-nickname" name="nickname" value={nickname} onChange={event => setNickname(event.target.value)} required maxLength={80} placeholder="Nickname" />
         <label htmlFor="quick-destination">Send to</label><select id="quick-destination" name="destination" value={destination} onChange={event => setDestination(event.target.value)}><option value="discord">Discord + /live</option><option value="live">/live only</option></select>
         {destination === "discord" && <WebhookPicker options={destinations} />}
