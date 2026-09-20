@@ -3,29 +3,23 @@ import { ComposerDialog } from "@/components/composer-dialog";
 import { requireRole } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
 import { listAccounts } from "@/lib/accounts";
-import { audienceAnalytics, queueCounts } from "@/lib/admin-data";
+import { queueCounts } from "@/lib/admin-data";
 import { getWebhookDetails } from "@/lib/webhook-details";
 import { AdminShell } from "@/components/admin-shell";
 import { QuickAnnouncement } from "@/components/quick-announcement";
-import { AudienceSnapshot } from "@/components/audience-snapshot";
 
 export default async function AdminOverviewPage({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
   const session = await requireRole("admin");
   const params = await searchParams;
   const sql = await dbReady();
-  const [counts, settingsRows, accounts, audience] = await Promise.all([
+  const [counts, settingsRows, accounts] = await Promise.all([
     queueCounts(),
     sql<{ mention_role_id: string | null; webhook_url_encrypted: string | null }[]>`select mention_role_id, webhook_url_encrypted from settings where singleton = true`,
     listAccounts(),
-    audienceAnalytics(),
   ]);
   const settings = settingsRows[0] || { mention_role_id: null, webhook_url_encrypted: null };
   const ready = Boolean(settings.webhook_url_encrypted && settings.mention_role_id);
   const awaitingSetup = accounts.filter((account) => !account.has_password).length;
-  const accountNames = new Set(accounts.map((account) => account.username.toLowerCase()));
-  const configuredAccounts = new Set([process.env.ADMIN_USERNAME, process.env.CONTRIBUTOR_USERNAME].filter((username): username is string => Boolean(username)).map((username) => username.toLowerCase()).filter((username) => !accountNames.has(username)));
-  const totalAccounts = accounts.length + configuredAccounts.size;
-  const passwordReadyAccounts = accounts.filter((account) => account.has_password).length + configuredAccounts.size;
   const destinations = await webhookOptions();
   const quickProfile = await getWebhookDetails(settings.webhook_url_encrypted);
 
@@ -41,7 +35,6 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
   return (
     <AdminShell page="overview" username={session.username} title="Overview" description="Daily announcements publish the previous evening; events publish on their selected publish date, during the 6 PM Pacific hour." notice={params}>
       <section className="stats" aria-label="Queue summary"><div><span>Awaiting review</span><strong>{counts.pending}</strong></div><div><span>Scheduled</span><strong>{counts.approved}</strong></div><div><span>Sent this week</span><strong>{counts.sentWeek}</strong></div></section>
-      <AudienceSnapshot totalAccounts={totalAccounts} passwordReadyAccounts={passwordReadyAccounts} notificationSubscriptions={audience.notificationSubscriptions} timeline={audience.timeline} />
       <ComposerDialog buttonLabel="Quick announcement" title="Quick announcement"><QuickAnnouncement destinations={destinations} roleId={settings.mention_role_id} avatarUrl={quickProfile.status === "connected" ? quickProfile.avatarUrl : null} /></ComposerDialog>
       <section className="section-block"><div className="section-title"><h2>Go to</h2></div>
         <div className="feature-grid">
