@@ -14,18 +14,22 @@
 .live-channel-edit input { width: min(17rem, 60vw); min-height: 30px; padding: .3rem .55rem; border: 1px solid var(--live-border); border-radius: 7px; background: var(--live-bg); color: var(--live-text); font: inherit; font-size: 1.05rem; font-weight: 800; }
 .live-channel-edit p { flex-basis: 100%; margin: 0; color: #b14552; font-size: .72rem; font-weight: 600; }
 .live-calendar { position: relative; }
-.live-calendar-popover { position: absolute; z-index: 10; top: calc(100% + .5rem); right: 0; width: min(34rem, calc(100vw - 2rem)); padding: .85rem; border: 1px solid var(--live-border); border-radius: 12px; background: var(--live-surface); color: var(--live-text); box-shadow: 0 14px 35px rgb(0 0 0 / 18%); }
-.live-calendar-title { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding-bottom: .65rem; border-bottom: 1px solid var(--live-border); }
-.live-calendar-title strong { font-size: .9rem; }
-.live-calendar-title button { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--live-border); border-radius: 7px; background: var(--live-bg); color: var(--live-text); font: inherit; font-size: 1.2rem; cursor: pointer; }
+.live-calendar-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: clamp(1rem, 4vw, 3rem); background: rgb(8 12 22 / 52%); backdrop-filter: blur(3px); }
+.live-calendar-popover { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; width: min(1120px, 100%); height: min(820px, 100%); min-height: 0; padding: 1rem; border: 1px solid var(--live-border); border-radius: 16px; background: var(--live-surface); color: var(--live-text); box-shadow: 0 24px 70px rgb(0 0 0 / 32%); }
+.live-calendar-title { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding-bottom: .8rem; border-bottom: 1px solid var(--live-border); }
+.live-calendar-title strong { font-size: 1.05rem; }
+.live-calendar-title-actions { display: flex; align-items: center; gap: .4rem; }
+.live-calendar-title button { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid var(--live-border); border-radius: 8px; background: var(--live-bg); color: var(--live-text); font: inherit; font-size: 1.3rem; cursor: pointer; }
+.live-calendar-grid-scroll { min-height: 0; overflow: auto; }
+.live-calendar-grid-inner { display: grid; grid-template-rows: auto minmax(620px, 1fr); min-width: 720px; height: 100%; }
 .live-calendar-weekdays, .live-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
-.live-calendar-weekdays { padding: .65rem 0 .25rem; color: var(--live-faint); font-size: .62rem; font-weight: 800; text-align: center; text-transform: uppercase; }
-.live-calendar-day { min-width: 0; min-height: 58px; padding: .25rem; border: 1px solid transparent; border-radius: 7px; background: var(--live-bg); overflow: hidden; }
+.live-calendar-grid { grid-template-rows: repeat(6, minmax(96px, 1fr)); min-height: 0; }
+.live-calendar-weekdays { padding: .8rem 0 .35rem; color: var(--live-faint); font-size: .68rem; font-weight: 800; text-align: center; text-transform: uppercase; }
+.live-calendar-day { min-width: 0; min-height: 0; padding: .42rem; border: 1px solid transparent; border-radius: 8px; background: var(--live-bg); overflow-y: auto; }
 .live-calendar-day.outside { opacity: .45; }
 .live-calendar-day.today { border-color: var(--live-accent); }
-.live-calendar-day time { display: block; margin-bottom: .18rem; color: var(--live-muted); font-size: .65rem; font-weight: 800; }
-.live-calendar-day span { display: block; overflow: hidden; padding: .08rem .18rem; border-radius: 3px; background: var(--live-accent-soft); color: var(--live-accent); font-size: .58rem; font-weight: 700; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
-.live-calendar-day small { display: block; padding: .1rem .18rem; color: var(--live-muted); font-size: .58rem; font-weight: 700; }
+.live-calendar-day time { display: block; margin-bottom: .3rem; color: var(--live-muted); font-size: .72rem; font-weight: 800; }
+.live-calendar-day span { display: block; margin-bottom: .22rem; padding: .2rem .28rem; border-radius: 4px; background: var(--live-accent-soft); color: var(--live-accent); font-size: .68rem; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
 .live-calendar-empty { margin: .8rem 0 0; color: var(--live-muted); font-size: .78rem; }
 .live-toolbar { padding-top: .1rem; }
 .live-toolbar-right { display: flex; gap: .5rem; flex-wrap: wrap; }
@@ -134,8 +138,8 @@
   .live-message { gap: .6rem; padding: .75rem .8rem; }
   .live-avatar { width: 32px; height: 32px; }
   .live-toolbar-right { width: 100%; }
-  .live-calendar-popover { position: fixed; top: 4.5rem; right: 1rem; left: 1rem; width: auto; max-height: calc(100dvh - 6rem); overflow-y: auto; }
-  .live-calendar-day { min-height: 49px; }
-  .live-calendar-day span { font-size: .54rem; }
+  .live-calendar-backdrop { padding: .75rem; }
+  .live-calendar-popover { width: 100%; height: 100%; padding: .75rem; border-radius: 12px; }
+  .live-calendar-grid-inner { grid-template-rows: auto minmax(540px, 1fr); min-width: 680px; }
   .live-compose fieldset { grid-template-columns: auto minmax(0, 1fr); }
 }
