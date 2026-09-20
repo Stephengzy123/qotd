@@ -1,16 +1,16 @@
 import { dbReady } from "@/lib/db";
-import { addDays, displayScheduledDate, scheduledDateValue } from "@/lib/qotd";
+import { addDays, displayPacificDateTime, displayScheduledDate, scheduledDateValue } from "@/lib/qotd";
 import { AnnouncementPreview } from "@/components/announcement-preview";
 import { DiscordMarkdown } from "@/components/discord-preview";
 import { MessagePreview } from "@/components/message-preview";
 
-type Queued = { id: string; question: string; question_type: string; event_title: string | null; scheduled_date: string | Date; days_early: number };
+type Queued = { id: string; question: string; question_type: string; event_title: string | null; scheduled_date: string | Date; days_early: number; send_schedule_mode: "auto" | "disabled" | "exact"; send_at: Date | string | null };
 type Sent = { id: string; message: string; created_at: Date };
 
 export async function ContributorAnnouncements({ announcementTemplate, eventTemplate }: { announcementTemplate: string; eventTemplate: string }) {
   const sql = await dbReady();
   const [queued, sent] = await Promise.all([
-    sql<Queued[]>`select id, question, question_type, event_title, scheduled_date, days_early
+    sql<Queued[]>`select id, question, question_type, event_title, scheduled_date, days_early, send_schedule_mode, send_at
       from questions where status = 'approved' and scheduled_date is not null
       order by scheduled_date asc, created_at asc`,
     sql<Sent[]>`select id, message, created_at from dispatches where success = true order by created_at desc limit 50`,
@@ -23,9 +23,10 @@ export async function ContributorAnnouncements({ announcementTemplate, eventTemp
       const date = scheduledDateValue(item.scheduled_date);
       const event = item.question_type === "event";
       const publishDate = event ? date : date ? addDays(date, -(Number(item.days_early) + 1)) : null;
+      const schedule = item.send_schedule_mode === "disabled" ? "Automatic sending is disabled" : item.send_schedule_mode === "exact" ? `Sends ${displayPacificDateTime(item.send_at)} · exact time` : `${event ? "Event" : `For ${displayScheduledDate(item.scheduled_date)}`} · sends ${publishDate ? displayScheduledDate(publishDate) : "on its selected date"} during the 6 PM Pacific hour`;
       return <article className="approved-row" key={item.id}>
         <span className="queue-number">{index + 1}</span>
-        <div><strong className="scheduled-label">{event ? "Event" : `For ${displayScheduledDate(item.scheduled_date)}`} · sends {displayScheduledDate(publishDate)} during the 6 PM Pacific hour</strong>
+        <div><strong className={`scheduled-label${item.send_schedule_mode === "disabled" ? " schedule-disabled" : ""}`}>{schedule}</strong>
           {item.event_title && <h3 className="approved-title">{item.event_title}</h3>}
           <p className="message-excerpt">{item.question}</p></div>
         <MessagePreview title="Scheduled message"><AnnouncementPreview type={event ? "event" : "announcement"} announcement={item.question} eventTitle={item.event_title || ""} scheduledDate={date || ""} announcementTemplate={announcementTemplate} eventTemplate={eventTemplate} /></MessagePreview>

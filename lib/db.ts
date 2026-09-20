@@ -362,6 +362,21 @@ const migrations = [
         check (live_channel_name is null or char_length(live_channel_name) between 1 and 60)`,
     ],
   },
+  {
+    version: 20,
+    statements: [
+      `alter table questions add column if not exists send_schedule_mode text not null default 'auto'`,
+      `alter table questions add column if not exists send_at timestamptz`,
+      `alter table questions drop constraint if exists questions_send_schedule_mode_check`,
+      `alter table questions add constraint questions_send_schedule_mode_check
+        check (send_schedule_mode in ('auto', 'disabled', 'exact'))`,
+      `alter table questions drop constraint if exists questions_exact_send_at_check`,
+      `alter table questions add constraint questions_exact_send_at_check
+        check (send_schedule_mode <> 'exact' or send_at is not null)`,
+      `create index if not exists questions_due_exact_idx
+        on questions(send_at, created_at) where status = 'approved' and send_schedule_mode = 'exact'`,
+    ],
+  },
 ] as const;
 
 export function db() {

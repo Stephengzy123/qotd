@@ -12,7 +12,7 @@ import { fetchCalendarByUrl, normalizeCalendarFeedUrl } from "@/lib/calendar";
 import { createAccount, createSetupLink, deleteAccount, getAccount, parseRole, ROLE_LABELS, updateAccountRole } from "@/lib/accounts";
 import { createClub, setMembership, type ClubRole } from "@/lib/clubs";
 import { logEvent } from "@/lib/log";
-import { readDeliverySettings } from "@/lib/delivery-settings";
+import { readDeliverySettings, readSendScheduleSettings } from "@/lib/delivery-settings";
 import type { Role } from "@/lib/auth";
 
 function messageUrl(path: string, kind: "ok" | "error", message: string) {
@@ -318,9 +318,9 @@ export async function regenerateSetupLinkAction(formData: FormData) {
 
 async function persistDeliverySettings(id: string, form: FormData) {
   try {
-    const settings = await readDeliverySettings(form);
+    const [settings, schedule] = await Promise.all([readDeliverySettings(form), Promise.resolve(readSendScheduleSettings(form))]);
     const sql = await dbReady();
-    const rows = await sql`update questions set delivery_destination = ${settings.destination}, remove_pings = ${settings.removePings}, discord_webhook_ids = ${settings.webhookIds}::text[], updated_at = now() where id = ${id} and status in ('pending', 'approved') returning id`;
+    const rows = await sql`update questions set delivery_destination = ${settings.destination}, remove_pings = ${settings.removePings}, discord_webhook_ids = ${settings.webhookIds}::text[], send_schedule_mode = ${schedule.mode}, send_at = ${schedule.sendAt}, updated_at = now() where id = ${id} and status in ('pending', 'approved') returning id`;
     return rows.length ? { success: "Delivery settings saved." } : { error: "This item has already been sent or removed." };
   } catch (error) { return { error: error instanceof Error ? error.message : "Could not save delivery settings." }; }
 }

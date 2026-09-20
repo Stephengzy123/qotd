@@ -7,7 +7,10 @@ import { LiveNotifications } from "@/components/live-notifications";
 import { LiveInstall } from "@/components/live-install";
 import { QuickAnnouncement } from "@/components/quick-announcement";
 import { ScheduledDeliveryCheck } from "@/components/scheduled-delivery-check";
+import { LiveCalendar } from "@/components/live-calendar";
+import { LiveChannelName } from "@/components/live-channel-name";
 import type { WebhookOption } from "@/lib/webhook-destinations";
+import type { CalendarEvent } from "@/lib/calendar";
 
 type Message = { id: string; message: string; type: string | null; human: boolean; sentAt: string; cursor: string; hidden: boolean; senderName?: string | null; senderAvatarUrl?: string | null };
 type Page = { messages: Message[]; hasMore: boolean };
@@ -30,7 +33,7 @@ function timestamp(value: string) {
   return `${day} at ${date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
 }
 
-export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botName = "Announcements", channelName = "Announcements", avatarUrl = null, roleId = null, destinations = [] }: { destinations?: WebhookOption[]; isAdmin?: boolean; canRunScheduledBackup?: boolean; botName?: string; channelName?: string; avatarUrl?: string | null; roleId?: string | null }) {
+export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botName = "Announcements", channelName = "Announcements", avatarUrl = null, roleId = null, destinations = [], calendarEvents = [], calendarToday }: { destinations?: WebhookOption[]; isAdmin?: boolean; canRunScheduledBackup?: boolean; botName?: string; channelName?: string; avatarUrl?: string | null; roleId?: string | null; calendarEvents?: CalendarEvent[]; calendarToday: string }) {
   const [showHidden, setShowHidden] = useState(false), [changing, setChanging] = useState<string | null>(null);
   const [filter, setFilter] = useState("all"), [theme, setTheme] = useState("system"), [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
   const [messages, setMessages] = useState<Message[]>([]), [hasOlder, setHasOlder] = useState(false);
@@ -112,9 +115,10 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
       <div className="live-header-row">
         <div className="live-identity">
           {avatarUrl ? <img className="live-avatar live-avatar-lg" src={avatarUrl} alt="" width={44} height={44} referrerPolicy="no-referrer" /> : <div className="live-avatar live-avatar-lg" aria-hidden="true">{botName.slice(0, 1).toUpperCase()}</div>}
-          <div><h1>{channelName}</h1><p className="live-sub"><span className="live-dot" aria-hidden="true" />Live · {loading && !messages.length ? "loading" : `${messages.length} loaded${todayCount ? ` · ${todayCount} today` : ""}`}</p></div>
+          <div><LiveChannelName initialName={channelName} editable={isAdmin} /><p className="live-sub"><span className="live-dot" aria-hidden="true" />Live · {loading && !messages.length ? "loading" : `${messages.length} loaded${todayCount ? ` · ${todayCount} today` : ""}`}</p></div>
         </div>
         <div className="live-actions">
+          <LiveCalendar events={calendarEvents} today={calendarToday} />
           <LiveNotifications />
           <LiveInstall />
           {isAdmin && <a href="/admin" className="live-pill live-pill-link">Admin</a>}

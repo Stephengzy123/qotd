@@ -24,10 +24,43 @@ export function pacificParts(date = new Date()) {
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
+    minute: "2-digit",
     hourCycle: "h23",
   }).formatToParts(date);
   const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value || "";
-  return { localDate: `${get("year")}-${get("month")}-${get("day")}`, hour: Number(get("hour")) };
+  return { localDate: `${get("year")}-${get("month")}-${get("day")}`, hour: Number(get("hour")), minute: Number(get("minute")) };
+}
+
+export type SendScheduleMode = "auto" | "disabled" | "exact";
+
+// datetime-local inputs have no timezone. Treat them as a Pacific wall-clock
+// value, including the daylight-saving offset that applies on that date.
+export function parsePacificDateTime(value: string) {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  const [, year, month, day, hour, minute] = match;
+  const baseline = Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute));
+  const raw = new Date(baseline);
+  if (raw.getUTCFullYear() !== Number(year) || raw.getUTCMonth() + 1 !== Number(month) || raw.getUTCDate() !== Number(day) || raw.getUTCHours() !== Number(hour) || raw.getUTCMinutes() !== Number(minute)) return null;
+  const wanted = `${year}-${month}-${day}T${hour}:${minute}`;
+  // Pacific is UTC-7 or UTC-8. Comparing formatted parts rejects impossible
+  // spring-forward wall times and chooses the earlier occurrence in fall.
+  const candidates = [7, 8].map((offset) => new Date(baseline + offset * 60 * 60 * 1000)).filter((candidate) => pacificDateTimeInput(candidate) === wanted);
+  return candidates.sort((a, b) => a.getTime() - b.getTime())[0] || null;
+}
+
+export function pacificDateTimeInput(value: Date | string | null | undefined) {
+  const date = value instanceof Date ? value : value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value || "";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+}
+
+export function displayPacificDateTime(value: Date | string | null | undefined) {
+  const date = value instanceof Date ? value : value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return "Time unavailable";
+  return new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(date);
 }
 
 export function addDays(localDate: string, days: number) {

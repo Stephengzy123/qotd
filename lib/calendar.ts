@@ -8,6 +8,7 @@ const MAX_FEED_BYTES = 1_000_000;
 const CACHE_MS = 5 * 60 * 1000;
 
 type CalendarByDate = Record<string, string[]>;
+export type CalendarEvent = { date: string; title: string };
 
 const globalForCalendar = globalThis as unknown as {
   announcementCalendarCache?: Map<string, { expires: number; entries: CalendarByDate }>;
@@ -164,13 +165,24 @@ export async function fetchCalendarByUrl(value: string) {
   return parseCalendarFeed(await readLimitedBody(response));
 }
 
-export async function getCalendarByDate(encryptedUrl: string | null | undefined, date: string) {
-  if (!encryptedUrl || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return [];
+async function calendarEntries(encryptedUrl: string | null | undefined) {
+  if (!encryptedUrl) return {} as CalendarByDate;
   const saved = cache().get(encryptedUrl);
-  if (saved && saved.expires > Date.now()) return saved.entries[date] || [];
+  if (saved && saved.expires > Date.now()) return saved.entries;
   const entries = await fetchCalendarByUrl(decryptSecret(encryptedUrl));
   cache().set(encryptedUrl, { expires: Date.now() + CACHE_MS, entries });
-  return entries[date] || [];
+  return entries;
+}
+
+export async function getCalendarByDate(encryptedUrl: string | null | undefined, date: string) {
+  if (!encryptedUrl || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return [];
+  return (await calendarEntries(encryptedUrl))[date] || [];
+}
+
+export async function getCalendarEvents(encryptedUrl: string | null | undefined, from: string, to: string) {
+  if (!encryptedUrl || !/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to) return [] as CalendarEvent[];
+  const entries = await calendarEntries(encryptedUrl);
+  return Object.entries(entries).flatMap(([date, titles]) => date >= from && date <= to ? titles.map((title) => ({ date, title })) : []).slice(0, 500);
 }
 
 export function calendarHeading(titles: string[]) {
