@@ -15,7 +15,8 @@ const delivery = load("lib/delivery-settings.ts", {
     resolutions++;
     if (!ids.length || ids.includes("forged")) throw Error("Unassigned destination");
     return [];
-  } }
+  } },
+  "@/lib/qotd": { parsePacificDateTime: value => value === "2030-09-20T16:15" ? new Date("2030-09-20T23:15:00.000Z") : null }
 });
 const actions = load("app/actions.ts", {
   "@/lib/delivery-settings": delivery,
@@ -37,10 +38,18 @@ const actions = load("app/actions.ts", {
   form.set("destination", "discord"); form.set("removePings", "on"); form.append("webhookIds", "primary");
   assert.ok((await actions.saveDeliverySettingsAction({}, form)).success);
   assert.deepEqual(writes[0].slice(0, 3), ["discord", true, ["primary"]]);
+  assert.deepEqual(writes[0].slice(3, 5), ["auto", null]);
   form.set("destination", "live"); form.delete("removePings");
   const prior = resolutions;
   assert.ok((await actions.saveDeliverySettingsAction({}, form)).success);
   assert.deepEqual(writes[1].slice(0, 3), ["live", false, ["primary"]]);
+  form.set("sendScheduleMode", "exact"); form.set("sendAt", "2030-09-20T16:15");
+  assert.ok((await actions.saveDeliverySettingsAction({}, form)).success);
+  assert.equal(writes[2][3], "exact");
+  assert.equal(new Date(writes[2][4]).toISOString(), "2030-09-20T23:15:00.000Z");
+  form.set("sendScheduleMode", "disabled"); form.delete("sendAt");
+  assert.ok((await actions.saveDeliverySettingsAction({}, form)).success);
+  assert.deepEqual(writes[3].slice(3, 5), ["disabled", null]);
   assert.equal(resolutions, prior);
   editable = false;
   assert.match((await actions.saveDeliverySettingsAction({}, form)).error, /sent or removed/);

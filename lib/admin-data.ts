@@ -1,8 +1,8 @@
 import "server-only";
 import { dbReady } from "@/lib/db";
-import { addDays, DEFAULT_ANNOUNCEMENT_TEMPLATE, DEFAULT_EVENT_TEMPLATE, pacificParts } from "@/lib/qotd";
+import { addDays, DEFAULT_ANNOUNCEMENT_TEMPLATE, DEFAULT_EVENT_TEMPLATE, pacificParts, type SendScheduleMode } from "@/lib/qotd";
 
-export type Announcement = { delivery_destination: "discord" | "live"; remove_pings: boolean; discord_webhook_ids: string[] | null; id: string; question: string; contributor_note: string | null; status: string; created_at: Date; scheduled_date: string | Date | null; question_type: "announcement" | "event"; event_title: string | null; days_early: number };
+export type Announcement = { delivery_destination: "discord" | "live"; remove_pings: boolean; discord_webhook_ids: string[] | null; send_schedule_mode: SendScheduleMode; send_at: Date | string | null; id: string; question: string; contributor_note: string | null; status: string; created_at: Date; scheduled_date: string | Date | null; question_type: "announcement" | "event"; event_title: string | null; days_early: number };
 
 export function relativeDate(date: Date) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" }).format(date);
@@ -19,7 +19,7 @@ export async function loadTemplates() {
 
 export async function listAnnouncements(status: "pending" | "approved") {
   const sql = await dbReady();
-  return sql<Announcement[]>`select delivery_destination, remove_pings, discord_webhook_ids, id, question, contributor_note, status, created_at, scheduled_date, question_type, event_title, days_early from questions where status = ${status} order by scheduled_date asc nulls last, created_at asc`;
+  return sql<Announcement[]>`select delivery_destination, remove_pings, discord_webhook_ids, send_schedule_mode, send_at, id, question, contributor_note, status, created_at, scheduled_date, question_type, event_title, days_early from questions where status = ${status} order by case when send_schedule_mode = 'exact' then send_at else scheduled_date::timestamptz end asc nulls last, created_at asc`;
 }
 
 export async function queueCounts() {

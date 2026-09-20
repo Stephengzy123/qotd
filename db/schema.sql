@@ -176,6 +176,11 @@ create table if not exists webhook_assignments (
 alter table questions add column if not exists discord_webhook_ids text[];
 alter table questions add column if not exists delivery_destination text not null default 'discord' check (delivery_destination in ('discord', 'live'));
 alter table questions add column if not exists remove_pings boolean not null default false;
+alter table questions add column if not exists send_schedule_mode text not null default 'auto' check (send_schedule_mode in ('auto', 'disabled', 'exact'));
+alter table questions add column if not exists send_at timestamptz;
+alter table questions drop constraint if exists questions_exact_send_at_check;
+alter table questions add constraint questions_exact_send_at_check check (send_schedule_mode <> 'exact' or send_at is not null);
+create index if not exists questions_due_exact_idx on questions(send_at, created_at) where status = 'approved' and send_schedule_mode = 'exact';
 alter table club_posts add column if not exists destination_name text;
 create table if not exists club_send_requests (
   id uuid primary key, account_id uuid references accounts(id) on delete set null,

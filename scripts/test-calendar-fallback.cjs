@@ -64,12 +64,12 @@ async function run(now, { trigger = 'cron', fails = false } = {}) {
   }
   await assert.rejects(() => fallbackCase({ outage: true }), /offline/);
   assert.ok(!(await fallbackCase({ titles: ['Assembly @everyone <@&123>'] })).inserts[0][1].includes('@'));
-  const summer = await run('2026-09-18T01:30:00Z');
+  const summer = await run('2026-09-18T01:00:00Z');
   assert.deepEqual(summer.calls, [['2026-09-18', '2026-09-17']]);
   assert.deepEqual(summer.pushes, ['fallback']);
   const winter = await run('2026-12-02T02:30:00Z', { trigger: 'page_load' });
   assert.deepEqual(winter.calls, [['2026-12-02', '2026-12-01']]);
-  assert.equal((await run('2026-09-18T02:00:00Z')).calls.length, 0);
-  assert.equal((await run('2026-09-18T01:30:00Z', { fails: true })).result.success, false);
+  assert.equal((await run('2026-09-18T01:01:00Z')).calls.length, 0);
+  assert.equal((await run('2026-09-18T01:00:00Z', { fails: true })).result.success, false);
   console.log('Calendar fallback checks passed: formatting, suppression, no events/feed, duplicate claim, no pings, failures, Pacific window, page-load fallback.');
 })().catch(error => { console.error(error); process.exitCode = 1; });
