@@ -1,6 +1,6 @@
 import "server-only";
 import { dbReady } from "@/lib/db";
-import { DEFAULT_ANNOUNCEMENT_TEMPLATE, DEFAULT_EVENT_TEMPLATE } from "@/lib/qotd";
+import { addDays, DEFAULT_ANNOUNCEMENT_TEMPLATE, DEFAULT_EVENT_TEMPLATE, pacificParts } from "@/lib/qotd";
 
 export type Announcement = { delivery_destination: "discord" | "live"; remove_pings: boolean; discord_webhook_ids: string[] | null; id: string; question: string; contributor_note: string | null; status: string; created_at: Date; scheduled_date: string | Date | null; question_type: "announcement" | "event"; event_title: string | null; days_early: number };
 
@@ -33,4 +33,32 @@ export async function queueCounts() {
     from questions
   `)[0];
   return { pending: row?.pending ?? 0, approved: row?.approved ?? 0, sentWeek: row?.sent_week ?? 0, failedWeek: row?.failed_week ?? 0 };
+}
+
+export type AudienceTimelinePoint = { date: string; accounts: number; subscriptions: number };
+
+// This intentionally returns only aggregate counts. Push endpoints and account
+// identifiers never leave this server-only module.
+export async function audienceAnalytics(days = 14) {
+  const sql = await dbReady();
+  const safeDays = Math.max(7, Math.min(31, Math.floor(days)));
+  const startDate = addDays(pacificParts().localDate, -(safeDays - 1));
+  const [subscriptionRows, accountRows, subscriptionDays] = await Promise.all([
+    sql<{ count: number }[]>`select count(*)::int as count from push_subscriptions`,
+    sql<{ date: string; count: number }[]>`
+      select to_char(created_at at time zone 'America/Los_Angeles', 'YYYY-MM-DD') as date, count(*)::int as count
+      from accounts where created_at >= (${startDate}::date at time zone 'America/Los_Angeles')
+      group by 1`,
+    sql<{ date: string; count: number }[]>`
+      select to_char(created_at at time zone 'America/Los_Angeles', 'YYYY-MM-DD') as date, count(*)::int as count
+      from push_subscriptions where created_at >= (${startDate}::date at time zone 'America/Los_Angeles')
+      group by 1`,
+  ]);
+  const accountCounts = new Map(accountRows.map((row) => [row.date, Number(row.count)]));
+  const subscriptionCounts = new Map(subscriptionDays.map((row) => [row.date, Number(row.count)]));
+  const timeline: AudienceTimelinePoint[] = Array.from({ length: safeDays }, (_, index) => {
+    const date = addDays(startDate, index);
+    return { date, accounts: accountCounts.get(date) || 0, subscriptions: subscriptionCounts.get(date) || 0 };
+  });
+  return { notificationSubscriptions: Number(subscriptionRows[0]?.count || 0), timeline };
 }
