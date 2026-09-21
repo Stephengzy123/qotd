@@ -183,6 +183,9 @@ export async function sendAnnouncement(announcementId: string, mode: Mode, local
       `;
       if (!lock[0]?.locked) return { skipped: true } as const;
     }
+    // Bind the version as text before PostgreSQL casts it. Binding directly as
+    // timestamptz invokes Postgres.js's Date serializer, losing microseconds and
+    // making unchanged rows fail this optimistic concurrency check.
     const claim = options.force
       ? await tx`
           update questions set status = 'sent', updated_at = now()
@@ -191,7 +194,7 @@ export async function sendAnnouncement(announcementId: string, mode: Mode, local
         `
       : await tx`
           update questions set status = 'sent', updated_at = now()
-          where id = ${announcement.id} and status = 'approved' and updated_at = ${announcement.settings_version}::timestamptz
+          where id = ${announcement.id} and status = 'approved' and updated_at = ${announcement.settings_version}::text::timestamptz
           returning id
         `;
     if (!claim[0]) return { error: "That announcement changed or is already being handled. Reload before retrying." } as const;

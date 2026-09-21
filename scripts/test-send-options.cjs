@@ -16,13 +16,23 @@ const text = load('lib/live-text.ts', {});
 assert.equal(text.removePings('# News\n<@123> <@!456> <@&789> @everyone @here\n-# <@&789>'), '# News');
 assert.equal(text.removePings('Email x@here.com and **bold**'), 'Email x@here.com and **bold**');
 async function scenario(options, webhook, responseOk = true, claimed = true, saved = {}) {
+  const { serializers } = await import('../node_modules/postgres/src/types.js');
   const queries = [], requests = [];
   const sql = async (parts, ...values) => {
     const query = parts.join('?'); queries.push({ query, values });
     if (query.includes('pg_try_advisory_xact_lock')) return [{ locked: true }];
     if (query.includes('select id, question')) return [{ id: 'item', question: 'Hello <@123> @everyone', scheduled_date: '2026-09-20', question_type: 'announcement', ...saved }];
     if (query.includes('from settings')) return [{ webhook_url_encrypted: webhook, mention_role_id: webhook ? '123456789012345' : null, message_template: '# News\n{announcement}\n-# {mention-role}' }];
-    if (query.includes("update questions set status = 'sent'")) return claimed ? [{ id: 'item' }] : [];
+    if (query.includes("update questions set status = 'sent'")) {
+      if (saved.settings_version && query.includes('and updated_at =')) {
+        // Model the actual driver's wire serialization for the parameter type
+        // inferred by PostgreSQL, including loss of sub-millisecond precision.
+        const version = values[1];
+        const wire = query.includes('?::text::timestamptz') ? serializers[25](version) : serializers[1184](version);
+        if (wire !== saved.settings_version) return [];
+      }
+      return claimed ? [{ id: 'item' }] : [];
+    }
     if (query.includes('insert into dispatches')) return [{ id: 'dispatch' }];
     return [];
   };
@@ -42,6 +52,13 @@ async function scenario(options, webhook, responseOk = true, claimed = true, sav
   return { result, queries, requests };
 }
 (async () => {
+  const { serializers } = await import('../node_modules/postgres/src/types.js');
+  const version = '2026-09-21 06:32:53.123456+00';
+  assert.equal(serializers[1184](version), '2026-09-21T06:32:53.123Z');
+  assert.equal(serializers[25](version), version);
+  const precise = await scenario({}, 'https://discord.test', true, true, { settings_version: version });
+  assert.equal(precise.result.success, true, 'Unchanged microsecond version must be claimable');
+  assert.equal(precise.requests.length, 1);
   const live = await scenario({ destination: 'live' }, null);
   assert.equal(live.result.success, true);
   assert.equal(live.requests.length, 0);
