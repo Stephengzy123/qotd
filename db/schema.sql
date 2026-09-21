@@ -9,7 +9,7 @@ create table if not exists questions (
   id uuid primary key default gen_random_uuid(),
   question text not null check (char_length(question) between 8 and 1500),
   scheduled_date date,
-  question_type text not null default 'announcement' check (question_type in ('announcement', 'event')),
+  question_type text not null default 'announcement' check (question_type in ('announcement', 'event', 'reminder')),
   event_title text check (event_title is null or char_length(event_title) between 1 and 200),
   days_early integer not null default 0 check (days_early between 0 and 365),
   contributor_note text check (contributor_note is null or char_length(contributor_note) <= 500),
@@ -180,6 +180,14 @@ alter table questions add column if not exists remove_pings boolean not null def
 alter table questions add column if not exists send_schedule_mode text not null default 'auto' check (send_schedule_mode in ('auto', 'disabled', 'exact'));
 alter table questions add column if not exists send_at timestamptz;
 alter table questions add column if not exists event_occurrence_date date;
+alter table questions add column if not exists event_occurrence_end_date date;
+alter table questions drop constraint if exists questions_question_type_check;
+alter table questions add constraint questions_question_type_check check (question_type in ('announcement', 'event', 'reminder'));
+alter table dispatches add column if not exists question_type text;
+alter table dispatches drop constraint if exists dispatches_question_type_check;
+alter table dispatches add constraint dispatches_question_type_check check (question_type in ('announcement', 'event', 'reminder'));
+alter table questions drop constraint if exists questions_event_occurrence_range_check;
+alter table questions add constraint questions_event_occurrence_range_check check (event_occurrence_end_date is null or event_occurrence_date is null or event_occurrence_end_date >= event_occurrence_date);
 alter table questions drop constraint if exists questions_exact_send_at_check;
 alter table questions add constraint questions_exact_send_at_check check (send_schedule_mode <> 'exact' or send_at is not null);
 create index if not exists questions_due_exact_idx on questions(send_at, created_at) where status = 'approved' and send_schedule_mode = 'exact';
@@ -201,6 +209,18 @@ create table if not exists lunch_menu_sync_state (
   last_error text
 );
 insert into lunch_menu_sync_state (singleton) values (true) on conflict (singleton) do nothing;
+create table if not exists calendar_events (
+  id uuid primary key default gen_random_uuid(),
+  event_date date not null,
+  end_date date not null,
+  title text not null check (char_length(title) between 1 and 200),
+  details text check (details is null or char_length(details) <= 1500),
+  created_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (end_date >= event_date)
+);
+create index if not exists calendar_events_date_idx on calendar_events(event_date, created_at);
 create table if not exists club_send_requests (
   id uuid primary key, account_id uuid references accounts(id) on delete set null,
   created_at timestamptz not null default now()

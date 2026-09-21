@@ -59,6 +59,9 @@ async function scenario(options, webhook, responseOk = true, claimed = true, sav
   assert.equal(quiet.requests[0].content.includes('@'), false);
   const normal = await scenario({}, 'https://discord.test');
   assert.equal(normal.requests[0].allowed_mentions.roles.length, 1);
+  const reminder = await scenario({}, 'https://discord.test', true, true, { question_type: 'reminder', event_title: 'Bring a blazer' });
+  assert.match(reminder.requests[0].content, /Announcement for Bring a blazer/);
+  assert.ok(reminder.queries.some(x => x.query.includes('insert into dispatches') && x.values.includes('reminder')));
   const failed = await scenario({}, 'https://discord.test', false);
   assert.ok(failed.result.error);
   assert.ok(failed.queries.some(x => x.query.includes("status = 'approved'")));
@@ -67,5 +70,5 @@ async function scenario(options, webhook, responseOk = true, claimed = true, sav
   assert.equal(duplicate.queries.some(x => x.query.includes('insert into dispatches')), false);
   const missing = await scenario({}, null);
   assert.ok(missing.result.error);
-  console.log('Send-option checks passed: live-only, no-ping, normal, failed, duplicate, missing webhook, mention cleanup.');
+  console.log('Send-option checks passed: live-only, no-ping, normal, reminders, failed, duplicate, missing webhook, mention cleanup.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

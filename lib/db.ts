@@ -15,7 +15,7 @@ const migrations = [
         id uuid primary key default gen_random_uuid(),
         question text not null check (char_length(question) between 8 and 1500),
         scheduled_date date,
-        question_type text not null default 'announcement' check (question_type in ('announcement', 'event')),
+        question_type text not null default 'announcement' check (question_type in ('announcement', 'event', 'reminder')),
         event_title text check (event_title is null or char_length(event_title) between 1 and 200),
         contributor_note text check (contributor_note is null or char_length(contributor_note) <= 500),
         status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'sent')),
@@ -404,6 +404,38 @@ const migrations = [
         last_error text
       )`,
       `insert into lunch_menu_sync_state (singleton) values (true) on conflict (singleton) do nothing`,
+    ],
+  },
+  {
+    version: 23,
+    statements: [
+      `alter table questions add column if not exists event_occurrence_end_date date`,
+      `alter table questions drop constraint if exists questions_event_occurrence_range_check`,
+      `alter table questions add constraint questions_event_occurrence_range_check
+        check (event_occurrence_end_date is null or event_occurrence_date is null or event_occurrence_end_date >= event_occurrence_date)`,
+      `create table if not exists calendar_events (
+        id uuid primary key default gen_random_uuid(),
+        event_date date not null,
+        end_date date not null,
+        title text not null check (char_length(title) between 1 and 200),
+        details text check (details is null or char_length(details) <= 1500),
+        created_by text,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now(),
+        check (end_date >= event_date)
+      )`,
+      `create index if not exists calendar_events_date_idx on calendar_events(event_date, created_at)`,
+    ],
+  },
+  {
+    version: 24,
+    statements: [
+      `alter table questions drop constraint if exists questions_question_type_check`,
+      `alter table questions add constraint questions_question_type_check
+        check (question_type in ('announcement', 'event', 'reminder'))`,
+      `alter table dispatches drop constraint if exists dispatches_question_type_check`,
+      `alter table dispatches add constraint dispatches_question_type_check
+        check (question_type in ('announcement', 'event', 'reminder'))`,
     ],
   },
 ] as const;

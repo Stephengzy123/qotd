@@ -18,7 +18,7 @@ function applyCalendarToken(template: string, calendar: string) {
 }
 
 type AnnouncementPreviewProps = {
-  type: "announcement" | "event";
+  type: "announcement" | "event" | "reminder";
   announcement: string;
   eventTitle: string;
   scheduledDate: string;
@@ -29,7 +29,7 @@ type AnnouncementPreviewProps = {
 export function AnnouncementPreview({ type, announcement, eventTitle, scheduledDate, announcementTemplate, eventTemplate }: AnnouncementPreviewProps) {
   const [calendar, setCalendar] = useState("");
   const [calendarStatus, setCalendarStatus] = useState<"idle" | "loading" | "ready" | "unavailable">("idle");
-  const template = type === "event" ? eventTemplate : announcementTemplate;
+  const template = type !== "announcement" ? eventTemplate : announcementTemplate;
   const preview = applyCalendarToken(template, type === "announcement" ? calendar : "")
     .replaceAll("{date}", displayDate(scheduledDate))
     .replaceAll("{announcement}", announcement || "Your announcement will appear here.")

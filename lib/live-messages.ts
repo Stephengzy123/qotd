@@ -3,7 +3,7 @@ import { dbReady } from "@/lib/db";
 import { liveMessageText } from "@/lib/live-text";
 
 type Row = {
-  id: string; message: string; question_type: "announcement" | "event" | null; sent_time: string; hidden_from_live: boolean;
+  id: string; message: string; question_type: "announcement" | "event" | "reminder" | null; sent_time: string; hidden_from_live: boolean;
   sender_name: string | null; sender_avatar_url: string | null; reply_to_dispatch_id: string | null;
   reply_message: string | null; reply_sender_name: string | null; reply_sent_time: string | null;
 };
@@ -36,7 +36,7 @@ export function parseLiveCursor(value: string | null): { time: string; id: strin
   return { time: parsed.time, id: parsed.id };
 }
 
-export type LiveFilter = "all" | "announcement" | "event" | "human";
+export type LiveFilter = "all" | "announcement" | "event" | "reminder" | "human";
 
 export async function getLiveMessages(type: LiveFilter, before: ReturnType<typeof parseLiveCursor>, after: ReturnType<typeof parseLiveCursor>, hidden = false) {
   const sql = await dbReady();

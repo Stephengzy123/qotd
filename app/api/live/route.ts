@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const type = params.get("type") || "all";
   const target = params.get("target");
-  if (!["all", "announcement", "event", "human"].includes(type) || (params.has("before") && params.has("after"))) return NextResponse.json({ error: "Invalid filter" }, { status: 400 });
+  if (!["all", "announcement", "event", "reminder", "human"].includes(type) || (params.has("before") && params.has("after"))) return NextResponse.json({ error: "Invalid filter" }, { status: 400 });
   if (target && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(target)) return NextResponse.json({ error: "Invalid target" }, { status: 400 });
   let before, after;
   try { before = parseLiveCursor(params.get("before")); after = parseLiveCursor(params.get("after")); }
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     }
     const hidden = params.get("hidden") === "true";
     if (hidden && (await getSession())?.role !== "admin") return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    return NextResponse.json(await getLiveMessages(type as "all" | "announcement" | "event" | "human", before, after, hidden), { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json(await getLiveMessages(type as "all" | "announcement" | "event" | "reminder" | "human", before, after, hidden), { headers: { "Cache-Control": "private, no-store" } });
   } catch {
     return NextResponse.json({ error: "Messages are temporarily unavailable" }, { status: 503 });
   }
