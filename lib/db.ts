@@ -438,6 +438,14 @@ const migrations = [
         check (question_type in ('announcement', 'event', 'reminder'))`,
     ],
   },
+  {
+    version: 25,
+    statements: [
+      `alter table dispatches drop constraint if exists dispatches_mode_check`,
+      `alter table dispatches add constraint dispatches_mode_check
+        check (mode in ('scheduled', 'manual_random', 'manual_selected', 'manual_force'))`,
+    ],
+  },
 ] as const;
 
 export function db() {

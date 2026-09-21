@@ -68,6 +68,11 @@ async function scenario(options, webhook, responseOk = true, claimed = true, sav
   const duplicate = await scenario({ destination: 'live' }, null, true, false);
   assert.ok(duplicate.result.error);
   assert.equal(duplicate.queries.some(x => x.query.includes('insert into dispatches')), false);
+  const forced = await scenario({ destination: 'live', force: true }, null, true, true);
+  assert.equal(forced.result.success, true);
+  const forceClaim = forced.queries.find(x => x.query.includes("update questions set status = 'sent'"));
+  assert.ok(forceClaim);
+  assert.equal(forceClaim.query.includes('and updated_at ='), false);
   const missing = await scenario({}, null);
   assert.ok(missing.result.error);
   console.log('Send-option checks passed: live-only, no-ping, normal, reminders, failed, duplicate, missing webhook, mention cleanup.');
