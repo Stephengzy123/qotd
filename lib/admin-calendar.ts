@@ -3,11 +3,11 @@ import "server-only";
 import { dbReady } from "@/lib/db";
 import { getCalendarEvents } from "@/lib/calendar";
 import type { LunchMenuItem } from "@/lib/lunch-menu";
-import { addDays } from "@/lib/qotd";
 
 export type AdminCalendarEvent = {
   id: string;
   date: string;
+  endDate?: string;
   title: string;
   kind: "imported" | "announcement" | "manual" | "lunch";
   details?: string;
@@ -26,16 +26,6 @@ export type EventDateRow = {
 };
 
 export type ManualCalendarEvent = { id: string; date: string; endDate: string; title: string; details: string | null };
-
-function datesInRange(start: string, end: string) {
-  const dates: string[] = [];
-  let date = start;
-  while (date <= end && dates.length < 366) {
-    dates.push(date);
-    date = addDays(date, 1);
-  }
-  return dates;
-}
 
 export async function loadAdminCalendar(from: string, to: string) {
   const sql = await dbReady();
@@ -72,8 +62,8 @@ export async function loadAdminCalendar(from: string, to: string) {
   const imported = await getCalendarEvents(settingsRows[0]?.calendar_feed_url_encrypted, from, to).catch(() => []);
   const events: AdminCalendarEvent[] = [
     ...imported.map((event, index) => ({ id: `imported-${event.date}-${index}`, date: event.date, title: event.title, kind: "imported" as const, meta: "Imported calendar" })),
-    ...announcementRows.flatMap((event) => datesInRange(event.occurrence_date < from ? from : event.occurrence_date, (event.occurrence_end_date || event.occurrence_date) > to ? to : (event.occurrence_end_date || event.occurrence_date)).map((date) => ({ id: `announcement-${event.id}-${date}`, date, title: event.title, kind: "announcement" as const, details: event.details, meta: `${event.status === "sent" ? "Sent" : "Approved"} announcement · ${event.occurrence_end_date ? `${event.occurrence_date}–${event.occurrence_end_date} · ` : ""}publishes ${event.scheduled_date}` }))),
-    ...manualRows.flatMap((event) => datesInRange(event.event_date < from ? from : event.event_date, event.end_date > to ? to : event.end_date).map((date) => ({ id: `manual-${event.id}-${date}`, date, title: event.title, kind: "manual" as const, details: event.details || undefined, meta: `Calendar-only event${event.end_date !== event.event_date ? ` · ${event.event_date}–${event.end_date}` : ""}` }))),
+    ...announcementRows.map((event) => ({ id: `announcement-${event.id}`, date: event.occurrence_date, endDate: event.occurrence_end_date || undefined, title: event.title, kind: "announcement" as const, details: event.details, meta: `${event.status === "sent" ? "Sent" : "Approved"} announcement · ${event.occurrence_end_date ? `${event.occurrence_date}–${event.occurrence_end_date} · ` : ""}publishes ${event.scheduled_date}` })),
+    ...manualRows.map((event) => ({ id: `manual-${event.id}`, date: event.event_date, endDate: event.end_date !== event.event_date ? event.end_date : undefined, title: event.title, kind: "manual" as const, details: event.details || undefined, meta: `Calendar-only event${event.end_date !== event.event_date ? ` · ${event.event_date}–${event.end_date}` : ""}` })),
     ...lunchRows.map((menu) => ({ id: `lunch-${menu.menu_date}`, date: menu.menu_date, title: "Senior School Lunch", kind: "lunch" as const, items: menu.items, meta: `Menu fetched ${new Date(menu.fetched_at).toISOString()}` })),
   ];
   const editableEvents: EventDateRow[] = eventDateRows.map((event) => ({
