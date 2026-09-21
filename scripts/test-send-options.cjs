@@ -19,6 +19,7 @@ async function scenario(options, webhook, responseOk = true, claimed = true, sav
   const queries = [], requests = [];
   const sql = async (parts, ...values) => {
     const query = parts.join('?'); queries.push({ query, values });
+    if (query.includes('pg_try_advisory_xact_lock')) return [{ locked: true }];
     if (query.includes('select id, question')) return [{ id: 'item', question: 'Hello <@123> @everyone', scheduled_date: '2026-09-20', question_type: 'announcement', ...saved }];
     if (query.includes('from settings')) return [{ webhook_url_encrypted: webhook, mention_role_id: webhook ? '123456789012345' : null, message_template: '# News\n{announcement}\n-# {mention-role}' }];
     if (query.includes("update questions set status = 'sent'")) return claimed ? [{ id: 'item' }] : [];

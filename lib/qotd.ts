@@ -177,6 +177,12 @@ export async function sendAnnouncement(announcementId: string, mode: Mode, local
   const message = stripPings ? removePings(formatted) : formatted;
   if (!message.trim()) return { error: "The message is empty after removing pings." } as const;
   const claimed = await sql.begin(async (tx) => {
+    if (mode === "scheduled") {
+      const lock = await tx<{ locked: boolean }[]>`
+        select pg_try_advisory_xact_lock(hashtextextended(${announcement.id}, 716834642)) as locked
+      `;
+      if (!lock[0]?.locked) return { skipped: true } as const;
+    }
     const claim = options.force
       ? await tx`
           update questions set status = 'sent', updated_at = now()
@@ -198,6 +204,7 @@ export async function sendAnnouncement(announcementId: string, mode: Mode, local
     return { dispatchId: rows[0].id as string } as const;
   });
 
+  if ("skipped" in claimed) return claimed;
   if ("error" in claimed) {
     await logEvent({ ...logBase, success: false, details: { announcementId, mode, localDate, reason: claimed.error } });
     return claimed;

@@ -27,6 +27,7 @@ export async function sendDueAnnouncements(now = new Date(), trigger: "cron" | "
     let sent = 0;
     for (const announcement of due) {
       const result = await sendAnnouncement(announcement.id, "scheduled", localDate);
+      if ("skipped" in result) continue;
       if ("error" in result) failures.push(result.error || "Scheduled delivery failed.");
       else { sent += 1; scheduleLivePush(result.dispatchId); if ("warning" in result && result.warning) failures.push(result.warning); }
     }
