@@ -256,7 +256,7 @@ export async function sendQuestionAction(formData: FormData) {
   const delivery = await persistDeliverySettings(id, formData);
   if ("error" in delivery) await fail("/admin/approved", session, "send_announcement", delivery.error || "Save failed.", { id });
   const result = await sendAnnouncement(id, "manual_selected", undefined, session.username);
-  if (!("error" in result)) scheduleLivePush(result.dispatchId);
+  if (result.dispatchId) scheduleLivePush(result.dispatchId);
   await logEvent({ action: "send_announcement", actor: session.username, role: session.role, success: !("error" in result), details: { id, mode: "manual_selected", error: "error" in result ? result.error : undefined } });
   revalidatePath("/admin", "layout");
   revalidatePath("/live");
@@ -269,7 +269,7 @@ export async function forceSendQuestionAction(formData: FormData) {
   const id = String(formData.get("id") || "");
   if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin/approved", session, "force_send_announcement", "Select an announcement to send.", { id });
   const result = await sendAnnouncement(id, "manual_force", undefined, session.username, { force: true });
-  if (!("error" in result)) scheduleLivePush(result.dispatchId);
+  if (result.dispatchId) scheduleLivePush(result.dispatchId);
   await logEvent({ action: "force_send_announcement", actor: session.username, role: session.role, success: !("error" in result), details: { id, mode: "manual_force", error: "error" in result ? result.error : undefined } });
   revalidatePath("/admin", "layout");
   revalidatePath("/live");
