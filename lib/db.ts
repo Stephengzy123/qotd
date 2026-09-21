@@ -384,6 +384,28 @@ const migrations = [
       `create index if not exists dispatches_reply_to_idx on dispatches(reply_to_dispatch_id) where reply_to_dispatch_id is not null`,
     ],
   },
+  {
+    version: 22,
+    statements: [
+      `alter table questions add column if not exists event_occurrence_date date`,
+      `create index if not exists questions_event_occurrence_idx
+        on questions(event_occurrence_date) where question_type = 'event' and status in ('approved', 'sent')`,
+      `create table if not exists lunch_menus (
+        menu_date date primary key,
+        items jsonb not null check (jsonb_typeof(items) = 'array'),
+        source_url text not null,
+        content_hash text not null,
+        fetched_at timestamptz not null default now()
+      )`,
+      `create table if not exists lunch_menu_sync_state (
+        singleton boolean primary key default true check (singleton),
+        last_attempt_at timestamptz,
+        last_success_at timestamptz,
+        last_error text
+      )`,
+      `insert into lunch_menu_sync_state (singleton) values (true) on conflict (singleton) do nothing`,
+    ],
+  },
 ] as const;
 
 export function db() {

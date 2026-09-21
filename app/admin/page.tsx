@@ -24,6 +24,7 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
   const quickProfile = await getWebhookDetails(settings.webhook_url_encrypted);
 
   const cards = [
+    { href: "/admin/calendar", title: "Calendar", count: null, text: "Lunch menus, imported dates, and announcement events in one place.", tone: "ready", label: "Admin preview" },
     { href: "/admin/pending", title: "Pending", count: counts.pending, text: "Contributor submissions waiting for a decision.", tone: counts.pending ? "pending" : "ready", label: counts.pending ? "Needs review" : "Clear" },
     { href: "/admin/approved", title: "Approved", count: counts.approved, text: "Scheduled announcements and events, plus manual sends.", tone: "ready", label: "Scheduled" },
     { href: "/admin/sends", title: "Sends", count: counts.sentWeek, text: "Every Discord and /live delivery, with the exact message.", tone: counts.failedWeek ? "pending" : "ready", label: counts.failedWeek ? `${counts.failedWeek} failed this week` : "Last 7 days" },

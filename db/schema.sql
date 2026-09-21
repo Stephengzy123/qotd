@@ -179,12 +179,28 @@ alter table questions add column if not exists delivery_destination text not nul
 alter table questions add column if not exists remove_pings boolean not null default false;
 alter table questions add column if not exists send_schedule_mode text not null default 'auto' check (send_schedule_mode in ('auto', 'disabled', 'exact'));
 alter table questions add column if not exists send_at timestamptz;
+alter table questions add column if not exists event_occurrence_date date;
 alter table questions drop constraint if exists questions_exact_send_at_check;
 alter table questions add constraint questions_exact_send_at_check check (send_schedule_mode <> 'exact' or send_at is not null);
 create index if not exists questions_due_exact_idx on questions(send_at, created_at) where status = 'approved' and send_schedule_mode = 'exact';
 alter table club_posts add column if not exists destination_name text;
 alter table dispatches add column if not exists reply_to_dispatch_id uuid references dispatches(id) on delete set null;
 create index if not exists dispatches_reply_to_idx on dispatches(reply_to_dispatch_id) where reply_to_dispatch_id is not null;
+create index if not exists questions_event_occurrence_idx on questions(event_occurrence_date) where question_type = 'event' and status in ('approved', 'sent');
+create table if not exists lunch_menus (
+  menu_date date primary key,
+  items jsonb not null check (jsonb_typeof(items) = 'array'),
+  source_url text not null,
+  content_hash text not null,
+  fetched_at timestamptz not null default now()
+);
+create table if not exists lunch_menu_sync_state (
+  singleton boolean primary key default true check (singleton),
+  last_attempt_at timestamptz,
+  last_success_at timestamptz,
+  last_error text
+);
+insert into lunch_menu_sync_state (singleton) values (true) on conflict (singleton) do nothing;
 create table if not exists club_send_requests (
   id uuid primary key, account_id uuid references accounts(id) on delete set null,
   created_at timestamptz not null default now()
