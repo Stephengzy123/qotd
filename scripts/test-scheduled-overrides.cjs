@@ -34,5 +34,6 @@ function load(file, deps) {
   assert.equal(result.sent, 1);
   assert.match(queries[0].query, /send_schedule_mode = 'exact' and send_at <=/);
   assert.match(queries[0].query, /send_schedule_mode = 'auto'/);
-  console.log("Scheduled override checks passed: exact sends work outside the default hour and still use the atomic dispatcher.");
+  assert.match(queries[0].query, /question_type in \('event', 'reminder'\)/);
+  console.log("Scheduled override checks passed: exact sends work outside the default hour, reminders share event timing, and delivery stays atomic.");
 })().catch(error => { console.error(error); process.exitCode = 1; });

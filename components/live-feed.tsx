@@ -25,7 +25,7 @@ function dayOf(value: string) {
 function clock(value: string) {
   return new Date(value).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
-const FILTERS = [{ value: "all", label: "Everything" }, { value: "announcement", label: "Daily" }, { value: "event", label: "Events" }, { value: "human", label: "Human posts" }];
+const FILTERS = [{ value: "all", label: "Everything" }, { value: "announcement", label: "Daily" }, { value: "event", label: "Events" }, { value: "reminder", label: "Reminders" }, { value: "human", label: "Human posts" }];
 const THEMES = [{ value: "system", label: "Auto" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }];
 function timestamp(value: string) {
   const date = new Date(value), today = new Date(), yesterday = new Date();
@@ -192,7 +192,7 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
             {message.replyTo && <button type="button" className="live-reply-preview" disabled={message.replyTo.unavailable} onClick={() => void revealMessage(message.replyTo!.id)} aria-label={message.replyTo.unavailable ? "Original announcement unavailable" : `View announcement from ${message.replyTo.senderName || botName}`}>
               <span aria-hidden="true">↪</span><strong>{message.replyTo.senderName || botName}</strong><span>{message.replyTo.message ? replyExcerpt(message.replyTo.message) : "Original announcement unavailable"}</span>
             </button>}
-            <div className="live-message-meta"><strong>{message.senderName || botName}</strong>{message.human ? <span className="live-human">HUMAN</span> : <span className="live-bot">BOT</span>}{message.type && <span className={`live-type live-type-${message.type}`}>{message.type === "event" ? "Event" : "Daily"}</span>}<time dateTime={message.sentAt} title={timestamp(message.sentAt)}>{clock(message.sentAt)}</time>
+            <div className="live-message-meta"><strong>{message.senderName || botName}</strong>{message.human ? <span className="live-human">HUMAN</span> : <span className="live-bot">BOT</span>}{message.type && <span className={`live-type live-type-${message.type}`}>{message.type === "event" ? "Event" : message.type === "reminder" ? "Reminder" : "Daily"}</span>}<time dateTime={message.sentAt} title={timestamp(message.sentAt)}>{clock(message.sentAt)}</time>
               {isAdmin && !message.hidden && <button type="button" className="live-message-action" onClick={() => {
                 setReplyingTo({ id: message.id, message: message.message, senderName: message.senderName || botName });
                 window.requestAnimationFrame(() => document.getElementById("quick-message")?.focus());

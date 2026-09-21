@@ -17,6 +17,10 @@ function monthLabel(value: string) {
   return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${value}-01T12:00:00Z`));
 }
 
+function dayLabel(value: string) {
+  return new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${value}T12:00:00Z`));
+}
+
 export function LiveCalendar({ events, today }: { events: CalendarEvent[]; today: string }) {
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(today.slice(0, 7));
@@ -38,6 +42,7 @@ export function LiveCalendar({ events, today }: { events: CalendarEvent[]; today
       return { value: date.toISOString().slice(0, 10), day: date.getUTCDate(), current: date.getUTCMonth() === monthNumber - 1 };
     });
   }, [month]);
+  const mobileDays = useMemo(() => cells.filter((cell) => cell.current && (byDate.get(cell.value)?.length || cell.value === today)), [byDate, cells, today]);
 
   useEffect(() => {
     if (!open) return;
@@ -74,6 +79,15 @@ export function LiveCalendar({ events, today }: { events: CalendarEvent[]; today
               return <div key={cell.value} className={`live-calendar-day${cell.current ? "" : " outside"}${cell.value === today ? " today" : ""}`}><time dateTime={cell.value}>{cell.day}</time>{titles.map((title, index) => <span key={`${title}-${index}`} title={title}>{title}</span>)}</div>;
             })}</div>
           </div>
+        </div>
+        <div className="live-calendar-agenda">
+          {mobileDays.length ? mobileDays.map((cell) => {
+            const titles = byDate.get(cell.value) || [];
+            return <details key={cell.value} className={cell.value === today ? "today" : undefined}>
+              <summary><span>{dayLabel(cell.value)}</span><small>{titles.length ? `${titles.length} item${titles.length === 1 ? "" : "s"}` : "Today"}</small></summary>
+              <div>{titles.length ? titles.map((title, index) => <p key={`${title}-${index}`}>{title}</p>) : <p>No calendar items today.</p>}</div>
+            </details>;
+          }) : <p className="live-calendar-empty">No events this month.</p>}
         </div>
         {!events.length && <p className="live-calendar-empty">No imported events are available for these months.</p>}
       </section>

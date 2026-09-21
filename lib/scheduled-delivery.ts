@@ -17,7 +17,7 @@ export async function sendDueAnnouncements(now = new Date(), trigger: "cron" | "
       (send_schedule_mode = 'exact' and send_at <= ${now}) or
       (${normalWindow} and send_schedule_mode = 'auto' and (
         (question_type = 'announcement' and scheduled_date - (days_early + 1) <= ${localDate}) or
-        (question_type = 'event' and scheduled_date <= ${localDate})
+        (question_type in ('event', 'reminder') and scheduled_date <= ${localDate})
       ))
     )
     order by case when send_schedule_mode = 'exact' then send_at else scheduled_date::timestamptz end asc, created_at asc

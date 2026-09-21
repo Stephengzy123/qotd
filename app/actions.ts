@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 import { clearSession, createSession, getSession, homePath, requireRole, verifyCredentials } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
 import { encryptSecret, hashAddress, validateDiscordWebhook } from "@/lib/security";
-import { isValidAnnouncementDate, isValidFuturePacificDate, normalizeDiscordTemplate, sendAnnouncement, sendPendingNotification, validateAnnouncementTemplate, type AnnouncementType } from "@/lib/qotd";
+import { isValidAnnouncementDate, isValidFuturePacificDate, normalizeDiscordTemplate, parseAnnouncementType, sendAnnouncement, sendPendingNotification, validateAnnouncementTemplate, type AnnouncementType } from "@/lib/qotd";
 import { fetchCalendarByUrl, normalizeCalendarFeedUrl } from "@/lib/calendar";
 import { createAccount, createSetupLink, deleteAccount, getAccount, parseRole, ROLE_LABELS, updateAccountRole } from "@/lib/accounts";
 import { createClub, setMembership, type ClubRole } from "@/lib/clubs";
@@ -82,20 +82,20 @@ export async function submitQuestionAction(formData: FormData) {
   if (formData.get("checkedAnnouncements") !== "yes") {
     await fail("/contribute", session, action, "Check the scheduled and recently sent announcements, then confirm that your submission is not repetitive.");
   }
-  const type: AnnouncementType = formData.get("type") === "event" ? "event" : "announcement";
+  const type = parseAnnouncementType(formData.get("type"));
   const announcement = String(formData.get("announcement") || "").trim();
   const eventTitle = String(formData.get("eventTitle") || "").trim();
   const scheduledDate = String(formData.get("scheduledDate") || "");
   const occurrenceDate = eventOccurrenceValue(formData, type);
   const occurrenceEndDate = eventOccurrenceEndValue(formData, type);
   const note = String(formData.get("note") || "").trim();
-  const details = { type, scheduledDate, occurrenceDate, occurrenceEndDate, eventTitle: type === "event" ? eventTitle : undefined, length: announcement.length };
+  const details = { type, scheduledDate, occurrenceDate, occurrenceEndDate, eventTitle: type !== "announcement" ? eventTitle : undefined, length: announcement.length };
   if (announcement.length < 8 || announcement.length > 1500) {
     await fail("/contribute", session, action, "Announcements must be between 8 and 1,500 characters.", details);
   }
   if (type === "announcement" && !isValidAnnouncementDate(scheduledDate)) await fail("/contribute", session, action, "Choose an announcement date whose previous-day 6 PM publishing window has not passed.", details);
-  if (type === "event" && !isValidFuturePacificDate(scheduledDate)) await fail("/contribute", session, action, "Choose a valid future event publish date.", details);
-  if (type === "event" && (eventTitle.length < 1 || eventTitle.length > 200)) await fail("/contribute", session, action, "Event titles must be between 1 and 200 characters.", details);
+  if (type !== "announcement" && !isValidFuturePacificDate(scheduledDate)) await fail("/contribute", session, action, "Choose a valid future publish date.", details);
+  if (type !== "announcement" && (eventTitle.length < 1 || eventTitle.length > 200)) await fail("/contribute", session, action, "Event and reminder titles must be between 1 and 200 characters.", details);
   if (type === "event" && (!occurrenceDate || !isValidFuturePacificDate(occurrenceDate) || occurrenceDate < scheduledDate)) await fail("/contribute", session, action, "Choose an event occurrence date on or after its publish date.", details);
   if (type === "event" && invalidOccurrenceRange(occurrenceDate, occurrenceEndDate)) await fail("/contribute", session, action, "Choose an end date on or after the event start date, or leave it blank for a single-day event.", details);
   if (note.length > 500) await fail("/contribute", session, action, "Notes must be 500 characters or fewer.", details);
@@ -106,9 +106,9 @@ export async function submitQuestionAction(formData: FormData) {
     where submitter_ip_hash = ${ipHash} and created_at > now() - interval '1 hour'
   `)[0].count);
   if (recent >= 8) await fail("/contribute", session, action, "You’ve submitted several announcements recently. Please try again in a little while.", { ...details, recentSubmissions: recent });
-  const inserted = await sql<{ id: string }[]>`insert into questions (question, contributor_note, scheduled_date, question_type, event_title, event_occurrence_date, event_occurrence_end_date, submitter_ip_hash) values (${announcement}, ${note || null}, ${scheduledDate}, ${type}, ${type === "event" ? eventTitle : null}, ${occurrenceDate}, ${occurrenceEndDate}, ${ipHash}) returning id`;
+  const inserted = await sql<{ id: string }[]>`insert into questions (question, contributor_note, scheduled_date, question_type, event_title, event_occurrence_date, event_occurrence_end_date, submitter_ip_hash) values (${announcement}, ${note || null}, ${scheduledDate}, ${type}, ${type !== "announcement" ? eventTitle : null}, ${occurrenceDate}, ${occurrenceEndDate}, ${ipHash}) returning id`;
   await logEvent({ action, actor: session.username, role: session.role, details: { ...details, id: inserted[0]?.id, hasNote: Boolean(note) } });
-  await sendPendingNotification(announcement, scheduledDate, type, type === "event" ? eventTitle : null);
+  await sendPendingNotification(announcement, scheduledDate, type, type !== "announcement" ? eventTitle : null);
   revalidatePath("/admin", "layout");
   redirect(messageUrl("/contribute", "ok", "Your announcement is ready for review."));
 }
@@ -116,7 +116,7 @@ export async function submitQuestionAction(formData: FormData) {
 export async function reviewQuestionAction(formData: FormData) {
   const session = await requireRole("admin");
   const id = String(formData.get("id") || "");
-  const type: AnnouncementType = formData.get("type") === "event" ? "event" : "announcement";
+  const type = parseAnnouncementType(formData.get("type"));
   const announcement = String(formData.get("announcement") || "").trim();
   const eventTitle = String(formData.get("eventTitle") || "").trim();
   const scheduledDate = String(formData.get("scheduledDate") || "");
@@ -126,7 +126,7 @@ export async function reviewQuestionAction(formData: FormData) {
   const intent = String(formData.get("intent") || "save");
   const status = intent === "approve" ? "approved" : intent === "reject" ? "rejected" : "pending";
   const action = intent === "approve" ? "approve_announcement" : intent === "reject" ? "reject_announcement" : "edit_announcement";
-  const details = { id, type, scheduledDate, occurrenceDate, occurrenceEndDate, eventTitle: type === "event" ? eventTitle : undefined, daysEarly: requestedDaysEarly, length: announcement.length };
+  const details = { id, type, scheduledDate, occurrenceDate, occurrenceEndDate, eventTitle: type !== "announcement" ? eventTitle : undefined, daysEarly: requestedDaysEarly, length: announcement.length };
   if (!id || announcement.length < 8 || announcement.length > 1500) await fail("/admin/pending", session, action, "Check the announcement length and try again.", details);
   const sql = await dbReady();
   const delivery = status !== "rejected" ? await readDeliverySettings(formData).catch(error => fail("/admin/pending", session, action, error.message)) : null;
@@ -136,11 +136,11 @@ export async function reviewQuestionAction(formData: FormData) {
   } else {
     const daysEarly = type === "announcement" ? (requestedDaysEarly ?? await fail("/admin/pending", session, action, "Days early must be between 0 and 365.", details)) : 0;
     if (type === "announcement" && !isValidAnnouncementDate(scheduledDate, new Date(), daysEarly)) await fail("/admin/pending", session, action, "Choose an announcement date whose calculated 6 PM publishing window has not passed.", details);
-    if (type === "event" && !isValidFuturePacificDate(scheduledDate)) await fail("/admin/pending", session, action, "Choose a valid future event publish date.", details);
-    if (type === "event" && (eventTitle.length < 1 || eventTitle.length > 200)) await fail("/admin/pending", session, action, "Event titles must be between 1 and 200 characters.", details);
+    if (type !== "announcement" && !isValidFuturePacificDate(scheduledDate)) await fail("/admin/pending", session, action, "Choose a valid future publish date.", details);
+    if (type !== "announcement" && (eventTitle.length < 1 || eventTitle.length > 200)) await fail("/admin/pending", session, action, "Event and reminder titles must be between 1 and 200 characters.", details);
     if (type === "event" && (!occurrenceDate || !isValidFuturePacificDate(occurrenceDate) || occurrenceDate < scheduledDate)) await fail("/admin/pending", session, action, "Choose an event occurrence date on or after its publish date.", details);
     if (type === "event" && invalidOccurrenceRange(occurrenceDate, occurrenceEndDate)) await fail("/admin/pending", session, action, "Choose an end date on or after the event start date, or leave it blank for a single-day event.", details);
-    updated = await sql<{ id: string }[]>`update questions set question = ${announcement}, scheduled_date = ${scheduledDate}, question_type = ${type}, event_title = ${type === "event" ? eventTitle : null}, event_occurrence_date = ${occurrenceDate}, event_occurrence_end_date = ${occurrenceEndDate}, days_early = ${daysEarly}, delivery_destination = ${delivery!.destination}, remove_pings = ${delivery!.removePings}, discord_webhook_ids = ${delivery!.webhookIds}::text[], status = ${status}, updated_at = now() where id = ${id} and status <> 'sent' returning id`;
+    updated = await sql<{ id: string }[]>`update questions set question = ${announcement}, scheduled_date = ${scheduledDate}, question_type = ${type}, event_title = ${type !== "announcement" ? eventTitle : null}, event_occurrence_date = ${occurrenceDate}, event_occurrence_end_date = ${occurrenceEndDate}, days_early = ${daysEarly}, delivery_destination = ${delivery!.destination}, remove_pings = ${delivery!.removePings}, discord_webhook_ids = ${delivery!.webhookIds}::text[], status = ${status}, updated_at = now() where id = ${id} and status <> 'sent' returning id`;
   }
   await logEvent({ action, actor: session.username, role: session.role, success: updated.length > 0, details: { ...details, updated: updated.length > 0 } });
   revalidatePath("/admin", "layout");
@@ -149,7 +149,7 @@ export async function reviewQuestionAction(formData: FormData) {
 
 export async function addApprovedQuestionAction(formData: FormData) {
   const session = await requireRole("admin");
-  const type: AnnouncementType = formData.get("type") === "event" ? "event" : "announcement";
+  const type = parseAnnouncementType(formData.get("type"));
   const announcement = String(formData.get("announcement") || "").trim();
   const eventTitle = String(formData.get("eventTitle") || "").trim();
   const scheduledDate = String(formData.get("scheduledDate") || "");
@@ -158,20 +158,20 @@ export async function addApprovedQuestionAction(formData: FormData) {
   const requestedDaysEarly = daysEarlyValue(formData);
   const action = "add_approved_announcement";
   const delivery = await readDeliverySettings(formData).catch(error => fail("/admin/approved", session, action, error.message));
-  const details = { type, scheduledDate, occurrenceDate, occurrenceEndDate, eventTitle: type === "event" ? eventTitle : undefined, daysEarly: requestedDaysEarly, length: announcement.length };
+  const details = { type, scheduledDate, occurrenceDate, occurrenceEndDate, eventTitle: type !== "announcement" ? eventTitle : undefined, daysEarly: requestedDaysEarly, length: announcement.length };
   if (announcement.length < 8 || announcement.length > 1500) {
     await fail("/admin/approved", session, action, "Announcements must be between 8 and 1,500 characters.", details);
   }
   const daysEarly = type === "announcement" ? (requestedDaysEarly ?? await fail("/admin/approved", session, action, "Days early must be between 0 and 365.", details)) : 0;
   if (type === "announcement" && !isValidAnnouncementDate(scheduledDate, new Date(), daysEarly)) await fail("/admin/approved", session, action, "Choose an announcement date whose calculated 6 PM publishing window has not passed.", details);
-  if (type === "event" && !isValidFuturePacificDate(scheduledDate)) await fail("/admin/approved", session, action, "Choose a valid future event publish date.", details);
-  if (type === "event" && (eventTitle.length < 1 || eventTitle.length > 200)) await fail("/admin/approved", session, action, "Event titles must be between 1 and 200 characters.", details);
+  if (type !== "announcement" && !isValidFuturePacificDate(scheduledDate)) await fail("/admin/approved", session, action, "Choose a valid future publish date.", details);
+  if (type !== "announcement" && (eventTitle.length < 1 || eventTitle.length > 200)) await fail("/admin/approved", session, action, "Event and reminder titles must be between 1 and 200 characters.", details);
   if (type === "event" && (!occurrenceDate || !isValidFuturePacificDate(occurrenceDate) || occurrenceDate < scheduledDate)) await fail("/admin/approved", session, action, "Choose an event occurrence date on or after its publish date.", details);
   if (type === "event" && invalidOccurrenceRange(occurrenceDate, occurrenceEndDate)) await fail("/admin/approved", session, action, "Choose an end date on or after the event start date, or leave it blank for a single-day event.", details);
   const sql = await dbReady();
   const inserted = await sql<{ id: string }[]>`
     insert into questions (question, scheduled_date, question_type, event_title, event_occurrence_date, event_occurrence_end_date, days_early, status, submitter_ip_hash, delivery_destination, remove_pings, discord_webhook_ids)
-    values (${announcement}, ${scheduledDate}, ${type}, ${type === "event" ? eventTitle : null}, ${occurrenceDate}, ${occurrenceEndDate}, ${daysEarly}, 'approved', ${hashAddress(`admin:${session.username}`)}, ${delivery.destination}, ${delivery.removePings}, ${delivery.webhookIds}::text[])
+    values (${announcement}, ${scheduledDate}, ${type}, ${type !== "announcement" ? eventTitle : null}, ${occurrenceDate}, ${occurrenceEndDate}, ${daysEarly}, 'approved', ${hashAddress(`admin:${session.username}`)}, ${delivery.destination}, ${delivery.removePings}, ${delivery.webhookIds}::text[])
     returning id
   `;
   await logEvent({ action, actor: session.username, role: session.role, details: { ...details, id: inserted[0]?.id } });

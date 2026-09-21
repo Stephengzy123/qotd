@@ -5,26 +5,29 @@ import { AnnouncementPreview } from "@/components/announcement-preview";
 import { MarkdownEditor } from "@/components/markdown-editor";
 
 export function AnnouncementComposer({ announcementMinimumDate, eventMinimumDate, announcementTemplate, eventTemplate }: { announcementMinimumDate: string; eventMinimumDate: string; announcementTemplate: string; eventTemplate: string }) {
-  const [type, setType] = useState<"announcement" | "event">("announcement");
+  const [type, setType] = useState<"announcement" | "event" | "reminder">("announcement");
   const [announcement, setAnnouncement] = useState("");
   const [eventTitle, setEventTitle] = useState("");
   const [scheduledDate, setScheduledDate] = useState(announcementMinimumDate);
   const [occurrenceDate, setOccurrenceDate] = useState(eventMinimumDate);
   const [occurrenceEndDate, setOccurrenceEndDate] = useState("");
-  const minimumDate = type === "event" ? eventMinimumDate : announcementMinimumDate;
+  const minimumDate = type === "announcement" ? announcementMinimumDate : eventMinimumDate;
+  const titled = type !== "announcement";
 
   return (
     <>
       <div>
         <label htmlFor="type">Type</label>
-        <select id="type" name="type" value={type} onChange={(event) => { const nextType = event.target.value === "event" ? "event" : "announcement"; const nextMinimum = nextType === "event" ? eventMinimumDate : announcementMinimumDate; setType(nextType); if (scheduledDate < nextMinimum) setScheduledDate(nextMinimum); if (occurrenceDate < nextMinimum) setOccurrenceDate(nextMinimum); }}>
+        <select id="type" name="type" value={type} onChange={(event) => { const nextType = event.target.value === "event" ? "event" : event.target.value === "reminder" ? "reminder" : "announcement"; const nextMinimum = nextType === "announcement" ? announcementMinimumDate : eventMinimumDate; setType(nextType); if (scheduledDate < nextMinimum) setScheduledDate(nextMinimum); if (nextType === "event" && occurrenceDate < nextMinimum) setOccurrenceDate(nextMinimum); }}>
           <option value="announcement">Announcement</option>
           <option value="event">Event</option>
+          <option value="reminder">Reminder</option>
         </select>
       </div>
-      {type === "event" && <div>
-        <label htmlFor="eventTitle">Event title</label>
+      {titled && <div>
+        <label htmlFor="eventTitle">{type === "event" ? "Event" : "Reminder"} title</label>
         <input id="eventTitle" name="eventTitle" maxLength={200} required value={eventTitle} onChange={(event) => setEventTitle(event.target.value)} />
+        {type === "reminder" ? <p className="hint">Reminders use the event-style message format but never create a calendar entry.</p> : null}
       </div>}
       {type === "event" && <div>
         <label htmlFor="occurrenceDate">Event start date</label>
@@ -37,10 +40,10 @@ export function AnnouncementComposer({ announcementMinimumDate, eventMinimumDate
         <p className="hint">Leave blank for a single-day event. Set an end date only for a multi-day event.</p>
       </div>}
       <div>
-        <label htmlFor="scheduledDate">{type === "event" ? "Event publish date" : "Announcement date"}</label>
+        <label htmlFor="scheduledDate">{titled ? `${type === "event" ? "Event" : "Reminder"} publish date` : "Announcement date"}</label>
         <input id="scheduledDate" name="scheduledDate" type="date" min={minimumDate} required value={scheduledDate} onChange={(event) => { const value = event.target.value; setScheduledDate(value); if (type === "event" && occurrenceDate < value) { setOccurrenceDate(value); if (occurrenceEndDate && occurrenceEndDate < value) setOccurrenceEndDate(value); } }} />
-        <p className="hint">{type === "event"
-          ? "This is when the event announcement will be published during the 6 PM Pacific hour. It does not need to be the date of the event."
+        <p className="hint">{titled
+          ? `This is when the ${type} will be published during the 6 PM Pacific hour.${type === "event" ? " It does not need to be the date of the event." : " It will not be added to the calendar."}`
           : "This is the date the announcement is for. It will be published the previous day during the 6 PM Pacific hour."}</p>
       </div>
       <div className="template-grid">

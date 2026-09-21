@@ -2,7 +2,7 @@ import "server-only";
 import { dbReady } from "@/lib/db";
 import { addDays, DEFAULT_ANNOUNCEMENT_TEMPLATE, DEFAULT_EVENT_TEMPLATE, pacificParts, type SendScheduleMode } from "@/lib/qotd";
 
-export type Announcement = { delivery_destination: "discord" | "live"; remove_pings: boolean; discord_webhook_ids: string[] | null; send_schedule_mode: SendScheduleMode; send_at: Date | string | null; id: string; question: string; contributor_note: string | null; status: string; created_at: Date; scheduled_date: string | Date | null; question_type: "announcement" | "event"; event_title: string | null; event_occurrence_date: string | Date | null; event_occurrence_end_date: string | Date | null; days_early: number };
+export type Announcement = { delivery_destination: "discord" | "live"; remove_pings: boolean; discord_webhook_ids: string[] | null; send_schedule_mode: SendScheduleMode; send_at: Date | string | null; id: string; question: string; contributor_note: string | null; status: string; created_at: Date; scheduled_date: string | Date | null; question_type: "announcement" | "event" | "reminder"; event_title: string | null; event_occurrence_date: string | Date | null; event_occurrence_end_date: string | Date | null; days_early: number };
 
 export function relativeDate(date: Date) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" }).format(date);

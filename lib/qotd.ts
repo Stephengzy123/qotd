@@ -8,7 +8,11 @@ import { calendarHeading, getCalendarByDate } from "@/lib/calendar";
 export const DEFAULT_ANNOUNCEMENT_TEMPLATE = "# <:sgs:1372767087612657724> Announcements for {date}\n{calendar}\n\n{announcement}\n\n-# {mention-role}";
 export const DEFAULT_EVENT_TEMPLATE = "# <:sgs:1372767087612657724> Announcement for {title}\n\n{announcement}\n\n-# {mention-role}";
 const COMMON_TEMPLATE_TOKENS = ["{date}", "{announcement}", "{mention-role}"];
-export type AnnouncementType = "announcement" | "event";
+export type AnnouncementType = "announcement" | "event" | "reminder";
+
+export function parseAnnouncementType(value: FormDataEntryValue | null): AnnouncementType {
+  return value === "event" || value === "reminder" ? value : "announcement";
+}
 
 export function normalizeDiscordTemplate(template: string) {
   return template.split("\n").map((line) => {
@@ -107,9 +111,9 @@ export function displayScheduledDate(value: unknown) {
 
 export function validateAnnouncementTemplate(template: string, type: AnnouncementType) {
   if (!template.includes("{announcement}")) return "The format must include {announcement}.";
-  if (type === "event" && !template.includes("{title}")) return "The event format must include {title}.";
+  if (type !== "announcement" && !template.includes("{title}")) return "The event and reminder format must include {title}.";
   if (template.length > 500) return "Keep the format under 500 characters.";
-  const allowedTokens = type === "event" ? [...COMMON_TEMPLATE_TOKENS, "{title}"] : [...COMMON_TEMPLATE_TOKENS, "{calendar}"];
+  const allowedTokens = type !== "announcement" ? [...COMMON_TEMPLATE_TOKENS, "{title}"] : [...COMMON_TEMPLATE_TOKENS, "{calendar}"];
   const unknown = template.match(/\{[^{}]+\}/g)?.filter((token) => !allowedTokens.includes(token));
   return unknown?.length ? `Unknown element: ${unknown[0]}` : null;
 }
@@ -156,8 +160,8 @@ export async function sendAnnouncement(announcementId: string, mode: Mode, local
   if (destination === "discord" && !stripPings && !settings.mention_role_id) return { error: "Set a Discord role ID before sending." } as const;
   const scheduledDate = scheduledDateValue(announcement.scheduled_date);
   if (!scheduledDate) return { error: "This announcement has an invalid posting date. Unapprove it and choose the date again." } as const;
-  const type = announcement.question_type === "event" ? "event" : "announcement";
-  const template = type === "event"
+  const type: AnnouncementType = announcement.question_type === "event" ? "event" : announcement.question_type === "reminder" ? "reminder" : "announcement";
+  const template = type !== "announcement"
     ? (settings.event_message_template as string) || DEFAULT_EVENT_TEMPLATE
     : (settings.message_template as string) || DEFAULT_ANNOUNCEMENT_TEMPLATE;
   let calendar = "";
@@ -236,7 +240,7 @@ export async function sendPendingNotification(announcement: string, scheduledDat
       // Use the known production URL when Vercel's value is unavailable or malformed.
     }
   }
-  const subject = type === "event" ? `event “${title}” with a publish date of` : "announcement for";
+  const subject = type === "event" ? `event “${title}” with a publish date of` : type === "reminder" ? `reminder “${title}” with a publish date of` : "announcement for";
   const content = `<@${userId}> New ${subject} ${displayScheduledDate(scheduledDate)} is awaiting review:\n${excerpt}\n[Review it here](${reviewUrl})`;
   try {
     await fetch(decryptSecret(settings.notification_webhook_url_encrypted as string), {

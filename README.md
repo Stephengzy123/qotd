@@ -61,7 +61,11 @@ The admin-only **Calendar** page combines the configured iCalendar feed, event-a
 
 Event announcements have separate publish and occurrence dates. An optional end date supports multi-day events; leaving it blank creates a single-day event. Approved and sent events with an occurrence date appear on the admin calendar. The Calendar page also provides a guided **Complete missing dates** flow for stepping through older sent events, remembers skipped events for the rest of that pass, and includes a list for correcting individual dates.
 
+**Reminders** use the same titled message format and publish-date scheduling as events, but never create calendar entries or appear in missing-date backfill. Admins can permanently reclassify an older approved or sent event as a reminder from the Calendar backfill flow. Sent reminders have their own category on `/live`.
+
 Admins can also add calendar-only events when an item does not need its own announcement. Calendar-only events support the same optional end date and can be removed from the Calendar page. These app-owned calendar entries are not shown on the public `/live` calendar yet.
+
+On small screens, the `/live` calendar switches from the full month grid to a compact agenda. Each date expands on tap to reveal its items. Calendar items use neutral high-contrast surfaces in dark mode rather than blue text on a blue background.
 
 Configure both encrypted webhooks and the Discord IDs from the admin page. The notification webhook is optional and pings the configured user whenever a contributor submission enters Pending.
 

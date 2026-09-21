@@ -20,11 +20,11 @@ export default async function PendingPage({ searchParams }: { searchParams: Prom
   return <AdminShell page="pending" username={session.username} title="Pending" description="Contributor submissions waiting for review. Edit anything, then approve, save, or reject." notice={params} actions={<span className="count-badge large">{pending.length} waiting</span>}>
     <section className="section-block">
       {pending.length ? <div className="question-list">{pending.map((item) => <article className="question-card" key={item.id}>
-        <div className="question-meta"><span>{item.event_title || (item.question_type === "event" ? "Event" : "Announcement")}</span><span>{relativeDate(item.created_at)}</span></div>
+        <div className="question-meta"><span>{item.event_title || (item.question_type === "event" ? "Event" : item.question_type === "reminder" ? "Reminder" : "Announcement")}</span><span>{relativeDate(item.created_at)}</span></div>
         <p className="announcement-excerpt">{item.question}</p>
         <ComposerDialog buttonLabel="Review" title="Review submission" className="secondary"><form action={reviewQuestionAction} className="composer-form">
           <input type="hidden" name="id" value={item.id} />
-          <div className="question-meta"><span>Submitted {relativeDate(item.created_at)}</span><span className="status pending">{item.question_type === "event" ? "Event" : "Announcement"}</span></div>
+          <div className="question-meta"><span>Submitted {relativeDate(item.created_at)}</span><span className="status pending">{item.question_type === "event" ? "Event" : item.question_type === "reminder" ? "Reminder" : "Announcement"}</span></div>
           <AdminEntryFields idPrefix={item.id} announcementMinimumDate={announcementMinimumDate} eventMinimumDate={eventMinimumDate} initialType={item.question_type} initialTitle={item.event_title || ""} initialDate={scheduledDateValue(item.scheduled_date) || ""} initialOccurrenceDate={scheduledDateValue(item.event_occurrence_date) || ""} initialOccurrenceEndDate={scheduledDateValue(item.event_occurrence_end_date) || ""} initialAnnouncement={item.question} initialDaysEarly={Number(item.days_early) || 0} announcementTemplate={templates.announcementTemplate} eventTemplate={templates.eventTemplate} />
           <DeliverySettingsFields destinations={destinations} initialDestination={item.delivery_destination} initialRemovePings={item.remove_pings} selected={item.discord_webhook_ids ?? undefined} />
           {item.contributor_note && <p className="review-note"><strong>Note:</strong> {item.contributor_note}</p>}

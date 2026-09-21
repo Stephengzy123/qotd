@@ -5,7 +5,7 @@ import { requireRole } from "@/lib/auth";
 import { loadAdminCalendar } from "@/lib/admin-calendar";
 import { lunchSyncStatus } from "@/lib/lunch-menu";
 import { displayScheduledDate, pacificParts } from "@/lib/qotd";
-import { createCalendarEventAction, deleteCalendarEventAction, refreshLunchMenusAction, updateEventOccurrenceDateAction } from "@/app/admin/calendar/actions";
+import { createCalendarEventAction, deleteCalendarEventAction, markEventAsReminderAction, refreshLunchMenusAction, updateEventOccurrenceDateAction } from "@/app/admin/calendar/actions";
 
 function schoolYearRange(today: string) {
   const year = Number(today.slice(0, 4));
@@ -66,7 +66,7 @@ export default async function AdminCalendarPage({ searchParams }: { searchParams
         <div><strong>{event.title}</strong><span>{event.status === "sent" ? "Sent" : "Approved"} · published {event.publishDate}</span></div>
         <label><span>Start date</span><input name="occurrenceDate" type="date" defaultValue={event.occurrenceDate || ""} required /></label>
         <label><span>End date <span className="hint">(optional)</span></span><input name="occurrenceEndDate" type="date" min={event.occurrenceDate || undefined} defaultValue={event.occurrenceEndDate || ""} /><small className="hint">Leave blank for one day.</small></label>
-        <PendingButton className="secondary" pendingText="Saving…">Save dates</PendingButton>
+        <div className="event-date-actions"><PendingButton className="secondary" pendingText="Saving…">Save dates</PendingButton><PendingButton formAction={markEventAsReminderAction} formNoValidate className="text-button" pendingText="Moving…" confirmMessage="Move this event to Reminders? It will be permanently removed from calendar date backfill.">Make reminder</PendingButton></div>
       </form>)}</div> : <div className="empty-state compact">No event announcements are available yet.</div>}
     </section>
 
@@ -89,7 +89,7 @@ export default async function AdminCalendarPage({ searchParams }: { searchParams
           <input type="hidden" name="id" value={backfillEvent.id} /><input type="hidden" name="continueBackfill" value="yes" /><input type="hidden" name="skippedEvents" value={skippedIds.join(",")} />
           <label htmlFor="backfill-occurrence-date">Event start date</label><input id="backfill-occurrence-date" name="occurrenceDate" type="date" required autoFocus />
           <label htmlFor="backfill-occurrence-end-date">Event end date <span className="hint">(optional)</span></label><input id="backfill-occurrence-end-date" name="occurrenceEndDate" type="date" /><p className="hint">Leave blank for a single-day event. Set an end date only for a multi-day event.</p>
-          <div className="event-backfill-actions"><a className="text-button" href={nextBackfillEvent ? `/admin/calendar?backfill=1&event=${nextBackfillEvent.id}&skipped=${encodeURIComponent(skipQuery)}` : `/admin/calendar?backfill=1&skipped=${encodeURIComponent(skipQuery)}`}>Skip for now</a><PendingButton className="primary" pendingText="Saving…">Save and continue</PendingButton></div>
+          <div className="event-backfill-actions"><a className="text-button" href={nextBackfillEvent ? `/admin/calendar?backfill=1&event=${nextBackfillEvent.id}&skipped=${encodeURIComponent(skipQuery)}` : `/admin/calendar?backfill=1&skipped=${encodeURIComponent(skipQuery)}`}>Skip for now</a><div className="row-buttons"><PendingButton formAction={markEventAsReminderAction} formNoValidate className="secondary" pendingText="Moving…" confirmMessage="Move this event to Reminders? It will be permanently removed from calendar date backfill.">Make reminder</PendingButton><PendingButton className="primary" pendingText="Saving…">Save and continue</PendingButton></div></div>
         </form>
       </section> : <section className="calendar-detail event-backfill panel" role="dialog" aria-modal="true" aria-labelledby="backfill-complete-title"><div className="calendar-detail-heading"><div><span className="status ready">Pass complete</span><h2 id="backfill-complete-title">{allMissingEvents.length ? `${allMissingEvents.length} skipped for now` : "Every event has a date"}</h2><p>{allMissingEvents.length ? "Skipped events will stay out of this pass instead of immediately appearing again." : "There are no incomplete approved or sent event announcements."}</p></div></div><div className="event-backfill-actions">{allMissingEvents.length ? <a href={`/admin/calendar?backfill=1&event=${allMissingEvents[0].id}`} className="secondary">Review skipped</a> : null}<a href="/admin/calendar" className="primary">Done</a></div></section>}
     </div> : null}

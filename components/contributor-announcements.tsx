@@ -22,17 +22,18 @@ export async function ContributorAnnouncements({ announcementTemplate, eventTemp
     {queued.length ? <div className="approved-list">{queued.map((item, index) => {
       const date = scheduledDateValue(item.scheduled_date);
       const event = item.question_type === "event";
-      const publishDate = event ? date : date ? addDays(date, -(Number(item.days_early) + 1)) : null;
+      const reminder = item.question_type === "reminder";
+      const publishDate = event || reminder ? date : date ? addDays(date, -(Number(item.days_early) + 1)) : null;
       const occurs = scheduledDateValue(item.event_occurrence_date);
       const occurrenceEnd = scheduledDateValue(item.event_occurrence_end_date);
       const occurrenceLabel = occurs ? `${displayScheduledDate(occurs)}${occurrenceEnd && occurrenceEnd !== occurs ? ` – ${displayScheduledDate(occurrenceEnd)}` : ""}` : "on an unset date";
-      const schedule = item.send_schedule_mode === "disabled" ? "Automatic sending is disabled" : item.send_schedule_mode === "exact" ? `Sends ${displayPacificDateTime(item.send_at)} · exact time` : `${event ? `Occurs ${occurrenceLabel}` : `For ${displayScheduledDate(item.scheduled_date)}`} · sends ${publishDate ? displayScheduledDate(publishDate) : "on its selected date"} during the 6 PM Pacific hour`;
+      const schedule = item.send_schedule_mode === "disabled" ? "Automatic sending is disabled" : item.send_schedule_mode === "exact" ? `Sends ${displayPacificDateTime(item.send_at)} · exact time` : `${event ? `Occurs ${occurrenceLabel}` : reminder ? "Reminder" : `For ${displayScheduledDate(item.scheduled_date)}`} · sends ${publishDate ? displayScheduledDate(publishDate) : "on its selected date"} during the 6 PM Pacific hour`;
       return <article className="approved-row" key={item.id}>
         <span className="queue-number">{index + 1}</span>
         <div><strong className={`scheduled-label${item.send_schedule_mode === "disabled" ? " schedule-disabled" : ""}`}>{schedule}</strong>
           {item.event_title && <h3 className="approved-title">{item.event_title}</h3>}
           <p className="message-excerpt">{item.question}</p></div>
-        <MessagePreview title="Scheduled message"><AnnouncementPreview type={event ? "event" : "announcement"} announcement={item.question} eventTitle={item.event_title || ""} scheduledDate={date || ""} announcementTemplate={announcementTemplate} eventTemplate={eventTemplate} /></MessagePreview>
+        <MessagePreview title="Scheduled message"><AnnouncementPreview type={event ? "event" : reminder ? "reminder" : "announcement"} announcement={item.question} eventTitle={item.event_title || ""} scheduledDate={date || ""} announcementTemplate={announcementTemplate} eventTemplate={eventTemplate} /></MessagePreview>
       </article>;
     })}</div> : <div className="empty-state compact">No announcements are currently scheduled.</div>}
     <h3 className="sent-list-heading">Recently sent</h3>

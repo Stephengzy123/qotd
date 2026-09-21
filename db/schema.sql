@@ -9,7 +9,7 @@ create table if not exists questions (
   id uuid primary key default gen_random_uuid(),
   question text not null check (char_length(question) between 8 and 1500),
   scheduled_date date,
-  question_type text not null default 'announcement' check (question_type in ('announcement', 'event')),
+  question_type text not null default 'announcement' check (question_type in ('announcement', 'event', 'reminder')),
   event_title text check (event_title is null or char_length(event_title) between 1 and 200),
   days_early integer not null default 0 check (days_early between 0 and 365),
   contributor_note text check (contributor_note is null or char_length(contributor_note) <= 500),
@@ -181,6 +181,11 @@ alter table questions add column if not exists send_schedule_mode text not null 
 alter table questions add column if not exists send_at timestamptz;
 alter table questions add column if not exists event_occurrence_date date;
 alter table questions add column if not exists event_occurrence_end_date date;
+alter table questions drop constraint if exists questions_question_type_check;
+alter table questions add constraint questions_question_type_check check (question_type in ('announcement', 'event', 'reminder'));
+alter table dispatches add column if not exists question_type text;
+alter table dispatches drop constraint if exists dispatches_question_type_check;
+alter table dispatches add constraint dispatches_question_type_check check (question_type in ('announcement', 'event', 'reminder'));
 alter table questions drop constraint if exists questions_event_occurrence_range_check;
 alter table questions add constraint questions_event_occurrence_range_check check (event_occurrence_end_date is null or event_occurrence_date is null or event_occurrence_end_date >= event_occurrence_date);
 alter table questions drop constraint if exists questions_exact_send_at_check;

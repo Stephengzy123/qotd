@@ -60,6 +60,28 @@ export async function updateEventOccurrenceDateAction(formData: FormData) {
   redirect(calendarUrl("ok", "Event date updated.", continueBackfill, skipped));
 }
 
+export async function markEventAsReminderAction(formData: FormData) {
+  const session = await requireRole("admin");
+  const id = String(formData.get("id") || "");
+  const continueBackfill = formData.get("continueBackfill") === "yes";
+  const skipped = normalizedSkipped(formData.get("skippedEvents"));
+  if (!/^[0-9a-f-]{36}$/i.test(id)) redirect(calendarUrl("error", "Invalid event announcement.", continueBackfill, skipped));
+  const sql = await dbReady();
+  const updated = await sql.begin(async (tx) => {
+    const rows = await tx<{ event_title: string }[]>`
+      update questions set question_type = 'reminder', event_occurrence_date = null, event_occurrence_end_date = null, updated_at = now()
+      where id = ${id} and question_type = 'event' and status in ('approved', 'sent') returning event_title
+    `;
+    if (rows.length) await tx`update dispatches set question_type = 'reminder' where question_id = ${id}`;
+    return rows;
+  });
+  await logEvent({ action: "mark_event_as_reminder", actor: session.username, role: session.role, success: updated.length > 0, details: { id, title: updated[0]?.event_title } });
+  if (!updated.length) redirect(calendarUrl("error", "That event announcement is no longer available.", continueBackfill, skipped));
+  revalidatePath("/admin/calendar");
+  revalidatePath("/live");
+  redirect(calendarUrl("ok", "Moved to Reminders. It will no longer appear on the calendar or in date backfill.", continueBackfill, skipped));
+}
+
 export async function createCalendarEventAction(formData: FormData) {
   const session = await requireRole("admin");
   const title = String(formData.get("title") || "").trim();
