@@ -10,6 +10,7 @@ export function AnnouncementComposer({ announcementMinimumDate, eventMinimumDate
   const [eventTitle, setEventTitle] = useState("");
   const [scheduledDate, setScheduledDate] = useState(announcementMinimumDate);
   const [occurrenceDate, setOccurrenceDate] = useState(eventMinimumDate);
+  const [occurrenceEndDate, setOccurrenceEndDate] = useState("");
   const minimumDate = type === "event" ? eventMinimumDate : announcementMinimumDate;
 
   return (
@@ -26,13 +27,18 @@ export function AnnouncementComposer({ announcementMinimumDate, eventMinimumDate
         <input id="eventTitle" name="eventTitle" maxLength={200} required value={eventTitle} onChange={(event) => setEventTitle(event.target.value)} />
       </div>}
       {type === "event" && <div>
-        <label htmlFor="occurrenceDate">Event occurrence date</label>
-        <input id="occurrenceDate" name="occurrenceDate" type="date" min={scheduledDate || eventMinimumDate} required value={occurrenceDate} onChange={(event) => setOccurrenceDate(event.target.value)} />
-        <p className="hint">The event appears on the admin calendar on this date.</p>
+        <label htmlFor="occurrenceDate">Event start date</label>
+        <input id="occurrenceDate" name="occurrenceDate" type="date" min={scheduledDate || eventMinimumDate} required value={occurrenceDate} onChange={(event) => { const value = event.target.value; setOccurrenceDate(value); if (occurrenceEndDate && occurrenceEndDate < value) setOccurrenceEndDate(value); }} />
+        <p className="hint">The event appears on the admin calendar starting on this date.</p>
+      </div>}
+      {type === "event" && <div>
+        <label htmlFor="occurrenceEndDate">Event end date <span className="hint">(optional)</span></label>
+        <input id="occurrenceEndDate" name="occurrenceEndDate" type="date" min={occurrenceDate} value={occurrenceEndDate} onChange={(event) => setOccurrenceEndDate(event.target.value)} />
+        <p className="hint">Leave blank for a single-day event. Set an end date only for a multi-day event.</p>
       </div>}
       <div>
         <label htmlFor="scheduledDate">{type === "event" ? "Event publish date" : "Announcement date"}</label>
-        <input id="scheduledDate" name="scheduledDate" type="date" min={minimumDate} required value={scheduledDate} onChange={(event) => { const value = event.target.value; setScheduledDate(value); if (type === "event" && occurrenceDate < value) setOccurrenceDate(value); }} />
+        <input id="scheduledDate" name="scheduledDate" type="date" min={minimumDate} required value={scheduledDate} onChange={(event) => { const value = event.target.value; setScheduledDate(value); if (type === "event" && occurrenceDate < value) { setOccurrenceDate(value); if (occurrenceEndDate && occurrenceEndDate < value) setOccurrenceEndDate(value); } }} />
         <p className="hint">{type === "event"
           ? "This is when the event announcement will be published during the 6 PM Pacific hour. It does not need to be the date of the event."
           : "This is the date the announcement is for. It will be published the previous day during the 6 PM Pacific hour."}</p>

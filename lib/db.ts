@@ -406,6 +406,27 @@ const migrations = [
       `insert into lunch_menu_sync_state (singleton) values (true) on conflict (singleton) do nothing`,
     ],
   },
+  {
+    version: 23,
+    statements: [
+      `alter table questions add column if not exists event_occurrence_end_date date`,
+      `alter table questions drop constraint if exists questions_event_occurrence_range_check`,
+      `alter table questions add constraint questions_event_occurrence_range_check
+        check (event_occurrence_end_date is null or event_occurrence_date is null or event_occurrence_end_date >= event_occurrence_date)`,
+      `create table if not exists calendar_events (
+        id uuid primary key default gen_random_uuid(),
+        event_date date not null,
+        end_date date not null,
+        title text not null check (char_length(title) between 1 and 200),
+        details text check (details is null or char_length(details) <= 1500),
+        created_by text,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now(),
+        check (end_date >= event_date)
+      )`,
+      `create index if not exists calendar_events_date_idx on calendar_events(event_date, created_at)`,
+    ],
+  },
 ] as const;
 
 export function db() {

@@ -69,11 +69,11 @@ export function AdminCalendar({ events, today, rangeStart, rangeEnd }: { events:
           </div>)}</div>
         </div>
       </div>
-      <div className="admin-calendar-legend"><span><i className="imported" />Imported</span><span><i className="announcement" />Announcement event</span><span><i className="lunch" />Lunch</span></div>
+        <div className="admin-calendar-legend"><span><i className="imported" />Imported</span><span><i className="announcement" />Announcement event</span><span><i className="manual" />Calendar-only event</span><span><i className="lunch" />Lunch</span></div>
     </div>
     {selected ? <div className="calendar-detail-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelected(null); }}>
       <section ref={dialog} className="calendar-detail panel" role="dialog" aria-modal="true" aria-labelledby="calendar-detail-title" tabIndex={-1}>
-        <div className="calendar-detail-heading"><div><span className={`status calendar-${selected.kind}`}>{selected.kind === "announcement" ? "Announcement event" : selected.kind === "lunch" ? "Lunch menu" : "Imported event"}</span><h2 id="calendar-detail-title">{selected.title}</h2><p>{fullDate(selected.date)}</p></div><button type="button" className="secondary" onClick={() => setSelected(null)} aria-label="Close">×</button></div>
+        <div className="calendar-detail-heading"><div><span className={`status calendar-${selected.kind}`}>{selected.kind === "announcement" ? "Announcement event" : selected.kind === "manual" ? "Calendar-only event" : selected.kind === "lunch" ? "Lunch menu" : "Imported event"}</span><h2 id="calendar-detail-title">{selected.title}</h2><p>{fullDate(selected.date)}</p></div><button type="button" className="secondary" onClick={() => setSelected(null)} aria-label="Close">×</button></div>
         {selected.details && <p className="calendar-detail-copy">{selected.details}</p>}
         {selected.items && <div className="lunch-detail-list">{selected.items.map((item, index) => <div key={`${item.category}-${index}`}><strong>{item.category}</strong><span>{item.dish}</span></div>)}</div>}
         {selected.meta && <p className="hint">{selected.meta}</p>}

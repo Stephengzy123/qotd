@@ -59,7 +59,9 @@ Overdue approved entries are included in the next run so a missed invocation doe
 
 The admin-only **Calendar** page combines the configured iCalendar feed, event-announcement occurrence dates, and the public Senior School lunch menu. Lunch menus are refreshed by the existing authorized cron route at most once per Pacific day; admins can also refresh them manually. Failed or malformed menu fetches preserve the last successfully imported data.
 
-Event announcements have separate publish and occurrence dates. Approved and sent events with an occurrence date appear on the admin calendar. The Calendar page also provides a guided **Complete missing dates** flow for stepping through older sent events, plus a list for correcting individual dates. These app-owned calendar entries are not shown on the public `/live` calendar yet.
+Event announcements have separate publish and occurrence dates. An optional end date supports multi-day events; leaving it blank creates a single-day event. Approved and sent events with an occurrence date appear on the admin calendar. The Calendar page also provides a guided **Complete missing dates** flow for stepping through older sent events, remembers skipped events for the rest of that pass, and includes a list for correcting individual dates.
+
+Admins can also add calendar-only events when an item does not need its own announcement. Calendar-only events support the same optional end date and can be removed from the Calendar page. These app-owned calendar entries are not shown on the public `/live` calendar yet.
 
 Configure both encrypted webhooks and the Discord IDs from the admin page. The notification webhook is optional and pings the configured user whenever a contributor submission enters Pending.
 
