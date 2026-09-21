@@ -1,6 +1,6 @@
 "use client";
 import { useActionState } from "react";
-import { deleteApprovedQuestionAction, saveDeliverySettingsAction, sendQuestionAction, unapproveQuestionAction } from "@/app/actions";
+import { deleteApprovedQuestionAction, forceSendQuestionAction, saveDeliverySettingsAction, sendQuestionAction, unapproveQuestionAction } from "@/app/actions";
 import { PendingButton } from "@/components/pending-button";
 import { DeliverySettingsFields, type DeliveryFieldsProps } from "@/components/delivery-settings-fields";
 import { SendScheduleSettings } from "@/components/send-schedule-settings";
@@ -10,7 +10,7 @@ export function ApprovedQuestionActions({ id, question, initialScheduleMode, ini
   const [result, save] = useActionState<{ success?: string; error?: string }, FormData>(saveDeliverySettingsAction, {});
   return <details className="item-manage"><summary className="secondary">Manage</summary><div className="item-manage-panel">
     <form action={save} className="stack"><input type="hidden" name="id" value={id} /><DeliverySettingsFields {...delivery} /><SendScheduleSettings initialMode={initialScheduleMode} initialSendAt={initialSendAt} />
-      <div className="row-buttons"><PendingButton className="primary" pendingText="Saving…">Save settings</PendingButton><PendingButton formAction={sendQuestionAction} className="secondary" pendingText="Sending…" confirmMessage="Save these settings and send this announcement now?">Save & send now</PendingButton></div>
+      <div className="row-buttons"><PendingButton className="primary" pendingText="Saving…">Save settings</PendingButton><PendingButton formAction={sendQuestionAction} className="secondary" pendingText="Sending…" confirmMessage="Save these settings and send this announcement now?">Save & send now</PendingButton><PendingButton formAction={forceSendQuestionAction} className="danger" pendingText="Force sending…" confirmMessage="Force send this approved announcement now? This bypasses the stale-settings check, but will not resend an item that is already sent.">Force send</PendingButton></div>
       {result.success && <p role="status" className="inline-feedback">{result.success}</p>}{result.error && <p role="alert" className="send-error">{result.error}</p>}
     </form><div className="row-buttons item-other-actions">
       <form action={unapproveQuestionAction}><input type="hidden" name="id" value={id} /><PendingButton className="secondary" pendingText="Moving…">Unapprove</PendingButton></form>

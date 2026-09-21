@@ -264,6 +264,19 @@ export async function sendQuestionAction(formData: FormData) {
   redirect(messageUrl("/admin/approved", "error" in result ? "error" : "ok", "error" in result ? (result.error || "Send failed.") : "warning" in result && result.warning ? `Partially sent. ${result.warning}` : "Announcement sent using its saved delivery settings."));
 }
 
+export async function forceSendQuestionAction(formData: FormData) {
+  const session = await requireRole("admin");
+  const id = String(formData.get("id") || "");
+  if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin/approved", session, "force_send_announcement", "Select an announcement to send.", { id });
+  const result = await sendAnnouncement(id, "manual_force", undefined, session.username, { force: true });
+  if (!("error" in result)) scheduleLivePush(result.dispatchId);
+  await logEvent({ action: "force_send_announcement", actor: session.username, role: session.role, success: !("error" in result), details: { id, mode: "manual_force", error: "error" in result ? result.error : undefined } });
+  revalidatePath("/admin", "layout");
+  revalidatePath("/live");
+  revalidatePath("/contribute");
+  redirect(messageUrl("/admin/approved", "error" in result ? "error" : "ok", "error" in result ? (result.error || "Force send failed.") : "Announcement force-sent using its saved delivery settings."));
+}
+
 export async function createAccountAction(formData: FormData) {
   const session = await requireRole("admin");
   const username = String(formData.get("username") || "").trim();

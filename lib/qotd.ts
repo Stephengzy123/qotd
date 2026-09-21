@@ -131,9 +131,9 @@ export function formatAnnouncement(template: string, announcement: string, sched
   return normalizeDiscordTemplate(formatted).slice(0, 2000);
 }
 
-type Mode = "scheduled" | "manual_selected";
+type Mode = "scheduled" | "manual_selected" | "manual_force";
 
-export async function sendAnnouncement(announcementId: string, mode: Mode, localDate?: string, actor?: string, options: { destination?: "discord" | "live"; removePings?: boolean; webhookIds?: string[] } = {}) {
+export async function sendAnnouncement(announcementId: string, mode: Mode, localDate?: string, actor?: string, options: { destination?: "discord" | "live"; removePings?: boolean; webhookIds?: string[]; force?: boolean } = {}) {
   const logBase = { action: "dispatch_announcement", actor: actor ?? (mode === "scheduled" ? "scheduler" : null), role: mode === "scheduled" ? "system" : "admin" } as const;
   const sql = await dbReady();
   const announcements = await sql`
@@ -177,11 +177,17 @@ export async function sendAnnouncement(announcementId: string, mode: Mode, local
   const message = stripPings ? removePings(formatted) : formatted;
   if (!message.trim()) return { error: "The message is empty after removing pings." } as const;
   const claimed = await sql.begin(async (tx) => {
-    const claim = await tx`
-      update questions set status = 'sent', updated_at = now()
-      where id = ${announcement.id} and status = 'approved' and updated_at = ${announcement.settings_version}::timestamptz
-      returning id
-    `;
+    const claim = options.force
+      ? await tx`
+          update questions set status = 'sent', updated_at = now()
+          where id = ${announcement.id} and status = 'approved'
+          returning id
+        `
+      : await tx`
+          update questions set status = 'sent', updated_at = now()
+          where id = ${announcement.id} and status = 'approved' and updated_at = ${announcement.settings_version}::timestamptz
+          returning id
+        `;
     if (!claim[0]) return { error: "That announcement changed or is already being handled. Reload before retrying." } as const;
     const rows = await tx`
       insert into dispatches (question_id, local_date, mode, message, success, question_type, destination)
