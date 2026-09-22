@@ -1,5 +1,6 @@
 import { AdminShell } from "@/components/admin-shell";
 import { AdminCalendar } from "@/components/admin-calendar";
+import { CalendarEmbedCopy } from "@/components/calendar-embed-copy";
 import { PendingButton } from "@/components/pending-button";
 import { requireRole } from "@/lib/auth";
 import { loadAdminCalendar } from "@/lib/admin-calendar";
@@ -42,6 +43,7 @@ export default async function AdminCalendarPage({ searchParams }: { searchParams
   const skipIds = backfillEvent ? [...skippedIds, backfillEvent.id].slice(0, 50) : skippedIds;
   const skipQuery = skipIds.join(",");
   const actions = <>
+    <CalendarEmbedCopy />
     <a className="secondary" href="/admin/calendar?add=1">＋ Add event</a>
     {allMissingEvents.length ? <a className="secondary" href={`/admin/calendar?backfill=1&event=${allMissingEvents[0].id}`}>Complete missing dates <span className="count-badge">{allMissingEvents.length}</span></a> : <span className="status ready">Event dates complete</span>}
     <form action={refreshLunchMenusAction}><PendingButton className="primary" pendingText="Refreshing…">Refresh lunch menus</PendingButton></form>

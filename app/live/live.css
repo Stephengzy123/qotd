@@ -61,6 +61,9 @@
 .live-avatar { display: grid; place-items: center; flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; background: var(--live-accent); color: #fff; font-weight: 800; object-fit: cover; }
 .live-avatar-lg { width: 44px; height: 44px; }
 .live-message-body { flex: 1; min-width: 0; }
+.live-calendar-cta { margin-top: .85rem; margin-bottom: .35rem; }
+.live-message-body:has(.live-calendar-cta) .discord-line:has(> br:only-child) { height: .5rem; line-height: .5rem; }
+.live-calendar-cta .live-pill { display: inline-flex; align-items: center; min-height: 40px; padding: .5rem .85rem; border-radius: 8px; }
 .live-message-meta { display: flex; align-items: center; flex-wrap: wrap; gap: .45rem; margin-bottom: .4rem; font-size: .86rem; }
 .live-message-meta strong { font-weight: 800; }
 .live-message-meta time { color: var(--live-faint); font-size: .74rem; font-weight: 600; font-variant-numeric: tabular-nums; }

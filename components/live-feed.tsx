@@ -203,7 +203,7 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
                 finally { setChanging(null); }
               }}>{changing === message.id ? "Saving…" : message.hidden ? "Restore" : "Hide"}</button>}</div>
             <div className="discord-preview"><DiscordMarkdown value={message.message} /></div>
-            {message.calendarDate && <a className="live-pill live-pill-link" href="/live/calendar">View Whole Calendar</a>}
+            {message.calendarDate && <div className="live-calendar-cta"><a className="live-pill live-pill-link" href="/live/calendar">View Whole Calendar</a></div>}
           </div>
         </article>)}
       </section>)}
