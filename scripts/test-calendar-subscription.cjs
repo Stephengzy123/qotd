@@ -13,6 +13,12 @@ const rows = [
 ];
 const render = (feed, events = rows) => subscriptionCalendar(events, feed, 'https://example.com', new Date('2026-09-21T12:00:00Z'));
 const events = render('events');
+const mixed = render(['manual', 'lunch']);
+assert.match(mixed, /SUMMARY:Assembly/);
+assert.match(mixed, /SUMMARY:Lunch/);
+assert.doesNotMatch(mixed, /SUMMARY:Trip|SUMMARY:Day 1/);
+assert.doesNotMatch(render(['imported']), /SUMMARY:Day 1/);
+assert.equal((render(['manual', 'manual']).match(/BEGIN:VEVENT/g) || []).length, 1);
 assert.match(events, /SUMMARY:Trip/);
 assert.match(events, /SUMMARY:Assembly/);
 assert.doesNotMatch(events, /SUMMARY:Lunch|SUMMARY:Day 1/);
