@@ -1,0 +1,8 @@
+.public-calendar-page { min-height: 100dvh; padding: clamp(1rem, 3vw, 2.5rem); background: var(--paper); color: var(--text); }
+.public-calendar-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+.public-calendar-heading h1 { margin: 0; }
+.public-calendar-heading p { color: var(--muted); }
+@media (max-width: 640px) { .public-calendar-heading { align-items: flex-start; flex-direction: column; } }
+@media (prefers-color-scheme: dark) {
+  .public-calendar-page { color-scheme: dark; --paper: #151a25; --surface: #202735; --text: #e7eaf1; --muted: #b4bdd0; --border: #364052; --border-strong: #526078; --accent-soft: #2d3a55; --accent-ink: #e4eaff; --amber-soft: #423923; --amber-ink: #f7d492; --moss-soft: #1d3e32; --moss-ink: #9fe6c0; }
+}
