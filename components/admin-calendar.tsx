@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { AdminCalendarEvent } from "@/lib/admin-calendar";
+import { DiscordMarkdown } from "@/components/discord-preview";
 
 type CalendarCell = { value: string; day: number; current: boolean };
 type SpanSegment = { event: AdminCalendarEvent; startColumn: number; endColumn: number; lane: number; continuesBefore: boolean; continuesAfter: boolean };
@@ -107,7 +108,7 @@ export function AdminCalendar({ events, today, rangeStart, rangeEnd }: { events:
     </div>
     {selected ? <div className="calendar-detail-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelected(null); }}><section ref={dialog} className="calendar-detail panel" role="dialog" aria-modal="true" aria-labelledby="calendar-detail-title" tabIndex={-1}>
       <div className="calendar-detail-heading"><div><span className={`status calendar-${selected.kind}`}>{selected.kind === "announcement" ? "Announcement event" : selected.kind === "manual" ? "Calendar-only event" : selected.kind === "lunch" ? "Lunch menu" : "Imported event"}</span><h2 id="calendar-detail-title">{selected.title}</h2><p>{fullDate(selected.date)}{selected.endDate && selected.endDate !== selected.date ? ` – ${fullDate(selected.endDate)}` : ""}</p></div><button type="button" className="secondary" onClick={() => setSelected(null)} aria-label="Close">×</button></div>
-      {selected.details ? <p className="calendar-detail-copy">{selected.details}</p> : null}
+      {selected.details ? <div className="calendar-detail-copy discord-preview"><DiscordMarkdown value={selected.details} /></div> : null}
       {selected.items ? <div className="lunch-detail-list">{selected.items.map((item, index) => <div key={`${item.category}-${index}`}><strong>{item.category}</strong><span>{item.dish}</span></div>)}</div> : null}
       {selected.meta ? <p className="hint">{selected.meta}</p> : null}
     </section></div> : null}
