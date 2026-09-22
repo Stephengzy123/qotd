@@ -2,8 +2,8 @@
 import { useEffect, useState } from "react";
 
 const options = [
-  ["announcement", "Announcement events"], ["manual", "Calendar-only events"],
-  ["imported", "Other imported events"], ["rotations", "Block rotations"], ["lunch", "Lunch menus (full menu details)"],
+  ["events", "Events (announcement and calendar-only events)"],
+  ["rotations", "Block rotations"], ["lunch", "Lunch menus (full menu details)"],
 ] as const;
 
 export function CalendarSubscriptions() {
@@ -12,7 +12,7 @@ export function CalendarSubscriptions() {
   const [notice, setNotice] = useState("");
   const [fallback, setFallback] = useState("");
   useEffect(() => setOrigin(window.location.origin), []);
-  const include = options.filter(([key]) => selected.includes(key)).map(([key]) => key).join(",");
+  const include = options.filter(([key]) => selected.includes(key)).flatMap(([key]) => key === "events" ? ["announcement", "manual", "imported"] : [key]).join(",");
   const url = `${origin}/api/calendar/custom.ics?include=${encodeURIComponent(include)}`;
   return <details className="panel calendar-subscriptions"><summary>Subscribe in your calendar app</summary>
     <p>Choose what to include in one subscription. In Google Calendar, use Other calendars → From URL and paste the link. Your calendar app controls refresh timing. Unsent announcement details stay private.</p>
