@@ -1,6 +1,11 @@
 .public-calendar-page { min-height: 100dvh; padding: clamp(1rem, 3vw, 2.5rem); background: var(--paper); color: var(--text); }
 .public-calendar-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
 .public-calendar-heading h1 { margin: 0; }
+.calendar-subscriptions { margin-top: 1rem; padding: 1rem; }
+.calendar-subscriptions summary { cursor: pointer; font-weight: 700; }
+.calendar-subscriptions p { color: var(--muted); }
+.calendar-subscription-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; padding: 1rem 0; border-top: 1px solid var(--border); }
+.calendar-subscription-row p { margin: .25rem 0 0; }
 .public-calendar-page.public-calendar-embed { padding: .5rem; }
 .public-calendar-heading p { color: var(--muted); }
 @media (max-width: 640px) { .public-calendar-heading { align-items: flex-start; flex-direction: column; } }
