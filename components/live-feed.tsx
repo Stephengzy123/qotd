@@ -7,13 +7,12 @@ import { LiveNotifications } from "@/components/live-notifications";
 import { LiveInstall } from "@/components/live-install";
 import { QuickAnnouncement, type QuickReplyTarget } from "@/components/quick-announcement";
 import { ScheduledDeliveryCheck } from "@/components/scheduled-delivery-check";
-import { LiveCalendar } from "@/components/live-calendar";
 import { LiveChannelName } from "@/components/live-channel-name";
 import type { WebhookOption } from "@/lib/webhook-destinations";
 import type { CalendarEvent } from "@/lib/calendar";
 
 type ReplyReference = { id: string; message: string | null; senderName: string | null; sentAt: string | null; unavailable: boolean };
-type Message = { id: string; message: string; type: string | null; human: boolean; sentAt: string; cursor: string; hidden: boolean; senderName?: string | null; senderAvatarUrl?: string | null; replyTo: ReplyReference | null };
+type Message = { id: string; message: string; type: string | null; human: boolean; sentAt: string; cursor: string; hidden: boolean; senderName?: string | null; senderAvatarUrl?: string | null; replyTo: ReplyReference | null; calendarDate?: string | null };
 type Page = { messages: Message[]; hasMore: boolean };
 function dayOf(value: string) {
   const date = new Date(value), today = new Date(), yesterday = new Date();
@@ -154,7 +153,7 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
           <div><LiveChannelName initialName={channelName} editable={isAdmin} /><p className="live-sub"><span className="live-dot" aria-hidden="true" />Live · {loading && !messages.length ? "loading" : `${messages.length} loaded${todayCount ? ` · ${todayCount} today` : ""}`}</p></div>
         </div>
         <div className="live-actions">
-          <LiveCalendar events={calendarEvents} today={calendarToday} />
+          <a href="/live/calendar" className="live-pill live-pill-link">Calendar</a>
           <LiveNotifications />
           <LiveInstall />
           {isAdmin && <a href="/admin" className="live-pill live-pill-link">Admin</a>}
@@ -204,6 +203,7 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
                 finally { setChanging(null); }
               }}>{changing === message.id ? "Saving…" : message.hidden ? "Restore" : "Hide"}</button>}</div>
             <div className="discord-preview"><DiscordMarkdown value={message.message} /></div>
+            {message.calendarDate && <a className="live-pill live-pill-link" href="/live/calendar">View Whole Calendar</a>}
           </div>
         </article>)}
       </section>)}

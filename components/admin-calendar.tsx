@@ -98,6 +98,11 @@ export function AdminCalendar({ events, today, rangeStart, rangeEnd }: { events:
           })}</div>
         </div>)}</div>
       </div></div>
+      <div className="public-calendar-agenda">{cells.filter(cell => cell.current).map(cell => {
+        const daily = events.filter(event => event.date <= cell.value && (event.endDate || event.date) >= cell.value);
+        if (!daily.length) return null;
+        return <details key={cell.value}><summary>{fullDate(cell.value)} · {daily.length} items</summary><div>{daily.map(event => <button key={event.id} type="button" className={`calendar-event ${event.kind}`} onClick={() => setSelected(event)}>{event.title}</button>)}</div></details>;
+      })}</div>
       <div className="admin-calendar-legend"><span><i className="imported" />Imported</span><span><i className="announcement" />Announcement event</span><span><i className="manual" />Calendar-only event</span><span><i className="lunch" />Lunch</span></div>
     </div>
     {selected ? <div className="calendar-detail-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelected(null); }}><section ref={dialog} className="calendar-detail panel" role="dialog" aria-modal="true" aria-labelledby="calendar-detail-title" tabIndex={-1}>

@@ -3,6 +3,7 @@ import { dbReady } from "@/lib/db";
 import { liveMessageText } from "@/lib/live-text";
 
 type Row = {
+  calendar_fallback_date: string | null;
   id: string; message: string; question_type: "announcement" | "event" | "reminder" | null; sent_time: string; hidden_from_live: boolean;
   sender_name: string | null; sender_avatar_url: string | null; reply_to_dispatch_id: string | null;
   reply_message: string | null; reply_sender_name: string | null; reply_sent_time: string | null;
@@ -11,6 +12,7 @@ type Row = {
 function serializeLiveMessage(row: Row) {
   return {
     id: row.id,
+    calendarDate: row.calendar_fallback_date || null,
     message: liveMessageText(row.message),
     senderName: row.sender_name,
     senderAvatarUrl: row.sender_avatar_url,
@@ -41,7 +43,7 @@ export type LiveFilter = "all" | "announcement" | "event" | "reminder" | "human"
 export async function getLiveMessages(type: LiveFilter, before: ReturnType<typeof parseLiveCursor>, after: ReturnType<typeof parseLiveCursor>, hidden = false) {
   const sql = await dbReady();
   const rows = await sql<Row[]>`select d.id, d.message, d.question_type, d.hidden_from_live, d.sender_name, d.sender_avatar_url,
-      d.reply_to_dispatch_id, d.created_at::text as sent_time, r.message as reply_message,
+      d.calendar_fallback_date::text, d.reply_to_dispatch_id, d.created_at::text as sent_time, r.message as reply_message,
       r.sender_name as reply_sender_name, r.created_at::text as reply_sent_time
     from dispatches d
     left join dispatches r on r.id = d.reply_to_dispatch_id and r.success = true and r.hidden_from_live = false
@@ -61,7 +63,7 @@ export async function getLiveMessages(type: LiveFilter, before: ReturnType<typeo
 export async function getLiveMessageById(id: string) {
   const sql = await dbReady();
   const rows = await sql<Row[]>`select d.id, d.message, d.question_type, d.hidden_from_live, d.sender_name, d.sender_avatar_url,
-      d.reply_to_dispatch_id, d.created_at::text as sent_time, r.message as reply_message,
+      d.calendar_fallback_date::text, d.reply_to_dispatch_id, d.created_at::text as sent_time, r.message as reply_message,
       r.sender_name as reply_sender_name, r.created_at::text as reply_sent_time
     from dispatches d
     left join dispatches r on r.id = d.reply_to_dispatch_id and r.success = true and r.hidden_from_live = false

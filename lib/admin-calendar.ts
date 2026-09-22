@@ -78,3 +78,10 @@ export async function loadAdminCalendar(from: string, to: string) {
   const manualEvents: ManualCalendarEvent[] = manualRows.map((event) => ({ id: event.id, date: event.event_date, endDate: event.end_date, title: event.title, details: event.details }));
   return { events, editableEvents, manualEvents };
 }
+
+// Only calendar entries cross the public boundary, never backfill records or
+// credentials. Approved events are intentionally visible before announcement day.
+export async function loadPublicCalendar(from: string, to: string) {
+  const { events } = await loadAdminCalendar(from, to);
+  return events.map(({ meta: _meta, ...event }) => event);
+}
