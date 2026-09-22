@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AdminCalendar } from "@/components/admin-calendar";
+import { CalendarSubscriptions } from "@/components/calendar-subscriptions";
 import { loadPublicCalendar } from "@/lib/admin-calendar";
 import { pacificParts } from "@/lib/qotd";
 import "./calendar.css";
@@ -16,5 +17,6 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
   return <main className={`public-calendar-page${embedded ? " public-calendar-embed" : ""}`}>
     {!embedded && <header className="public-calendar-heading"><div><h1>School calendar</h1><p>Block rotations, upcoming events, and Senior School lunch menus. Select an entry for details.</p></div><a className="secondary" href="/live">Back to live announcements</a></header>}
     <AdminCalendar events={events} today={today} rangeStart={start} rangeEnd={end} />
+    {!embedded && <CalendarSubscriptions />}
   </main>;
 }

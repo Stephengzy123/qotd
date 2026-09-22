@@ -27,7 +27,7 @@ export type EventDateRow = {
 
 export type ManualCalendarEvent = { id: string; date: string; endDate: string; title: string; details: string | null };
 
-export async function loadAdminCalendar(from: string, to: string, publicView = false) {
+export async function loadAdminCalendar(from: string, to: string, publicView = false, strictFeed = false) {
   const sql = await dbReady();
   const [settingsRows, lunchRows, announcementRows, eventDateRows, manualRows] = await Promise.all([
     sql<{ calendar_feed_url_encrypted: string | null }[]>`select calendar_feed_url_encrypted from settings where singleton = true`,
@@ -63,7 +63,7 @@ export async function loadAdminCalendar(from: string, to: string, publicView = f
       order by event_date, created_at
     `,
   ]);
-  const imported = await getCalendarEvents(settingsRows[0]?.calendar_feed_url_encrypted, from, to).catch(() => []);
+  const imported = await getCalendarEvents(settingsRows[0]?.calendar_feed_url_encrypted, from, to).catch(error => { if (strictFeed) throw error; return []; });
   const events: AdminCalendarEvent[] = [
     ...imported.map((event, index) => ({ id: `imported-${event.date}-${index}`, date: event.date, title: event.title, kind: "imported" as const, meta: "Imported calendar" })),
     ...announcementRows.map((event) => ({ id: `announcement-${event.id}`, date: event.occurrence_date, endDate: event.occurrence_end_date || undefined, title: event.title, kind: "announcement" as const, details: event.details, meta: `${event.status === "sent" ? "Sent" : "Approved"} announcement · ${event.occurrence_end_date ? `${event.occurrence_date}–${event.occurrence_end_date} · ` : ""}publishes ${event.scheduled_date}` })),
@@ -85,7 +85,7 @@ export async function loadAdminCalendar(from: string, to: string, publicView = f
 
 // Only calendar entries cross the public boundary, never backfill records or
 // credentials. Approved events are intentionally visible before announcement day.
-export async function loadPublicCalendar(from: string, to: string) {
-  const { events } = await loadAdminCalendar(from, to, true);
+export async function loadPublicCalendar(from: string, to: string, strictFeed = false) {
+  const { events } = await loadAdminCalendar(from, to, true, strictFeed);
   return events.map(({ meta: _meta, ...event }) => event);
 }

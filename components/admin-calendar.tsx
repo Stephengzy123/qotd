@@ -45,6 +45,9 @@ function layoutWeek(cells: CalendarCell[], events: AdminCalendarEvent[]) {
 }
 
 export function AdminCalendar({ events, today, rangeStart, rangeEnd }: { events: AdminCalendarEvent[]; today: string; rangeStart: string; rangeEnd: string }) {
+  const [view, setView] = useState<"week" | "month" | "list">("month");
+  const [anchor, setAnchor] = useState(today);
+  useEffect(() => { if (window.matchMedia("(max-width: 700px), (max-width: 1000px) and (pointer: coarse)").matches) setView("week"); }, []);
   const [month, setMonth] = useState(today.slice(0, 7));
   const [selected, setSelected] = useState<AdminCalendarEvent | null>(null);
   const dialog = useRef<HTMLElement>(null);
@@ -71,6 +74,31 @@ export function AdminCalendar({ events, today, rangeStart, rangeEnd }: { events:
     });
   }, [month]);
   const weeks = useMemo(() => Array.from({ length: cells.length / 7 }, (_, index) => layoutWeek(cells.slice(index * 7, index * 7 + 7), rangeEvents)), [cells, rangeEvents]);
+  const weekCells = useMemo(() => {
+    const date = new Date(`${anchor}T12:00:00Z`);
+    date.setUTCDate(date.getUTCDate() - date.getUTCDay());
+    return Array.from({ length: 7 }, (_, index) => {
+      const day = new Date(date);
+      day.setUTCDate(day.getUTCDate() + index);
+      const value = day.toISOString().slice(0, 10);
+      return { value, day: day.getUTCDate(), current: value >= rangeStart && value <= rangeEnd };
+    });
+  }, [anchor, rangeStart, rangeEnd]);
+  const shownWeeks = view === "week" ? [layoutWeek(weekCells, rangeEvents)] : weeks;
+  function navigate(by: number) {
+    if (view === "week") {
+      const date = new Date(`${anchor}T12:00:00Z`);
+      date.setUTCDate(date.getUTCDate() + by * 7);
+      const value = date.toISOString().slice(0, 10);
+      const bounded = value < rangeStart ? rangeStart : value > rangeEnd ? rangeEnd : value;
+      setAnchor(bounded);
+      setMonth(bounded.slice(0, 7));
+    } else {
+      const value = moveMonth(month, by);
+      setMonth(value);
+      setAnchor(`${value}-01`);
+    }
+  }
 
   useEffect(() => {
     if (!selected) return;
@@ -83,14 +111,15 @@ export function AdminCalendar({ events, today, rangeStart, rangeEnd }: { events:
   const previous = moveMonth(month, -1);
   const next = moveMonth(month, 1);
   return <>
-    <div className="admin-calendar panel">
+    <div className="admin-calendar panel" data-calendar-view={view}>
       <div className="admin-calendar-toolbar">
-        <div><strong>{monthLabel(month)}</strong><span>{events.length} calendar entries loaded</span></div>
-        <div><button type="button" className="secondary" disabled={previous < rangeStart.slice(0, 7)} onClick={() => setMonth(previous)} aria-label="Previous month">‹</button><button type="button" className="secondary" onClick={() => setMonth(today.slice(0, 7))}>Today</button><button type="button" className="secondary" disabled={next > rangeEnd.slice(0, 7)} onClick={() => setMonth(next)} aria-label="Next month">›</button></div>
+        <div><strong>{view === "week" ? `${fullDate(weekCells[0].value)} – ${fullDate(weekCells[6].value)}` : monthLabel(month)}</strong><span>{events.length} calendar entries loaded</span></div>
+        <div className="calendar-view-picker" role="group" aria-label="Calendar view">{(["week", "month", "list"] as const).map(option => <button key={option} className="secondary" type="button" aria-pressed={view === option} onClick={() => setView(option)}>{option[0].toUpperCase() + option.slice(1)}</button>)}</div>
+        <div><button type="button" className="secondary" disabled={view === "week" ? weekCells[0].value <= rangeStart : previous < rangeStart.slice(0, 7)} onClick={() => navigate(-1)} aria-label={view === "week" ? "Previous week" : "Previous month"}>‹</button><button type="button" className="secondary" onClick={() => { setMonth(today.slice(0, 7)); setAnchor(today); }}>Today</button><button type="button" className="secondary" disabled={view === "week" ? weekCells[6].value >= rangeEnd : next > rangeEnd.slice(0, 7)} onClick={() => navigate(1)} aria-label={view === "week" ? "Next week" : "Next month"}>›</button></div>
       </div>
       <div className="admin-calendar-scroll"><div className="admin-calendar-inner">
         <div className="admin-calendar-weekdays" aria-hidden="true">{["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => <span key={day}>{day}</span>)}</div>
-        <div className="admin-calendar-grid">{weeks.map((week, weekIndex) => <div className="admin-calendar-week" key={week.cells[0].value}>
+        <div className="admin-calendar-grid">{shownWeeks.map((week, weekIndex) => <div className="admin-calendar-week" key={week.cells[0].value}>
           {week.cells.map((cell) => <div key={cell.value} className={`admin-calendar-day${cell.current ? "" : " outside"}${cell.value === today ? " today" : ""}`}>
             <time dateTime={cell.value}>{cell.day}</time>
             <div className="admin-calendar-events" style={{ paddingTop: week.laneCount ? `${week.laneCount * 1.55}rem` : undefined }}>{(singleEventsByDate.get(cell.value) || []).map((event) => <button key={event.id} type="button" className={`calendar-event ${event.kind}`} onClick={() => setSelected(event)}>{event.title}</button>)}</div>
@@ -101,6 +130,10 @@ export function AdminCalendar({ events, today, rangeStart, rangeEnd }: { events:
           })}</div>
         </div>)}</div>
       </div></div>
+      {view === "week" && <div className="calendar-week-stack">{weekCells.map(cell => {
+        const daily = events.filter(event => event.date <= cell.value && (event.endDate || event.date) >= cell.value);
+        return <section key={cell.value} className={cell.value === today ? "is-today" : undefined}><h3><time dateTime={cell.value}>{fullDate(cell.value)}</time>{cell.value === today ? " · Today" : ""}</h3><div>{daily.length ? daily.map(event => <button key={event.id} type="button" className={`calendar-event ${event.kind}`} onClick={() => setSelected(event)}>{event.title}{event.endDate && event.endDate !== event.date ? <small> · {event.date} – {event.endDate}</small> : null}</button>) : <p className="hint">No events</p>}</div></section>;
+      })}</div>}
       <div className="public-calendar-agenda">{cells.filter(cell => cell.current).map(cell => {
         const daily = events.filter(event => event.date <= cell.value && (event.endDate || event.date) >= cell.value);
         if (!daily.length) return null;
