@@ -27,7 +27,7 @@ export type EventDateRow = {
 
 export type ManualCalendarEvent = { id: string; date: string; endDate: string; title: string; details: string | null };
 
-export async function loadAdminCalendar(from: string, to: string) {
+export async function loadAdminCalendar(from: string, to: string, publicView = false) {
   const sql = await dbReady();
   const [settingsRows, lunchRows, announcementRows, eventDateRows, manualRows] = await Promise.all([
     sql<{ calendar_feed_url_encrypted: string | null }[]>`select calendar_feed_url_encrypted from settings where singleton = true`,
@@ -36,7 +36,11 @@ export async function loadAdminCalendar(from: string, to: string) {
       where menu_date between ${from}::date and ${to}::date order by menu_date
     `,
     sql<{ id: string; occurrence_date: string; occurrence_end_date: string | null; title: string; details: string; status: string; scheduled_date: string }[]>`
-      select id, event_occurrence_date::text as occurrence_date, event_occurrence_end_date::text as occurrence_end_date, event_title as title, question as details,
+      select id, event_occurrence_date::text as occurrence_date, event_occurrence_end_date::text as occurrence_end_date, event_title as title,
+        case when not ${publicView} or exists (
+          select 1 from dispatches d where d.question_id = questions.id
+            and d.success = true and d.hidden_from_live = false
+        ) then question else '' end as details,
         status, scheduled_date::text
       from questions
       where question_type = 'event' and status in ('approved', 'sent')
@@ -82,6 +86,6 @@ export async function loadAdminCalendar(from: string, to: string) {
 // Only calendar entries cross the public boundary, never backfill records or
 // credentials. Approved events are intentionally visible before announcement day.
 export async function loadPublicCalendar(from: string, to: string) {
-  const { events } = await loadAdminCalendar(from, to);
+  const { events } = await loadAdminCalendar(from, to, true);
   return events.map(({ meta: _meta, ...event }) => event);
 }
