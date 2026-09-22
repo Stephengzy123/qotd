@@ -62,13 +62,15 @@ export function AdminCalendar({ events, today, rangeStart, rangeEnd }: { events:
     const first = new Date(Date.UTC(year, monthNumber - 1, 1, 12));
     const start = new Date(first);
     start.setUTCDate(1 - first.getUTCDay());
-    return Array.from({ length: 42 }, (_, index) => {
+    const daysInMonth = new Date(Date.UTC(year, monthNumber, 0, 12)).getUTCDate();
+    const cellCount = Math.ceil((first.getUTCDay() + daysInMonth) / 7) * 7;
+    return Array.from({ length: cellCount }, (_, index) => {
       const date = new Date(start);
       date.setUTCDate(start.getUTCDate() + index);
       return { value: date.toISOString().slice(0, 10), day: date.getUTCDate(), current: date.getUTCMonth() === monthNumber - 1 };
     });
   }, [month]);
-  const weeks = useMemo(() => Array.from({ length: 6 }, (_, index) => layoutWeek(cells.slice(index * 7, index * 7 + 7), rangeEvents)), [cells, rangeEvents]);
+  const weeks = useMemo(() => Array.from({ length: cells.length / 7 }, (_, index) => layoutWeek(cells.slice(index * 7, index * 7 + 7), rangeEvents)), [cells, rangeEvents]);
 
   useEffect(() => {
     if (!selected) return;
