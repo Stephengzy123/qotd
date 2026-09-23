@@ -7,11 +7,12 @@ import { PendingButton } from "@/components/pending-button";
 import { ScheduledDeliveryCheck } from "@/components/scheduled-delivery-check";
 import { AdminThemeToggle } from "@/components/admin-theme-toggle";
 
-export type AdminPage = "overview" | "calendar" | "analytics" | "pending" | "approved" | "sends" | "clubs" | "settings" | "accounts" | "logs" | "webhooks" | "reports";
+export type AdminPage = "overview" | "calendar" | "timetable" | "analytics" | "pending" | "approved" | "sends" | "clubs" | "settings" | "accounts" | "logs" | "webhooks" | "reports";
 
 export const ADMIN_PAGES: { key: AdminPage; href: string; label: string }[] = [
   { key: "overview", href: "/admin", label: "Overview" },
   { key: "calendar", href: "/admin/calendar", label: "Calendar" },
+  { key: "timetable", href: "/admin/timetable", label: "Timetable" },
   { key: "reports", href: "/admin/reports", label: "Inbox" },
   { key: "analytics", href: "/admin/analytics", label: "Analytics" },
   { key: "pending", href: "/admin/pending", label: "Pending" },

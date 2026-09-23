@@ -720,6 +720,17 @@ body.dialog-open { overflow: hidden; }
 .webhook-picker input[type=checkbox], .checkbox-label input { width: 1rem; height: 1rem; flex: 0 0 auto; }
 .item-other-actions { padding-top: .75rem; margin-top: .75rem; border-top: 1px solid var(--border); }
 .announcement-excerpt { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; }
+.timetable-editor { display: grid; gap: 1rem; }
+.timetable-template { padding: 1rem; }
+.timetable-rows { display: grid; gap: .45rem; }
+.timetable-row { display: grid; grid-template-columns: minmax(12rem, 1fr) 8rem 8rem 10rem auto; gap: .45rem; align-items: center; }
+.timetable-row input, .timetable-row select { min-width: 0; }
+.timetable-head { padding: 0 .65rem; color: var(--muted); font-size: .74rem; font-weight: 800; }
+.timetable-preview { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; padding: 1rem; }
+.timetable-preview article { padding: .85rem; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.timetable-preview h3 { margin: 0 0 .6rem; font-size: .9rem; }
+.timetable-preview-row { display: grid; grid-template-columns: 8rem 1fr; gap: .5rem; padding: .35rem 0; border-top: 1px solid var(--border); font-size: .82rem; }
+.timetable-preview-row time { color: var(--muted); font-variant-numeric: tabular-nums; }
 @media (max-width: 700px) {
   .admin-rail { padding: .5rem .75rem; gap: .25rem; }
   .admin-rail .rail-nav { flex-basis: 100%; order: 3; }
@@ -732,6 +743,10 @@ body.dialog-open { overflow: hidden; }
   .event-date-row button { width: 100%; }
   .event-backfill-actions { align-items: stretch; flex-direction: column-reverse; }
   .event-backfill-actions > * { width: 100%; }
+  .timetable-row { grid-template-columns: 1fr 1fr; }
+  .timetable-row input:first-child, .timetable-row select, .timetable-row .text-button { grid-column: 1 / -1; }
+  .timetable-head { display: none; }
+  .timetable-preview { grid-template-columns: 1fr; }
 }
 @media (prefers-color-scheme: dark) {
   .admin-frame { color-scheme: dark; --paper: #151a25; --surface: #202735; --text: #e7eaf1; --muted: #b4bdd0; --faint: #9ba6bc; --border: #364052; --border-strong: #526078; --accent-soft: #27385b; --red-ink: #ffb6b6; --moss-ink: #9fe6c0; --amber-ink: #f7d492; --red-soft: #442831; --moss-soft: #1d3e32; --amber-soft: #423923; background: var(--paper); min-height: 100dvh; }
