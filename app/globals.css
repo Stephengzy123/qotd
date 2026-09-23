@@ -785,6 +785,7 @@ body.dialog-open { overflow: hidden; }
 .personal-timetable-export fieldset { border: 0; padding: 0; min-width: 0; }
 .personal-timetable-export legend { font-weight: 700; margin-bottom: 1rem; }
 .personal-class-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
+.personal-class-fields { display: grid; gap: .65rem; min-width: 0; }
 .personal-class-grid label, .personal-export-link label { display: grid; gap: .4rem; min-width: 0; }
 .personal-export-link { margin-top: 1.25rem; }
 .personal-export-link .form-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .75rem; }
