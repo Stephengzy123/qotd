@@ -17,7 +17,7 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
   return <main className={`public-calendar-page${embedded ? " public-calendar-embed" : ""}`}>
     {!embedded && <header className="public-calendar-heading"><div><h1>School calendar</h1><p>Block rotations, upcoming events, and Senior School lunch menus. Select an entry for details.</p></div><a className="secondary" href="/live">Back to live announcements</a></header>}
     <AdminCalendar events={events} today={today} rangeStart={start} rangeEnd={end} />
-    {!embedded && <p><a href="/report?category=calendar">Report a calendar issue</a></p>}
+    {!embedded && <p className="row-buttons"><a href="/report?category=calendar">Report a calendar issue</a><a href="/report?category=suggestion">Suggest a feature</a></p>}
     {!embedded && <CalendarSubscriptions />}
   </main>;
 }

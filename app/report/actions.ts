@@ -12,22 +12,23 @@ export async function submitIssue(_previous: { error?: string; success?: string 
   const context = String(form.get("context") || "").trim();
   const description = String(form.get("description") || "").trim();
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return { error: "Reload the page and try again." };
-  if (!["announcement", "calendar", "general"].includes(category) || context.length > 500 || description.length < 10 || description.length > 2000) return { error: "Choose a category and describe the issue in 10–2,000 characters." };
+  if (!["announcement", "calendar", "general", "suggestion"].includes(category) || context.length > 500 || description.length < 10 || description.length > 2000) return { error: "Choose a category and enter 10–2,000 characters." };
+  const confirmation = category === "suggestion" ? "Suggestion received. Thanks for helping improve the site!" : "Report received. An admin will review it.";
   try {
     const h = await headers();
     const hash = hashAddress(h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown");
     const sql = await dbReady();
     const result = await sql.begin(async tx => {
       await tx`select pg_advisory_xact_lock(hashtextextended(${hash}, 82641))`;
-      if ((await tx`select id from issue_reports where id = ${id}`).length) return { success: "Report received. An admin will review it." };
+      if ((await tx`select id from issue_reports where id = ${id}`).length) return { success: confirmation };
       const [rate] = await tx`select count(*)::int as count from issue_reports where reporter_hash = ${hash} and created_at > now() - interval '1 hour'`;
-      if (rate.count >= 10) return { error: "Too many reports from this network. Please try again later." };
+      if (rate.count >= 10) return { error: "Too many submissions from this network. Please try again later." };
       await tx`insert into issue_reports (id, category, context, description, reporter_hash) values (${id}, ${category}, ${context}, ${description}, ${hash})`;
-      return { success: "Report received. An admin will review it." };
+      return { success: confirmation };
     });
     revalidatePath("/admin/reports");
     return result;
-  } catch { return { error: "Could not submit your report. Please try again." }; }
+  } catch { return { error: "Could not submit. Please try again." }; }
 }
 
 export async function updateIssue(form: FormData) {

@@ -32,6 +32,10 @@ const form = () => { const f = new FormData(); f.set('requestId', '12345678-1234
   assert.equal(inserted, 1);
   const invalid = form(); invalid.set('category', 'invented');
   assert.ok((await exportsObject.submitIssue({}, invalid)).error);
+  rate = 0;
+  const suggestion = form(); suggestion.set('category', 'suggestion');
+  assert.match((await exportsObject.submitIssue({}, suggestion)).success, /Suggestion received/);
+  assert.equal(inserted, 2);
   const update = new FormData(); update.set('id', '12345678-1234-1234-1234-123456789abc'); update.set('status', 'resolved');
   await assert.rejects(exportsObject.updateIssue(update), /Forbidden/);
   admin = true; await exportsObject.updateIssue(update);

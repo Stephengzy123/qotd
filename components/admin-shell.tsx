@@ -12,7 +12,7 @@ export type AdminPage = "overview" | "calendar" | "analytics" | "pending" | "app
 export const ADMIN_PAGES: { key: AdminPage; href: string; label: string }[] = [
   { key: "overview", href: "/admin", label: "Overview" },
   { key: "calendar", href: "/admin/calendar", label: "Calendar" },
-  { key: "reports", href: "/admin/reports", label: "Issue reports" },
+  { key: "reports", href: "/admin/reports", label: "Inbox" },
   { key: "analytics", href: "/admin/analytics", label: "Analytics" },
   { key: "pending", href: "/admin/pending", label: "Pending" },
   { key: "approved", href: "/admin/approved", label: "Approved" },

@@ -155,6 +155,7 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
         <div className="live-actions">
           <a href="/live/calendar" className="live-pill live-pill-link">Calendar</a>
           <a href="/report" className="live-pill">Report an issue</a>
+          <a href="/report?category=suggestion" className="live-pill">Suggest a feature</a>
           <LiveNotifications />
           <LiveInstall />
           {isAdmin && <a href="/admin" className="live-pill live-pill-link">Admin</a>}
