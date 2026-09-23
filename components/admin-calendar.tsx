@@ -146,7 +146,7 @@ export function AdminCalendar({ events, today, rangeStart, rangeEnd }: { events:
       {selected.details ? <div className="calendar-detail-copy discord-preview"><DiscordMarkdown value={selected.details} /></div> : null}
       {selected.items ? <div className="lunch-detail-list">{selected.items.map((item, index) => <div key={`${item.category}-${index}`}><strong>{item.category}</strong><span>{item.dish}</span></div>)}</div> : null}
       {selected.meta ? <p className="hint">{selected.meta}</p> : null}
-      <a className="secondary" href={`/report?category=calendar&context=${encodeURIComponent(`${selected.title} (${selected.date}${selected.endDate ? ` to ${selected.endDate}` : ""}) [${selected.id}]`.slice(0, 500))}`}>Report an issue</a>
+      <a className="secondary" href={`/live/report?category=calendar&context=${encodeURIComponent(`${selected.title} (${selected.date}${selected.endDate ? ` to ${selected.endDate}` : ""}) [${selected.id}]`.slice(0, 500))}`}>Report an issue</a>
     </section></div> : null}
   </>;
 }
