@@ -1,32 +1,32 @@
 import "server-only";
 
-export type TimetablePeriod = { label: string; start: string; end: string; kind: "class" | "activity" };
+export type TimetablePeriod = { label: string; start: string; end: string; kind: "class" | "activity" | "lunch"; infoUrl?: string };
 export type TimetableConfig = { monday: TimetablePeriod[]; tuesday: TimetablePeriod[]; wednesday: TimetablePeriod[]; thursday: TimetablePeriod[]; friday: TimetablePeriod[]; flex: TimetablePeriod[] };
 
 export const DEFAULT_TIMETABLE: TimetableConfig = {
   monday: [
     { label: "Period 1", start: "08:30", end: "09:40", kind: "class" }, { label: "Period 2", start: "09:50", end: "11:00", kind: "class" },
-    { label: "Connection Block", start: "11:05", end: "11:35", kind: "activity" }, { label: "Lunch", start: "11:35", end: "12:35", kind: "activity" },
+    { label: "Connection Block", start: "11:05", end: "11:35", kind: "activity" }, { label: "Lunch", start: "11:35", end: "12:35", kind: "lunch" },
     { label: "Period 3", start: "12:45", end: "13:55", kind: "class" }, { label: "Period 4", start: "14:05", end: "15:15", kind: "class" },
   ],
   tuesday: [
     { label: "Period 1", start: "08:30", end: "09:40", kind: "class" }, { label: "Period 2", start: "09:50", end: "11:00", kind: "class" },
-    { label: "Advisory", start: "11:05", end: "11:35", kind: "activity" }, { label: "Lunch", start: "11:35", end: "12:35", kind: "activity" },
+    { label: "Advisory", start: "11:05", end: "11:35", kind: "activity" }, { label: "Lunch", start: "11:35", end: "12:35", kind: "lunch" },
     { label: "Period 3", start: "12:45", end: "13:55", kind: "class" }, { label: "Period 4", start: "14:05", end: "15:15", kind: "class" },
   ],
   wednesday: [
     { label: "Period 1", start: "08:30", end: "09:30", kind: "class" }, { label: "Period 2", start: "09:40", end: "10:40", kind: "class" },
-    { label: "X Block", start: "10:50", end: "11:50", kind: "activity" }, { label: "Lunch", start: "11:50", end: "12:55", kind: "activity" },
+    { label: "X Block", start: "10:50", end: "11:50", kind: "activity" }, { label: "Lunch", start: "11:50", end: "12:55", kind: "lunch" },
     { label: "Period 3", start: "13:05", end: "14:05", kind: "class" }, { label: "Period 4", start: "14:15", end: "15:15", kind: "class" },
   ],
   thursday: [
     { label: "Period 1", start: "08:30", end: "09:40", kind: "class" }, { label: "Period 2", start: "09:50", end: "11:00", kind: "class" },
-    { label: "Connection Block", start: "11:05", end: "11:35", kind: "activity" }, { label: "Lunch", start: "11:35", end: "12:35", kind: "activity" },
+    { label: "Connection Block", start: "11:05", end: "11:35", kind: "activity" }, { label: "Lunch", start: "11:35", end: "12:35", kind: "lunch" },
     { label: "Period 3", start: "12:45", end: "13:55", kind: "class" }, { label: "Period 4", start: "14:05", end: "15:15", kind: "class" },
   ],
   friday: [
     { label: "Period 1", start: "08:30", end: "09:40", kind: "class" }, { label: "Period 2", start: "09:50", end: "11:00", kind: "class" },
-    { label: "Assembly", start: "11:05", end: "11:35", kind: "activity" }, { label: "Lunch", start: "11:35", end: "12:35", kind: "activity" },
+    { label: "Assembly", start: "11:05", end: "11:35", kind: "activity" }, { label: "Lunch", start: "11:35", end: "12:35", kind: "lunch" },
     { label: "Period 3", start: "12:45", end: "13:55", kind: "class" }, { label: "Period 4", start: "14:05", end: "15:15", kind: "class" },
   ],
   flex: [{ label: "Flex Day", start: "08:30", end: "15:15", kind: "activity" }],
@@ -47,9 +47,18 @@ export function validateTimetable(input: unknown): TimetableConfig {
       const time = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
       if (typeof start !== "string" || typeof end !== "string" || !time.test(start) || !time.test(end) || start >= end) throw new Error(`${prefix}: enter valid start and end times, with the end after the start.`);
       if (start < previousEnd) throw new Error(`${prefix}: periods must be in time order without overlapping.`);
-      if (kind !== "class" && kind !== "activity") throw new Error(`${prefix}: choose a valid period type.`);
+      if (kind !== "class" && kind !== "activity" && kind !== "lunch") throw new Error(`${prefix}: choose a valid period type.`);
+      let infoUrl: string | undefined;
+      if (kind === "activity" && row.infoUrl) {
+        if (typeof row.infoUrl !== "string" || row.infoUrl.length > 2048) throw new Error(`${prefix}: enter an information URL of at most 2,048 characters.`);
+        try {
+          const url = new URL(row.infoUrl.trim());
+          if (!["https:", "http:"].includes(url.protocol) || url.username || url.password) throw new Error();
+          infoUrl = url.href;
+        } catch { throw new Error(`${prefix}: enter a full http:// or https:// information link.`); }
+      }
       previousEnd = end;
-      return { label: label.trim(), start, end, kind };
+      return { label: label.trim(), start, end, kind, ...(infoUrl ? { infoUrl } : {}) };
     });
     const classes = result[key].filter(row => row.kind === "class").length;
     if (key === "flex" ? classes !== 0 : classes !== 4) throw new Error(key === "flex" ? "Flex Day uses activities only, without rotation class slots." : `${key}: include exactly four class slots for the four rotation letters.`);

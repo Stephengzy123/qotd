@@ -55,6 +55,7 @@ export default async function AdminCalendarPage({ searchParams }: { searchParams
   const actions = <>
     <CalendarEmbedCopy />
     <a className="secondary" href="/admin/timetable">Edit timetable</a>
+    <a className="secondary" href="/admin/calendar/export">Test calendar exports</a>
     <a className="secondary" href="/admin/calendar?add=1">＋ Add event</a>
     {allMissingEvents.length ? <a className="secondary" href={`/admin/calendar?backfill=1&event=${allMissingEvents[0].id}`}>Complete missing dates <span className="count-badge">{allMissingEvents.length}</span></a> : <span className="status ready">Event dates complete</span>}
     <form action={refreshLunchMenusAction}><PendingButton className="primary" pendingText="Refreshing…">Refresh lunch menus</PendingButton></form>

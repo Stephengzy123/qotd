@@ -478,6 +478,18 @@ const migrations = [
       `alter table settings add column if not exists timetable_config jsonb not null default '{"monday":[],"tuesday":[],"wednesday":[],"thursday":[],"friday":[],"flex":[]}'::jsonb`,
     ],
   },
+  {
+    version: 29,
+    statements: [
+      `create table if not exists personal_timetables (
+        token_hash text primary key,
+        owner_key text not null,
+        classes jsonb not null,
+        revoked_at timestamptz,
+        updated_at timestamptz not null default now()
+      )`,
+    ],
+  },
 ] as const;
 
 export function db() {

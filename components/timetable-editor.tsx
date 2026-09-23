@@ -26,8 +26,10 @@ export function TimetableEditor({ initial }: { initial: TimetableConfig }) {
         <input disabled={pending} required aria-label={`${labels[template]} period ${index + 1} label`} value={period.label} onChange={(event) => update(template, index, "label", event.target.value)} maxLength={80} />
         <input disabled={pending} required aria-label={`${labels[template]} period ${index + 1} start time`} type="time" value={period.start} onChange={(event) => update(template, index, "start", event.target.value)} />
         <input disabled={pending} required aria-label={`${labels[template]} period ${index + 1} end time`} type="time" value={period.end} onChange={(event) => update(template, index, "end", event.target.value)} />
-        <select disabled={pending} aria-label={`${labels[template]} period ${index + 1} type`} value={period.kind} onChange={(event) => update(template, index, "kind", event.target.value as TimetablePeriod["kind"])}>{template !== "flex" && <option value="class">Class slot</option>}<option value="activity">Activity / break</option></select>
+        <select disabled={pending} aria-label={`${labels[template]} period ${index + 1} type`} value={period.kind} onChange={(event) => update(template, index, "kind", event.target.value as TimetablePeriod["kind"])}>{template !== "flex" && <option value="class">Class slot</option>}<option value="activity">Activity / break</option><option value="lunch">Lunch menu</option></select>
         <button disabled={pending} type="button" className="text-button" onClick={() => remove(template, index)} aria-label={`Remove ${period.label}`}>Remove</button>
+        {period.kind === "activity" && <label className="timetable-period-info">Information link (optional)<input disabled={pending} type="url" placeholder="https://…" maxLength={2048} value={period.infoUrl || ""} onChange={event => update(template, index, "infoUrl", event.target.value)} aria-label={`${labels[template]} period ${index + 1} information link`} /></label>}
+        {period.kind === "lunch" && <p className="hint timetable-period-info">Opens this date’s Senior School lunch menu from the calendar.</p>}
       </div>)}</div>
     </section>)}
     {result.error && <p role="alert" className="error-text">{result.error}</p>}

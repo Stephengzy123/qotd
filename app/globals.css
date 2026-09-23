@@ -216,6 +216,11 @@ a.secondary.small { min-height: 30px; padding: .25rem .6rem; font-size: .8rem; }
 .calendar-day-hour time { position: absolute; right: calc(100% + 8px); top: -.65rem; white-space: nowrap; font-size: .7rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .calendar-day-period { position: absolute; left: 8px; right: 0; z-index: 1; display: flex; flex-wrap: wrap; align-content: flex-start; gap: .15rem .75rem; padding: .35rem .65rem; border: 1px solid var(--border-strong); border-left: 3px solid var(--accent); border-radius: 6px; background: var(--accent-soft); color: var(--text); overflow: hidden; font-size: .85rem; }
 .calendar-day-period.activity { border-left-color: var(--moss); background: var(--moss-soft); }
+.calendar-day-period.lunch { border-left-color: var(--moss); background: var(--moss-soft); }
+button.calendar-day-period, a.calendar-day-period { font-family: inherit; text-align: left; text-decoration: none; }
+button.calendar-day-period:hover, a.calendar-day-period:hover { border-color: var(--text); }
+button.calendar-day-period:focus-visible, a.calendar-day-period:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.timetable-period-info { grid-column: 1 / -1; margin-bottom: .6rem; font-size: .8rem; }
 .calendar-day-period span { color: var(--muted); font-size: .75rem; }
 .calendar-day-now { position: absolute; left: 0; right: 0; z-index: 3; border-top: 2px solid var(--red-ink); pointer-events: none; }
 .calendar-day-now::before { content: ""; position: absolute; top: -5px; left: -4px; width: 8px; height: 8px; background: var(--red-ink); border-radius: 50%; }
@@ -776,3 +781,12 @@ body.dialog-open { overflow: hidden; }
 }
 @media (max-width: 900px) { .two-col, .audience-chart-grid { grid-template-columns: 1fr; } }
 @media (max-width: 700px) { .inline-create { width: 100%; } .inline-create input { flex: 1; width: auto; } .club-stats { width: 100%; } .club-stats > div { flex: 1; } }
+.personal-timetable-export { padding: 1.25rem; }
+.personal-timetable-export fieldset { border: 0; padding: 0; min-width: 0; }
+.personal-timetable-export legend { font-weight: 700; margin-bottom: 1rem; }
+.personal-class-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
+.personal-class-grid label, .personal-export-link label { display: grid; gap: .4rem; min-width: 0; }
+.personal-export-link { margin-top: 1.25rem; }
+.personal-export-link .form-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .75rem; }
+@media (max-width: 760px) { .personal-class-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 400px) { .personal-class-grid { grid-template-columns: 1fr; } }
