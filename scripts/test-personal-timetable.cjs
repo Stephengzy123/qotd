@@ -43,6 +43,16 @@ assert.notDeepEqual(uids(render(classes, 'two')), uids(ics));
 assert.ok(render({ ...classes, A: '' }).includes('SUMMARY:Block A'));
 assert.ok(render({ ...classes, A: '中'.repeat(100) }).split('\r\n').every(line => Buffer.byteLength(line) <= 75));
 assert.ok(!ics.includes('VALUE=DATE'));
+const withRoom = personal.validateClasses({ ...classes, 'room:A': ' T215 ' });
+assert.equal(withRoom['room:A'], 'T215');
+assert.ok(render(withRoom).includes('SUMMARY:Class A (T215)'));
+assert.ok(render(withRoom).includes('LOCATION:T215'));
+assert.deepEqual(uids(render(withRoom)), uids(ics));
+assert.ok(!render({ ...withRoom, A: 'Math (T215)' }).includes('(T215) (T215)'));
+assert.ok(render({ ...classes, A: '', 'room:A': 'Gym' }).includes('SUMMARY:Block A (Gym)'));
+assert.ok(render({ ...classes, 'room:A': 'Hall, East' }).includes('LOCATION:Hall\\, East'));
+assert.throws(() => personal.validateClasses({ ...classes, 'room:A': 'x\nSUMMARY:bad' }));
+assert.throws(() => personal.validateClasses({ ...classes, 'room:A': 'a'.repeat(61) }));
 
 (async () => {
   const { types } = await import('../node_modules/postgres/src/types.js');
@@ -115,6 +125,9 @@ assert.ok(!ics.includes('VALUE=DATE'));
   assert.equal(typeof records.get(personal.tokenHash(token)).classes, 'object');
   assert.equal((await action('load', token)).classes.A, 'Updated again');
   assert.ok((await (await get(token)).text()).includes('SUMMARY:Updated again'));
+  await action('save', token, withRoom);
+  assert.equal((await action('load', token)).classes['room:A'], 'T215');
+  assert.ok((await (await get(token)).text()).includes('LOCATION:T215'));
   feedFailure = true;
   assert.equal((await get(token)).status, 503);
   feedFailure = false;

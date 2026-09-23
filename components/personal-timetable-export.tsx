@@ -57,7 +57,8 @@ export function PersonalTimetableExport({ storageKey }: { storageKey: string }) 
   }
   return <div className="panel personal-timetable-export">
     <form onSubmit={event => { event.preventDefault(); void save(); }}>
-      <fieldset disabled={busy}><legend>Classes by block</legend><div className="personal-class-grid">{[..."ABCDEFGH"].map(letter => <label key={letter}>Block {letter}<input maxLength={100} value={classes[letter]} placeholder={`Class for ${letter} (optional)`} onChange={event => setClasses(previous => ({ ...previous, [letter]: event.target.value }))} /></label>)}</div>
+      <fieldset disabled={busy}><legend>Classes by block</legend><div className="personal-class-grid">{[..."ABCDEFGH"].map(letter => <div className="personal-class-fields" key={letter}><label>Block {letter}<input maxLength={100} value={classes[letter]} placeholder={`Class for ${letter} (optional)`} onChange={event => setClasses(previous => ({ ...previous, [letter]: event.target.value }))} /></label><label>Room for {letter} (optional)<input maxLength={60} value={classes[`room:${letter}`] || ""} placeholder="e.g. T215" onChange={event => setClasses(previous => ({ ...previous, [`room:${letter}`]: event.target.value }))} /></label></div>)}</div>
+        <p className="hint">Rooms appear as “Course (Room)” and in the calendar event’s location. Existing course names are kept as entered; an identical room suffix will not be added twice.</p>
         <p className="hint">Blank classes appear as “Block A”, etc. One remembered timetable per browser and admin account. Clearing browser storage loses the remembered link, but does not revoke existing subscriptions.</p>
         <button type="submit" className="primary" disabled={loadFailed}>{busy ? "Working…" : saved ? "Save changes" : "Create subscription link"}</button> <button type="button" className="secondary" onClick={reset} disabled={!token}>Revoke / reset link</button>
       </fieldset>
