@@ -27,6 +27,7 @@ export function CalendarDayView({ date, periods, events, onSelect }: { date: str
     if (scroll.current) scroll.current.scrollTop = Math.max(0, (periods.length ? minutes(periods[0].start) - 30 : 480) * SCALE);
   }, [date, periods]);
   const daily = events.filter(event => event.date <= date && (event.endDate || event.date) >= date);
+  const lunch = daily.find(event => event.kind === "lunch" && event.date === date);
   return <div className="calendar-day-view">
     <div className="calendar-day-all-day"><span>All day</span><div>{daily.length ? daily.map(event => <button type="button" key={event.id} className={`calendar-event ${event.kind}`} onClick={() => onSelect(event)}>{event.title}</button>) : <p className="hint">No all-day events</p>}</div></div>
     <div className="calendar-day-note"><span>Times shown in Vancouver time</span><a href="/admin/timetable">Edit timetable</a></div>
@@ -34,9 +35,13 @@ export function CalendarDayView({ date, periods, events, onSelect }: { date: str
     <div className="calendar-day-scroll" ref={scroll} tabIndex={0} aria-label="Daily schedule, scroll for other times">
       <div className="calendar-day-timeline" style={{ height: 1440 * SCALE }}>
         {Array.from({ length: 24 }, (_, hour) => <div key={hour} className="calendar-day-hour" style={{ top: hour * 60 * SCALE }}><time>{clockLabel(hour * 60)}</time></div>)}
-        {periods.map((period, index) => <div key={`${date}-${index}`} className={`calendar-day-period ${period.kind}`} style={{ top: minutes(period.start) * SCALE, height: (minutes(period.end) - minutes(period.start)) * SCALE }} title={`${period.letter ? `${period.letter} · ` : ""}${period.label}, ${clockLabel(minutes(period.start))}–${clockLabel(minutes(period.end))}`}>
-          <strong>{period.letter ? `${period.letter} · ` : ""}{period.label}</strong><span>{clockLabel(minutes(period.start))}–{clockLabel(minutes(period.end))}</span>
-        </div>)}
+        {periods.map((period, index) => {
+          const props = { className: `calendar-day-period ${period.kind}`, style: { top: minutes(period.start) * SCALE, height: (minutes(period.end) - minutes(period.start)) * SCALE }, title: `${period.letter ? `${period.letter} · ` : ""}${period.label}, ${clockLabel(minutes(period.start))}–${clockLabel(minutes(period.end))}` };
+          const content = <><strong>{period.letter ? `${period.letter} · ` : ""}{period.label}</strong><span>{clockLabel(minutes(period.start))}–{clockLabel(minutes(period.end))}</span>{period.kind === "lunch" && <span>{lunch ? "View menu" : "Menu not available yet"}</span>}{period.kind === "activity" && period.infoUrl && <span>View information ↗</span>}</>;
+          if (period.kind === "lunch" && lunch) return <button key={`${date}-${index}`} type="button" {...props} onClick={() => onSelect(lunch)} aria-label={`${period.label}: view Senior School lunch menu`}>{content}</button>;
+          if (period.kind === "activity" && period.infoUrl) return <a key={`${date}-${index}`} {...props} href={period.infoUrl} target="_blank" rel="noopener noreferrer" aria-label={`${period.label}: information (opens in a new tab)`}>{content}</a>;
+          return <div key={`${date}-${index}`} {...props}>{content}</div>;
+        })}
         {now?.date === date && <div className="calendar-day-now" style={{ top: now.minute * SCALE }} aria-label={`Current time ${clockLabel(now.minute)} Vancouver`}><span>{clockLabel(now.minute)}</span></div>}
       </div>
     </div>

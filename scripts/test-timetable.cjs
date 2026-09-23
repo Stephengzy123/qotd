@@ -17,6 +17,17 @@ const { DEFAULT_TIMETABLE: defaults, validateTimetable, normalizeTimetable, rota
 const copy = () => structuredClone(defaults);
 assert.deepEqual(validateTimetable(copy()), defaults);
 assert.deepEqual(normalizeTimetable({}), defaults);
+const linked = copy();
+linked.tuesday[2].infoUrl = 'https://example.org/advisory';
+assert.equal(validateTimetable(linked).tuesday[2].infoUrl, linked.tuesday[2].infoUrl);
+assert.equal(scheduleForDate(validateTimetable(linked), '2026-09-22', ['C','D','A','B'])[2].infoUrl, linked.tuesday[2].infoUrl);
+assert.equal(scheduleForDate(defaults, '2026-09-22', ['C','D','A','B'])[3].kind, 'lunch');
+for (const url of ['javascript:alert(1)', 'data:text/html,test', 'file:///tmp/test', '/relative', 'https://user:password@example.org']) {
+  const invalidLink = copy(); invalidLink.tuesday[2].infoUrl = url;
+  assert.throws(() => validateTimetable(invalidLink), /information link/);
+}
+const legacy = copy(); legacy.monday[3].kind = 'activity';
+assert.equal(validateTimetable(legacy).monday[3].kind, 'activity');
 for (const [title, letters] of [['Day 1 (ABCD)', 'ABCD'], ['Day 1 (CDAB)', 'CDAB'], ['Day 2 (EFGH)', 'EFGH'], ['Day 1 (XB)', 'X'], ['XB', 'X']]) {
   assert.equal(rotationLetters(title).join(''), letters);
   const schedule = scheduleForDate(defaults, '2026-09-21', rotationLetters(title));
