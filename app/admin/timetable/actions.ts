@@ -18,5 +18,6 @@ export async function saveTimetableAction(_previous: { error?: string; success?:
   await sql`update settings set timetable_config = ${JSON.stringify(config)}::jsonb, updated_at = now() where singleton = true`;
   await logEvent({ action: "save_timetable", actor: session.username, role: session.role, details: { monday: config.monday.length, tuesday: config.tuesday.length, wednesday: config.wednesday.length, thursday: config.thursday.length, friday: config.friday.length, flex: config.flex.length } });
   revalidatePath("/admin/timetable");
+  revalidatePath("/admin/calendar");
   return { success: "Timetable saved. The daily preview has been updated." };
 }
