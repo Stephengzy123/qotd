@@ -472,6 +472,12 @@ const migrations = [
         check (category in ('announcement', 'calendar', 'general', 'suggestion'))`,
     ],
   },
+  {
+    version: 28,
+    statements: [
+      `alter table settings add column if not exists timetable_config jsonb not null default '{"monday":[],"tuesday":[],"wednesday":[],"thursday":[],"friday":[],"flex":[]}'::jsonb`,
+    ],
+  },
 ] as const;
 
 export function db() {
