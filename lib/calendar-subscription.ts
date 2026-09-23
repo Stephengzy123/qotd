@@ -6,10 +6,10 @@ export type CalendarFeed = keyof typeof calendarFeeds;
 export const subscriptionCategories = ["announcement", "manual", "imported", "rotations", "lunch"] as const;
 export type SubscriptionCategory = typeof subscriptionCategories[number];
 
-function escapeText(value: string) {
+export function escapeText(value: string) {
   return value.replace(/\\/g, "\\\\").replace(/\r\n?|\n/g, "\\n").replace(/;/g, "\\;").replace(/,/g, "\\,");
 }
-function fold(line: string) {
+export function fold(line: string) {
   let output = "", bytes = 0;
   for (const character of line) {
     const size = Buffer.byteLength(character);
