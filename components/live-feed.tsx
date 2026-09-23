@@ -48,6 +48,22 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
   const scrollChange = useRef<{ height: number; top: number } | "bottom" | null>(null);
   const revealAfterRender = useRef<string | null>(null);
   const retryDirection = useRef<"initial" | "older" | "newer">("initial");
+  const moreMenu = useRef<HTMLDetailsElement>(null);
+
+  useEffect(() => {
+    const dismiss = (event: PointerEvent) => {
+      if (moreMenu.current && !moreMenu.current.contains(event.target as Node)) moreMenu.current.open = false;
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && moreMenu.current?.open) {
+        moreMenu.current.open = false;
+        moreMenu.current.querySelector("summary")?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("keydown", escape);
+    return () => { document.removeEventListener("pointerdown", dismiss); document.removeEventListener("keydown", escape); };
+  }, []);
 
   useEffect(() => { try { const saved = localStorage.getItem("announcement-live-theme"); if (saved && ["system", "light", "dark"].includes(saved)) setTheme(saved); } catch {} }, []);
   useEffect(() => {
@@ -152,26 +168,34 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
           {avatarUrl ? <img className="live-avatar live-avatar-lg" src={avatarUrl} alt="" width={44} height={44} referrerPolicy="no-referrer" /> : <div className="live-avatar live-avatar-lg" aria-hidden="true">{botName.slice(0, 1).toUpperCase()}</div>}
           <div><LiveChannelName initialName={channelName} editable={isAdmin} /><p className="live-sub"><span className="live-dot" aria-hidden="true" />Live · {loading && !messages.length ? "loading" : `${messages.length} loaded${todayCount ? ` · ${todayCount} today` : ""}`}</p></div>
         </div>
-        <div className="live-actions">
-          <a href="/live/calendar" className="live-pill live-pill-link">Calendar</a>
-          <a href="/report" className="live-pill">Report an issue</a>
-          <LiveNotifications />
-          <LiveInstall />
-          {isAdmin && <a href="/admin" className="live-pill live-pill-link">Admin</a>}
-        </div>
+        <button type="button" className="live-pill live-theme-cycle" title="Cycle appearance: Auto → Light → Dark" aria-label={`Appearance: ${THEMES.find(item => item.value === theme)?.label}. Switch to ${THEMES[(THEMES.findIndex(item => item.value === theme) + 1) % THEMES.length].label}`} onClick={() => {
+          const next = THEMES[(THEMES.findIndex(item => item.value === theme) + 1) % THEMES.length].value;
+          setTheme(next); try { localStorage.setItem("announcement-live-theme", next); } catch {}
+        }}><span aria-hidden="true">{theme === "system" ? "◐" : theme === "light" ? "☀" : "☾"}</span>{THEMES.find(item => item.value === theme)?.label}</button>
       </div>
       <div className="live-header-row live-toolbar">
-        <div className="live-segmented" role="radiogroup" aria-label="Show">
+        <select className="live-filter-select" aria-label="Filter messages" value={filter} onChange={event => setFilter(event.target.value)}>
+          {FILTERS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
+        </select>
+        <div className="live-segmented live-filter-tabs" role="radiogroup" aria-label="Show">
           {FILTERS.map(item => <button key={item.value} type="button" role="radio" aria-checked={filter === item.value} className={filter === item.value ? "active" : undefined} onClick={() => setFilter(item.value)}>{item.label}</button>)}
         </div>
         <div className="live-toolbar-right">
+          <a href="/live/calendar" className="live-pill live-pill-link">Calendar</a>
+          <details className="live-more" ref={moreMenu}>
+            <summary className="live-pill">More <span aria-hidden="true">▾</span></summary>
+            <div className="live-more-panel">
+              <LiveNotifications />
+              <LiveInstall />
+              <a href="/live/report" className="live-pill">Report an issue</a>
+              <a href="/live/suggest" className="live-pill">Suggest a feature</a>
+              {isAdmin && <a href="/admin" className="live-pill">Admin</a>}
+            </div>
+          </details>
           {isAdmin && <div className="live-segmented" role="radiogroup" aria-label="Visibility">
             <button type="button" role="radio" aria-checked={!showHidden} className={!showHidden ? "active" : undefined} onClick={() => setShowHidden(false)}>Visible</button>
             <button type="button" role="radio" aria-checked={showHidden} className={showHidden ? "active" : undefined} onClick={() => setShowHidden(true)}>Hidden</button>
           </div>}
-          <div className="live-segmented" role="radiogroup" aria-label="Appearance">
-            {THEMES.map(item => <button key={item.value} type="button" role="radio" aria-checked={theme === item.value} className={theme === item.value ? "active" : undefined} onClick={() => { setTheme(item.value); try { localStorage.setItem("announcement-live-theme", item.value); } catch {} }}>{item.label}</button>)}
-          </div>
         </div>
       </div>
     </header>
@@ -186,9 +210,7 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
       {!loading && !error && !messages.length && <div className="live-empty"><strong>Nothing here yet</strong><p>{filter === "all" ? "Announcements appear the moment they’re sent." : "No messages in this category yet. Try Everything."}</p></div>}
       {groups.map(group => <section key={group.day} className="live-day">
         <div className="live-day-divider"><span>{group.day}</span></div>
-        {group.items.map(message => <article id={`live-message-${message.id}`} className={`live-message${message.hidden ? " is-hidden" : ""}${highlighted === message.id ? " is-highlighted" : ""}`} key={message.id} tabIndex={0} onClick={event => {
-          if (!(event.target as HTMLElement).closest("a, button, input, textarea, select, summary")) event.currentTarget.focus({ preventScroll: true });
-        }}>
+        {group.items.map(message => <article id={`live-message-${message.id}`} className={`live-message${message.hidden ? " is-hidden" : ""}${highlighted === message.id ? " is-highlighted" : ""}`} key={message.id}>
             {message.replyTo && <button type="button" className="live-reply-preview" disabled={message.replyTo.unavailable} onClick={() => void revealMessage(message.replyTo!.id)} aria-label={message.replyTo.unavailable ? "Original announcement unavailable" : `View announcement from ${message.replyTo.senderName || botName}`}>
               <span aria-hidden="true">↪</span><strong>{message.replyTo.senderName || botName}</strong><span>{message.replyTo.message ? replyExcerpt(message.replyTo.message) : "Original announcement unavailable"}</span>
             </button>}
@@ -206,7 +228,7 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
                 finally { setChanging(null); }
               }}>{changing === message.id ? "Saving…" : message.hidden ? "Restore" : "Hide"}</button>}</div>
             <div className="discord-preview"><DiscordMarkdown value={message.message} /></div>
-            <a className="live-report-link" href={`/report?category=announcement&context=${encodeURIComponent(`Announcement ${message.id}: ${message.message.slice(0, 300)}`)}`}>Report an issue</a>
+            <a className="live-report-flag" title="Report an issue" aria-label="Report an issue with this message" href={`/live/report?category=announcement&context=${encodeURIComponent(`Announcement ${message.id}: ${message.message.slice(0, 300)}`)}`}><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 21V3m0 1c5-4 9 4 14 0v10c-5 4-9-4-14 0" /></svg></a>
             {message.calendarDate && <div className="live-calendar-cta"><a className="live-pill live-pill-link" href="/live/calendar">View Whole Calendar</a></div>}
           </div>
         </article>)}

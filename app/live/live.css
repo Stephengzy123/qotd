@@ -1,7 +1,7 @@
 .live-shell { --live-bg: #eef1f6; --live-surface: #ffffff; --live-text: #171c2c; --live-muted: #5d6578; --live-faint: #8b93a6; --live-border: #dde2ec; --live-accent: #3b5bfd; --live-accent-soft: #e9edff; --live-code: #e4e7ee; --live-event: #7a5200; --live-event-bg: #fff4d6; --live-daily: #0f5c3b; --live-daily-bg: #e0f5ea; --live-reminder: #6b3fa0; --live-reminder-bg: #f1eafa; --live-calendar-item: #374151; --live-calendar-item-bg: #f4f5f8; color-scheme: light; height: 100dvh; display: flex; flex-direction: column; background: var(--live-bg); color: var(--live-text); font-family: var(--font); }
 .live-shell[data-theme="dark"] { --live-bg: #151923; --live-surface: #1d2230; --live-text: #eceef4; --live-muted: #aab1c1; --live-faint: #7b8398; --live-border: #384154; --live-accent: #aebaff; --live-accent-soft: rgb(174 186 255 / 12%); --live-code: #10131b; --live-event: #ffd27a; --live-event-bg: rgb(255 210 122 / 14%); --live-daily: #8fe0b6; --live-daily-bg: rgb(143 224 182 / 14%); --live-reminder: #d4b5f5; --live-reminder-bg: rgb(185 135 230 / 14%); --live-calendar-item: #eef1f7; --live-calendar-item-bg: #303848; color-scheme: dark; }
 /* Header */
-.live-header { position: relative; z-index: 2; display: grid; gap: .75rem; padding: .9rem max(1rem, calc((100vw - 1040px) / 2)) .8rem; border-bottom: 1px solid var(--live-border); background: color-mix(in srgb, var(--live-surface) 88%, transparent); backdrop-filter: blur(10px); }
+.live-header { position: relative; z-index: 2; display: grid; gap: .5rem; padding: .65rem max(1rem, calc((100vw - 1040px) / 2)); border-bottom: 1px solid var(--live-border); background: var(--live-surface); }
 .live-header-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .live-identity { display: flex; align-items: center; gap: .8rem; min-width: 0; }
 .live-header h1 { margin: 0; font-size: 1.2rem; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; }
@@ -40,6 +40,14 @@
 .live-calendar-agenda details p { margin: 0; padding: .55rem .65rem; border: 1px solid var(--live-border); border-radius: 7px; background: var(--live-calendar-item-bg); color: var(--live-calendar-item); font-size: .82rem; font-weight: 700; }
 .live-toolbar { padding-top: .1rem; }
 .live-toolbar-right { display: flex; gap: .5rem; flex-wrap: wrap; }
+.live-filter-select { display: none; }
+.live-theme-cycle { gap: .35rem; flex-shrink: 0; }
+.live-more { position: relative; }
+.live-more > summary { gap: .4rem; list-style: none; }
+.live-more > summary::-webkit-details-marker { display: none; }
+.live-more-panel { position: absolute; top: calc(100% + .5rem); right: 0; width: min(20rem, calc(100vw - 2rem)); max-height: min(65dvh, 32rem); overflow-y: auto; display: grid; gap: .65rem; padding: .85rem; border: 1px solid var(--live-border); border-radius: 10px; background: var(--live-surface); box-shadow: 0 8px 24px rgb(0 0 0 / 18%); }
+.live-more-panel > .live-pill, .live-more-panel .live-notifications button { width: 100%; justify-content: flex-start; border-radius: 7px; min-height: 44px; }
+.live-more-panel .live-install summary { padding: .6rem .2rem; }
 .live-segmented { display: inline-flex; padding: 3px; border: 1px solid var(--live-border); border-radius: 999px; background: var(--live-bg); }
 .live-segmented button { min-height: 30px; padding: .25rem .8rem; border: 0; border-radius: 999px; background: transparent; color: var(--live-muted); font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; }
 .live-segmented button.active { background: var(--live-surface); color: var(--live-text); box-shadow: 0 1px 2px rgb(0 0 0 / 12%); }
@@ -50,6 +58,18 @@
 .live-shell[data-theme="dark"] .live-pill-link { color: #0d1330; }
 
 /* Stream */
+.live-feedback { --paper: var(--live-bg); --surface: var(--live-surface); --text: var(--live-text); --muted: var(--live-muted); --faint: var(--live-muted); --border: var(--live-border); --border-strong: var(--live-border); --accent: var(--live-accent); --accent-soft: var(--live-accent-soft); height: auto; min-height: 100dvh; padding: 1.5rem 1rem; }
+.live-feedback-inner { width: 100%; max-width: 660px; margin: 0 auto; }
+.live-feedback .panel { padding: clamp(1rem, 3vw, 1.5rem); }
+.live-feedback a { color: var(--live-accent); }
+.live-feedback .primary { background: var(--live-accent); color: white; }
+.live-feedback[data-theme="dark"] .primary { color: #0d1330; }
+.live-feedback .primary:hover { filter: brightness(.92); }
+.live-feedback .secondary { color: var(--live-text); margin: .25rem; }
+.live-feedback .secondary:hover { background: var(--live-accent-soft); }
+.live-feedback .send-error { color: #b42330; }
+.live-feedback[data-theme="dark"] .send-error { color: #ffb3b8; }
+.live-feedback:not([data-theme]) { visibility: hidden; }
 .live-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; overflow-anchor: none; }
 .live-content { max-width: 1040px; margin: auto; padding: 1rem 1rem 2rem; }
 .live-day { margin-bottom: .5rem; }
@@ -62,18 +82,13 @@
 .live-message.is-highlighted { border-color: var(--live-accent); box-shadow: 0 0 0 3px var(--live-accent-soft); }
 .live-avatar { display: grid; place-items: center; flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; background: var(--live-accent); color: #fff; font-weight: 800; object-fit: cover; }
 .live-avatar-lg { width: 44px; height: 44px; }
-.live-message-body { flex: 1; min-width: 0; }
-.live-report-link { display: inline-block; margin-top: .7rem; color: var(--live-muted); font-size: .75rem; opacity: 0; pointer-events: none; }
-.live-message:focus-within .live-report-link { opacity: 1; pointer-events: auto; }
-.live-message:focus-visible { outline: 2px solid var(--live-accent); outline-offset: 2px; }
-@media (hover: hover) {
-  .live-message:hover .live-report-link { opacity: 1; pointer-events: auto; }
-}
-.live-report-link:hover { color: var(--live-text); }
+.live-message-body { position: relative; flex: 1; min-width: 0; }
+.live-report-flag { position: absolute; top: 0; right: 0; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 7px; color: var(--live-muted); }
+.live-report-flag:hover { color: var(--live-text); background: var(--live-accent-soft); }
 .live-calendar-cta { margin-top: .85rem; margin-bottom: .35rem; }
 .live-message-body:has(.live-calendar-cta) .discord-line:has(> br:only-child) { height: .5rem; line-height: .5rem; }
 .live-calendar-cta .live-pill { display: inline-flex; align-items: center; min-height: 40px; padding: .5rem .85rem; border-radius: 8px; }
-.live-message-meta { display: flex; align-items: center; flex-wrap: wrap; gap: .45rem; margin-bottom: .4rem; font-size: .86rem; }
+.live-message-meta { display: flex; align-items: center; flex-wrap: wrap; gap: .45rem; min-height: 44px; padding-right: 48px; margin-bottom: .4rem; font-size: .86rem; }
 .live-message-meta strong { font-weight: 800; }
 .live-message-meta time { color: var(--live-faint); font-size: .74rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .live-message-action { margin-left: auto; padding: .12rem .42rem; border: 0; border-radius: 4px; background: transparent; color: var(--live-muted); font: inherit; font-size: .74rem; font-weight: 700; cursor: pointer; }
@@ -156,9 +171,17 @@
   .live-content { padding: .75rem .6rem 2rem; }
   .live-message { grid-template-columns: 32px minmax(0, 1fr); column-gap: .6rem; padding: .75rem .8rem; }
   .live-avatar { width: 32px; height: 32px; }
-  .live-toolbar-right { width: 100%; }
-  .live-toolbar > .live-segmented { width: 100%; overflow-x: auto; }
-  .live-toolbar > .live-segmented button { flex: 0 0 auto; }
+  .live-header-row { gap: .5rem; }
+  .live-identity { flex: 1; gap: .5rem; }
+  .live-identity > div:last-child { min-width: 0; }
+  .live-header h1 { font-size: 1.05rem; overflow-wrap: anywhere; }
+  .live-toolbar { flex-wrap: nowrap; align-items: flex-start; }
+  .live-toolbar-right { flex-shrink: 0; gap: .35rem; }
+  .live-toolbar-right > .live-segmented { flex-basis: 100%; }
+  .live-toolbar:has(.live-toolbar-right > .live-segmented) { flex-wrap: wrap; }
+  .live-toolbar > .live-filter-tabs { display: none; }
+  .live-filter-select { display: block; flex: 1; min-width: 0; width: 0; min-height: 44px; padding: .4rem .5rem; border: 1px solid var(--live-border); border-radius: 8px; background: var(--live-bg); color: var(--live-text); font: inherit; font-size: .82rem; font-weight: 700; }
+  .live-header .live-pill { min-height: 44px; padding-inline: .65rem; border-radius: 8px; }
   .live-calendar-backdrop { padding: .75rem; }
   .live-calendar-popover { width: 100%; height: min(720px, 100%); padding: .75rem; border-radius: 12px; }
   .live-calendar-grid-scroll { display: none; }

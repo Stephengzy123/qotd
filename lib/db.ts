@@ -464,6 +464,14 @@ const migrations = [
       `create index if not exists issue_reports_status_idx on issue_reports(status, created_at desc)`,
     ],
   },
+  {
+    version: 27,
+    statements: [
+      `alter table issue_reports drop constraint if exists issue_reports_category_check`,
+      `alter table issue_reports add constraint issue_reports_category_check
+        check (category in ('announcement', 'calendar', 'general', 'suggestion'))`,
+    ],
+  },
 ] as const;
 
 export function db() {
