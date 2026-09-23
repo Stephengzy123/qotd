@@ -186,7 +186,9 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
       {!loading && !error && !messages.length && <div className="live-empty"><strong>Nothing here yet</strong><p>{filter === "all" ? "Announcements appear the moment they’re sent." : "No messages in this category yet. Try Everything."}</p></div>}
       {groups.map(group => <section key={group.day} className="live-day">
         <div className="live-day-divider"><span>{group.day}</span></div>
-        {group.items.map(message => <article id={`live-message-${message.id}`} className={`live-message${message.hidden ? " is-hidden" : ""}${highlighted === message.id ? " is-highlighted" : ""}`} key={message.id}>
+        {group.items.map(message => <article id={`live-message-${message.id}`} className={`live-message${message.hidden ? " is-hidden" : ""}${highlighted === message.id ? " is-highlighted" : ""}`} key={message.id} tabIndex={0} onClick={event => {
+          if (!(event.target as HTMLElement).closest("a, button, input, textarea, select, summary")) event.currentTarget.focus({ preventScroll: true });
+        }}>
             {message.replyTo && <button type="button" className="live-reply-preview" disabled={message.replyTo.unavailable} onClick={() => void revealMessage(message.replyTo!.id)} aria-label={message.replyTo.unavailable ? "Original announcement unavailable" : `View announcement from ${message.replyTo.senderName || botName}`}>
               <span aria-hidden="true">↪</span><strong>{message.replyTo.senderName || botName}</strong><span>{message.replyTo.message ? replyExcerpt(message.replyTo.message) : "Original announcement unavailable"}</span>
             </button>}
