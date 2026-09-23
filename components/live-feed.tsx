@@ -154,6 +154,7 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
         </div>
         <div className="live-actions">
           <a href="/live/calendar" className="live-pill live-pill-link">Calendar</a>
+          <a href="/report" className="live-pill">Report an issue</a>
           <LiveNotifications />
           <LiveInstall />
           {isAdmin && <a href="/admin" className="live-pill live-pill-link">Admin</a>}
@@ -203,6 +204,7 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
                 finally { setChanging(null); }
               }}>{changing === message.id ? "Saving…" : message.hidden ? "Restore" : "Hide"}</button>}</div>
             <div className="discord-preview"><DiscordMarkdown value={message.message} /></div>
+            <a className="live-report-link" href={`/report?category=announcement&context=${encodeURIComponent(`Announcement ${message.id}: ${message.message.slice(0, 300)}`)}`}>Report an issue</a>
             {message.calendarDate && <div className="live-calendar-cta"><a className="live-pill live-pill-link" href="/live/calendar">View Whole Calendar</a></div>}
           </div>
         </article>)}
