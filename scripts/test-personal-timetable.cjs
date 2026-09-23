@@ -45,6 +45,11 @@ assert.ok(render({ ...classes, A: '中'.repeat(100) }).split('\r\n').every(line 
 assert.ok(!ics.includes('VALUE=DATE'));
 
 (async () => {
+  const { types } = await import('../node_modules/postgres/src/types.js');
+  const driver = require('postgres')({ prepare: false }); // No connection made; use the real typed JSON parameter.
+  const roundTrip = value => types.json.parse(types.json.serialize(value));
+  assert.equal(typeof roundTrip(JSON.stringify(classes)), 'string'); // Reproduces the original bug.
+  assert.deepEqual(personal.restoreClasses(roundTrip(JSON.stringify(classes))), classes);
   let owner = 'alice', authorized = true, calls = 0;
   const records = new Map();
   const sql = async (parts, ...values) => {
@@ -54,7 +59,8 @@ assert.ok(!ics.includes('VALUE=DATE'));
     if (query.includes('insert into personal_timetables')) {
       const old = records.get(hash);
       if (old && (old.owner !== ownerKey || old.revoked)) return [];
-      records.set(hash, { owner: ownerKey, classes: JSON.parse(json) });
+      assert.equal(json.type, 3802, 'Save must pass a typed sql.json parameter, not pre-stringified text');
+      records.set(hash, { owner: ownerKey, classes: roundTrip(json.value) });
       return [{ token_hash: hash }];
     }
     if (query.includes('set revoked_at')) {
@@ -65,10 +71,11 @@ assert.ok(!ics.includes('VALUE=DATE'));
       const record = records.get(hash);
       return record && !record.revoked && (!ownerKey || record.owner === ownerKey) ? [{ classes: record.classes }] : [];
     }
-    if (query.includes('from settings')) return [{ timetable_config: config, calendar_feed_url_encrypted: 'encrypted' }];
+    if (query.includes('from settings')) return [{ timetable_config: JSON.stringify(config), calendar_feed_url_encrypted: 'encrypted' }];
     if (query.includes('from lunch_menus')) return [];
     throw Error(`Unexpected SQL: ${query}`);
   };
+  sql.json = driver.json;
   const auth = { requireRole: async role => { assert.equal(role, 'admin'); if (!authorized) throw Error('unauthorized'); return { username: owner }; } };
   const { personalTimetableAction: action } = load('app/admin/calendar/export/actions.ts', {
     '@/lib/auth': auth, '@/lib/db': { dbReady: async () => sql }, '@/lib/personal-timetable': personal,
@@ -81,8 +88,10 @@ assert.ok(!ics.includes('VALUE=DATE'));
   await action('save', token, { ...classes, A: 'Updated' });
   assert.equal(records.size, 1);
   assert.equal((await action('load', token)).classes.A, 'Updated');
+  records.get(personal.tokenHash(token)).classes = JSON.stringify({ ...classes, A: 'Recovered' });
+  assert.equal((await action('load', token)).classes.A, 'Recovered');
   owner = 'bob';
-  assert.equal((await action('load', token)).classes, undefined);
+  assert.ok((await action('load', token)).error);
   assert.ok((await action('save', token, classes)).error);
   await action('revoke', token);
   assert.equal(records.size, 1);
@@ -99,8 +108,13 @@ assert.ok(!ics.includes('VALUE=DATE'));
   const feed = await get(token);
   assert.equal(feed.status, 200);
   assert.match(feed.headers.get('cache-control'), /private/);
-  assert.ok((await feed.text()).includes('SUMMARY:Updated'));
-  assert.ok(!(await (await get(otherToken)).text()).includes('SUMMARY:Updated'));
+  assert.ok((await feed.text()).includes('SUMMARY:Recovered'));
+  assert.ok(!(await (await get(otherToken)).text()).includes('SUMMARY:Recovered'));
+  owner = 'alice';
+  await action('save', token, { ...classes, A: 'Updated again' });
+  assert.equal(typeof records.get(personal.tokenHash(token)).classes, 'object');
+  assert.equal((await action('load', token)).classes.A, 'Updated again');
+  assert.ok((await (await get(token)).text()).includes('SUMMARY:Updated again'));
   feedFailure = true;
   assert.equal((await get(token)).status, 503);
   feedFailure = false;

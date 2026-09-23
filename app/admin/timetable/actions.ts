@@ -15,7 +15,7 @@ export async function saveTimetableAction(_previous: { error?: string; success?:
   let config;
   try { config = validateTimetable(parsed); } catch (error) { return { error: error instanceof Error ? error.message : "Invalid timetable." }; }
   const sql = await dbReady();
-  await sql`update settings set timetable_config = ${JSON.stringify(config)}::jsonb, updated_at = now() where singleton = true`;
+  await sql`update settings set timetable_config = ${sql.json(config)}, updated_at = now() where singleton = true`;
   await logEvent({ action: "save_timetable", actor: session.username, role: session.role, details: { monday: config.monday.length, tuesday: config.tuesday.length, wednesday: config.wednesday.length, thursday: config.thursday.length, friday: config.friday.length, flex: config.flex.length } });
   revalidatePath("/admin/timetable");
   revalidatePath("/admin/calendar");
