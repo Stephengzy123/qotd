@@ -15,6 +15,11 @@ export function validateClasses(input: unknown): Record<string, string> {
   }));
 }
 
+// Older writes encoded JSON twice. Recover them without changing the token/UIDs.
+export function restoreClasses(input: unknown) {
+  return validateClasses(typeof input === "string" ? JSON.parse(input) : input);
+}
+
 // Resolve Vancouver wall time per date, rather than using today's UTC offset.
 export function pacificTimestamp(date: string, time: string) {
   const offset = new Intl.DateTimeFormat("en-US", { timeZone: "America/Vancouver", timeZoneName: "shortOffset" }).formatToParts(new Date(`${date}T12:00:00Z`)).find(part => part.type === "timeZoneName")!.value;

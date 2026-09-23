@@ -68,6 +68,8 @@ export function validateTimetable(input: unknown): TimetableConfig {
 
 // Empty templates are the migration's initial state, never accepted on save.
 export function normalizeTimetable(input: unknown): TimetableConfig {
+  // Compatibility with the previous pre-stringified jsonb writes.
+  if (typeof input === "string") input = JSON.parse(input);
   const source = input && typeof input === "object" ? input as Record<string, unknown> : {};
   if (Object.keys(source).length === 0 || Object.values(source).every(value => Array.isArray(value) && value.length === 0)) return structuredClone(DEFAULT_TIMETABLE);
   return validateTimetable(input);

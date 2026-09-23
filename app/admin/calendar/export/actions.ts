@@ -2,7 +2,7 @@
 
 import { requireRole } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
-import { tokenHash, validateClasses } from "@/lib/personal-timetable";
+import { tokenHash, validateClasses, restoreClasses } from "@/lib/personal-timetable";
 
 export async function personalTimetableAction(operation: "load" | "save" | "revoke", token: string, input?: unknown): Promise<{ classes?: Record<string, string>; error?: string }> {
   const session = await requireRole("admin");
@@ -13,7 +13,7 @@ export async function personalTimetableAction(operation: "load" | "save" | "revo
     const sql = await dbReady();
     if (operation === "save") {
       const rows = await sql`insert into personal_timetables (token_hash, owner_key, classes)
-        values (${hash}, ${owner}, ${JSON.stringify(classes)}::jsonb)
+        values (${hash}, ${owner}, ${sql.json(classes!)})
         on conflict (token_hash) do update set classes = excluded.classes, updated_at = now()
         where personal_timetables.owner_key = ${owner} and personal_timetables.revoked_at is null returning token_hash`;
       if (!rows.length) return { error: "This link was revoked or belongs to another account. Reset the browser's remembered link." };
@@ -24,8 +24,9 @@ export async function personalTimetableAction(operation: "load" | "save" | "revo
       return {};
     }
     if (operation !== "load") return { error: "Unknown operation." };
-    const rows = await sql<{ classes: Record<string, string> }[]>`select classes from personal_timetables where token_hash = ${hash} and owner_key = ${owner} and revoked_at is null`;
-    return { classes: rows[0]?.classes };
+    const rows = await sql<{ classes: unknown }[]>`select classes from personal_timetables where token_hash = ${hash} and owner_key = ${owner} and revoked_at is null`;
+    if (!rows[0]) return { error: "This saved link could not be found for your account, or was revoked. Reset it only if you want to create a new subscription." };
+    return { classes: restoreClasses(rows[0].classes) };
   } catch {
     return { error: "Could not load or save your timetable. Check class names (maximum 100 characters each) and try again." };
   }

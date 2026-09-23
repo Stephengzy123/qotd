@@ -11,6 +11,7 @@ export function PersonalTimetableExport({ storageKey }: { storageKey: string }) 
   const [busy, setBusy] = useState(true);
   const [saved, setSaved] = useState(false);
   const [message, setMessage] = useState("");
+  const [loadFailed, setLoadFailed] = useState(false);
   useEffect(() => {
     let active = true;
     setOrigin(window.location.origin);
@@ -18,19 +19,21 @@ export function PersonalTimetableExport({ storageKey }: { storageKey: string }) 
       try {
         const stored = localStorage.getItem(storageKey);
         if (stored) {
+          if (active) setToken(stored);
           const result = await personalTimetableAction("load", stored);
           if (!active) return;
           setToken(stored);
           if (result.classes) { setClasses(result.classes); setSaved(true); }
-          if (result.error) setMessage(result.error);
+          if (result.error) { setMessage(result.error); setLoadFailed(true); }
         }
-      } catch { if (active) setMessage("Browser storage or the server is unavailable. Try reloading before saving."); }
+      } catch { if (active) { setMessage("Browser storage or the server is unavailable. Try reloading before saving."); setLoadFailed(true); } }
       finally { if (active) setBusy(false); }
     })();
     return () => { active = false; };
   }, [storageKey]);
   const link = saved && token ? `${origin}/api/calendar/timetable/${token}.ics` : "";
   async function save() {
+    if (loadFailed) return;
     setBusy(true); setMessage("");
     try {
       // Persist before sending so a retry cannot create a second subscription.
@@ -48,7 +51,7 @@ export function PersonalTimetableExport({ storageKey }: { storageKey: string }) 
     try {
       const result = token ? await personalTimetableAction("revoke", token) : {};
       if (result.error) { setMessage(result.error); return; }
-      localStorage.removeItem(storageKey); setToken(""); setSaved(false); setMessage("Old link revoked. Save to create a new one.");
+      localStorage.removeItem(storageKey); setToken(""); setSaved(false); setLoadFailed(false); setMessage("Old link revoked. Save to create a new one.");
     } catch { setMessage("Could not reset. Please try again."); }
     finally { setBusy(false); }
   }
@@ -56,7 +59,7 @@ export function PersonalTimetableExport({ storageKey }: { storageKey: string }) 
     <form onSubmit={event => { event.preventDefault(); void save(); }}>
       <fieldset disabled={busy}><legend>Classes by block</legend><div className="personal-class-grid">{[..."ABCDEFGH"].map(letter => <label key={letter}>Block {letter}<input maxLength={100} value={classes[letter]} placeholder={`Class for ${letter} (optional)`} onChange={event => setClasses(previous => ({ ...previous, [letter]: event.target.value }))} /></label>)}</div>
         <p className="hint">Blank classes appear as “Block A”, etc. One remembered timetable per browser and admin account. Clearing browser storage loses the remembered link, but does not revoke existing subscriptions.</p>
-        <button type="submit" className="primary">{busy ? "Working…" : saved ? "Save changes" : "Create subscription link"}</button> <button type="button" className="secondary" onClick={reset} disabled={!token}>Revoke / reset link</button>
+        <button type="submit" className="primary" disabled={loadFailed}>{busy ? "Working…" : saved ? "Save changes" : "Create subscription link"}</button> <button type="button" className="secondary" onClick={reset} disabled={!token}>Revoke / reset link</button>
       </fieldset>
     </form>
     {message && <p role="status">{message}</p>}

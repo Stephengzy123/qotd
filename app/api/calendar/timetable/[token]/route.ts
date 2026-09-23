@@ -1,7 +1,7 @@
 import { dbReady } from "@/lib/db";
 import { getCalendarEvents } from "@/lib/calendar";
 import { normalizeTimetable } from "@/lib/timetable";
-import { tokenHash, validateClasses, personalTimetableCalendar } from "@/lib/personal-timetable";
+import { tokenHash, restoreClasses, personalTimetableCalendar } from "@/lib/personal-timetable";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -25,7 +25,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
       rotations.push(...await getCalendarEvents(settings.calendar_feed_url_encrypted, month.toISOString().slice(0, 10), end.toISOString().slice(0, 10)));
     }
     const menus = await sql<{ menu_date: string; items: { category: string; dish: string }[] }[]>`select menu_date::text, items from lunch_menus where menu_date between ${from}::date and ${to}::date`;
-    return new Response(personalTimetableCalendar(hash, validateClasses(personal.classes), normalizeTimetable(settings.timetable_config), rotations, menus, new URL(request.url).origin), {
+    return new Response(personalTimetableCalendar(hash, restoreClasses(personal.classes), normalizeTimetable(settings.timetable_config), rotations, menus, new URL(request.url).origin), {
       headers: { "Content-Type": "text/calendar; charset=utf-8", "Content-Disposition": 'inline; filename="my-timetable.ics"', "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer", "X-Robots-Tag": "noindex" },
     });
   } catch {

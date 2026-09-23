@@ -17,6 +17,10 @@ const { DEFAULT_TIMETABLE: defaults, validateTimetable, normalizeTimetable, rota
 const copy = () => structuredClone(defaults);
 assert.deepEqual(validateTimetable(copy()), defaults);
 assert.deepEqual(normalizeTimetable({}), defaults);
+assert.deepEqual(normalizeTimetable(JSON.stringify(defaults)), defaults);
+const legacyCustom = copy(); legacyCustom.monday[0].label = 'Custom period';
+assert.deepEqual(normalizeTimetable(JSON.stringify(legacyCustom)), legacyCustom);
+assert.throws(() => normalizeTimetable('{invalid'));
 const linked = copy();
 linked.tuesday[2].infoUrl = 'https://example.org/advisory';
 assert.equal(validateTimetable(linked).tuesday[2].infoUrl, linked.tuesday[2].infoUrl);
@@ -59,15 +63,22 @@ for (const mutate of [
 ]) { const config = copy(); mutate(config); assert.throws(() => validateTimetable(config)); }
 
 let admin = false, writes = 0, saved, revalidated = false;
+let jsonTypes;
+const driver = require('postgres')({ prepare: false });
+const sql = Object.assign(async (_sql, value) => {
+  assert.equal(value.type, 3802, 'Use typed sql.json for school templates');
+  writes++; saved = jsonTypes.parse(jsonTypes.serialize(value.value)); return [];
+}, { json: driver.json });
 const actions = load('app/admin/timetable/actions.ts', {
   '@/lib/auth': { requireRole: async role => { assert.equal(role, 'admin'); if (!admin) throw Error('Forbidden'); return {username:'tester', role:'admin'}; } },
-  '@/lib/db': { dbReady: async () => async (_sql, value) => { writes++; saved = JSON.parse(value); return []; } },
+  '@/lib/db': { dbReady: async () => sql },
   '@/lib/timetable': timetable,
   '@/lib/log': {logEvent: async () => {}},
   'next/cache': {revalidatePath: path => { assert.ok(['/admin/timetable', '/admin/calendar'].includes(path)); revalidated = true; }},
 });
 const form = data => { const result = new FormData(); result.set('config', data); return result; };
 (async () => {
+  jsonTypes = (await import('../node_modules/postgres/src/types.js')).types.json;
   await assert.rejects(actions.saveTimetableAction({}, form(JSON.stringify(defaults))), /Forbidden/);
   assert.equal(writes, 0);
   admin = true;
