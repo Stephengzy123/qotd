@@ -446,6 +446,24 @@ const migrations = [
         check (mode in ('scheduled', 'manual_random', 'manual_selected', 'manual_force'))`,
     ],
   },
+  {
+    version: 26,
+    statements: [
+      `create table if not exists issue_reports (
+        id uuid primary key,
+        category text not null check (category in ('announcement', 'calendar', 'general')),
+        context text not null default '' check (char_length(context) <= 500),
+        description text not null check (char_length(description) between 10 and 2000),
+        reporter_hash text not null,
+        status text not null default 'open' check (status in ('open', 'resolved')),
+        created_at timestamptz not null default now(),
+        resolved_at timestamptz,
+        resolved_by text
+      )`,
+      `create index if not exists issue_reports_rate_idx on issue_reports(reporter_hash, created_at)`,
+      `create index if not exists issue_reports_status_idx on issue_reports(status, created_at desc)`,
+    ],
+  },
 ] as const;
 
 export function db() {
