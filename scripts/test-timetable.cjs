@@ -53,7 +53,7 @@ const actions = load('app/admin/timetable/actions.ts', {
   '@/lib/db': { dbReady: async () => async (_sql, value) => { writes++; saved = JSON.parse(value); return []; } },
   '@/lib/timetable': timetable,
   '@/lib/log': {logEvent: async () => {}},
-  'next/cache': {revalidatePath: path => { assert.equal(path, '/admin/timetable'); revalidated = true; }},
+  'next/cache': {revalidatePath: path => { assert.ok(['/admin/timetable', '/admin/calendar'].includes(path)); revalidated = true; }},
 });
 const form = data => { const result = new FormData(); result.set('config', data); return result; };
 (async () => {
