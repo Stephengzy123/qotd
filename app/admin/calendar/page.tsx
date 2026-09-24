@@ -5,6 +5,7 @@ import { PendingButton } from "@/components/pending-button";
 import { requireRole } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
 import { normalizeTimetable, rotationForDate, scheduleForDate } from "@/lib/timetable";
+import { personalizeSchedule, restoreClasses } from "@/lib/personal-timetable";
 import { loadAdminCalendar } from "@/lib/admin-calendar";
 import { lunchSyncStatus } from "@/lib/lunch-menu";
 import { displayScheduledDate, pacificParts } from "@/lib/qotd";
@@ -37,10 +38,15 @@ export default async function AdminCalendarPage({ searchParams }: { searchParams
   const sql = await dbReady();
   const settings = (await sql`select timetable_config from settings where singleton = true`)[0];
   const config = normalizeTimetable(settings?.timetable_config);
+  const owner = session.accountId ? `account:${session.accountId}` : `username:${session.username}`;
+  const personal = (await sql<{ classes: unknown }[]>`select classes from personal_timetables where owner_key = ${owner} and revoked_at is null order by updated_at desc limit 1`)[0];
+  let personalClasses: Record<string, string> | null = null;
+  try { if (personal) personalClasses = restoreClasses(personal.classes); } catch { /* Invalid legacy personal data falls back to block labels. */ }
   const timetable: Record<string, ReturnType<typeof scheduleForDate>> = {};
   const imported = events.filter(event => event.kind === "imported");
   for (const date of new Set(imported.map(event => event.date))) {
-    timetable[date] = scheduleForDate(config, date, rotationForDate(imported, date)?.letters || null);
+    const schedule = scheduleForDate(config, date, rotationForDate(imported, date)?.letters || null);
+    timetable[date] = personalClasses ? personalizeSchedule(schedule, personalClasses) : schedule;
   }
   const allMissingEvents = editableEvents.filter((event) => !event.occurrenceDate);
   const skippedIds = validSkipped(params.skipped);
@@ -64,7 +70,7 @@ export default async function AdminCalendarPage({ searchParams }: { searchParams
   return <AdminShell page="calendar" username={session.username} title="Calendar" description="Admin preview of imported events, announcement occurrence dates, calendar-only events, and Senior School lunch menus." notice={params} actions={actions}>
     <section className="section-block">
       <div className="calendar-status-row"><span><strong>Lunch menu sync</strong> · Last successful {displayTimestamp(syncStatus.last_success_at)}</span>{syncStatus.last_error ? <span className="status failed">{syncStatus.last_error}</span> : <span className="status ready">Ready</span>}</div>
-      <AdminCalendar events={events} today={today} rangeStart={range.start} rangeEnd={range.end} timetable={timetable} />
+      <AdminCalendar events={events} today={today} rangeStart={range.start} rangeEnd={range.end} timetable={timetable} personalizedTimetable={Boolean(personalClasses)} />
     </section>
     <section className="section-block">
       <div className="section-title"><div><h2>Calendar-only events</h2><p className="hint">Use these for items that need a calendar entry but do not need their own announcement.</p></div><span className="count-badge">{manualEvents.length}</span></div>

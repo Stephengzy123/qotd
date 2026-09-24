@@ -24,6 +24,9 @@ assert.throws(() => personal.tokenHash('guess'));
 assert.throws(() => personal.validateClasses({ ...classes, A: 'bad\nBEGIN:VEVENT' }));
 assert.throws(() => personal.validateClasses({ ...classes, A: 'a'.repeat(101) }));
 assert.equal(personal.validateClasses({ ...classes, A: ' Maths ' }).A, 'Maths');
+const personalized = personal.personalizeSchedule(timetable.scheduleForDate(timetable.DEFAULT_TIMETABLE, '2026-09-23', ['C', 'D', 'A', 'B']), { ...classes, 'room:C': 'B201' });
+assert.equal(personalized.filter(period => period.kind === 'class')[0].label, 'Class C (B201)');
+assert.equal(personalized.find(period => period.kind === 'activity').label, 'X Block');
 assert.equal(personal.pacificTimestamp('2026-09-23', '08:30'), '20260923T153000Z');
 assert.equal(personal.pacificTimestamp('2026-12-02', '08:30'), '20261202T163000Z');
 const config = structuredClone(timetable.DEFAULT_TIMETABLE);
@@ -37,6 +40,7 @@ assert.ok(ics.includes('DTEND:20260923T163000Z')); // Wednesday first class ends
 assert.ok(ics.includes('SUMMARY:Flex Day'));
 assert.ok(ics.includes('SR OPTION 1: Pasta\\, salad'));
 assert.ok(ics.includes('URL:https://example.org/advisory'));
+assert.ok(ics.includes('X-WR-CALDESC:Personal timetable only'));
 const uids = text => text.match(/^UID:.*$/gm);
 assert.deepEqual(uids(render({ ...classes, A: 'Renamed' })), uids(ics));
 assert.notDeepEqual(uids(render(classes, 'two')), uids(ics));

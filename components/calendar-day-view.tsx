@@ -14,7 +14,7 @@ function pacificNow() {
   return { date: `${part("year")}-${part("month")}-${part("day")}`, minute: Number(part("hour")) * 60 + Number(part("minute")) };
 }
 
-export function CalendarDayView({ date, periods, events, onSelect }: { date: string; periods: DailyPeriod[]; events: AdminCalendarEvent[]; onSelect: (event: AdminCalendarEvent) => void }) {
+export function CalendarDayView({ date, periods, events, onSelect, personalized = false }: { date: string; periods: DailyPeriod[]; events: AdminCalendarEvent[]; onSelect: (event: AdminCalendarEvent) => void; personalized?: boolean }) {
   const [now, setNow] = useState<ReturnType<typeof pacificNow> | null>(null);
   const scroll = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -30,7 +30,7 @@ export function CalendarDayView({ date, periods, events, onSelect }: { date: str
   const lunch = daily.find(event => event.kind === "lunch" && event.date === date);
   return <div className="calendar-day-view">
     <div className="calendar-day-all-day"><span>All day</span><div>{daily.length ? daily.map(event => <button type="button" key={event.id} className={`calendar-event ${event.kind}`} onClick={() => onSelect(event)}>{event.title}</button>) : <p className="hint">No all-day events</p>}</div></div>
-    <div className="calendar-day-note"><span>Times shown in Vancouver time</span><a href="/admin/timetable">Edit timetable</a></div>
+    <div className="calendar-day-note"><span>{personalized ? "Your saved classes · Vancouver time" : "Times shown in Vancouver time"}</span><a href={personalized ? "/admin/calendar/export" : "/admin/timetable"}>{personalized ? "Edit my timetable" : "Edit timetable"}</a></div>
     {!periods.length && <p className="calendar-day-empty hint">No timed school schedule for this date. A weekday rotation and saved timetable are needed.</p>}
     <div className="calendar-day-scroll" ref={scroll} tabIndex={0} aria-label="Daily schedule, scroll for other times">
       <div className="calendar-day-timeline" style={{ height: 1440 * SCALE }}>

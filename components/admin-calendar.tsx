@@ -45,7 +45,7 @@ function layoutWeek(cells: CalendarCell[], events: AdminCalendarEvent[]) {
   return { cells, segments, laneCount: laneEnds.length };
 }
 
-export function AdminCalendar({ events, today, rangeStart, rangeEnd, timetable }: { events: AdminCalendarEvent[]; today: string; rangeStart: string; rangeEnd: string; timetable?: Record<string, DailyPeriod[]> }) {
+export function AdminCalendar({ events, today, rangeStart, rangeEnd, timetable, personalizedTimetable = false }: { events: AdminCalendarEvent[]; today: string; rangeStart: string; rangeEnd: string; timetable?: Record<string, DailyPeriod[]>; personalizedTimetable?: boolean }) {
   const [view, setView] = useState<"day" | "week" | "month" | "list">(timetable ? "day" : "month");
   const [anchor, setAnchor] = useState(today);
   useEffect(() => { if (!timetable && window.matchMedia("(max-width: 700px), (max-width: 1000px) and (pointer: coarse)").matches) setView("week"); }, [timetable]);
@@ -118,7 +118,7 @@ export function AdminCalendar({ events, today, rangeStart, rangeEnd, timetable }
         <div className="calendar-view-picker" role="group" aria-label="Calendar view">{([...(timetable ? ["day" as const] : []), "week", "month", "list"] as const).map(option => <button key={option} className="secondary" type="button" aria-pressed={view === option} onClick={() => setView(option)}>{option[0].toUpperCase() + option.slice(1)}</button>)}</div>
         <div><button type="button" className="secondary" disabled={view === "day" ? anchor <= rangeStart : view === "week" ? weekCells[0].value <= rangeStart : previous < rangeStart.slice(0, 7)} onClick={() => navigate(-1)} aria-label={view === "day" ? "Previous day" : view === "week" ? "Previous week" : "Previous month"}>‹</button><button type="button" className="secondary" onClick={() => { setMonth(today.slice(0, 7)); setAnchor(today); }}>Today</button><button type="button" className="secondary" disabled={view === "day" ? anchor >= rangeEnd : view === "week" ? weekCells[6].value >= rangeEnd : next > rangeEnd.slice(0, 7)} onClick={() => navigate(1)} aria-label={view === "day" ? "Next day" : view === "week" ? "Next week" : "Next month"}>›</button></div>
       </div>
-      {view === "day" && timetable && <CalendarDayView date={anchor} periods={timetable[anchor] || []} events={events} onSelect={setSelected} />}
+      {view === "day" && timetable && <CalendarDayView date={anchor} periods={timetable[anchor] || []} events={events} onSelect={setSelected} personalized={personalizedTimetable} />}
       <div className="admin-calendar-scroll"><div className="admin-calendar-inner">
         <div className="admin-calendar-weekdays" aria-hidden="true">{["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => <span key={day}>{day}</span>)}</div>
         <div className="admin-calendar-grid">{shownWeeks.map((week, weekIndex) => <div className="admin-calendar-week" key={week.cells[0].value}>
