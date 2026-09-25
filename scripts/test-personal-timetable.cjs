@@ -16,6 +16,7 @@ function load(file, deps = {}) {
 const timetable = load('lib/timetable.ts');
 const personal = load('lib/personal-timetable.ts', {
   '@/lib/timetable': timetable, '@/lib/calendar-subscription': load('lib/calendar-subscription.ts'),
+  '@/lib/timetable-personalization': load('lib/timetable-personalization.ts'),
 });
 const classes = Object.fromEntries([...'ABCDEFGH'].map(letter => [letter, `Class ${letter}`]));
 const token = 'ab'.repeat(32), otherToken = 'cd'.repeat(32);

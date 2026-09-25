@@ -1,10 +1,22 @@
 "use client";
 import { useEffect, useState } from "react";
+import { defaultPushPreferences, type PushCategory, type PushPreferences } from "@/lib/push-preferences";
 
 async function save(subscription: PushSubscription, method: "POST" | "DELETE") {
   const response = await fetch("/api/push", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(subscription.toJSON()) });
   if (!response.ok) throw new Error(await response.text());
 }
+
+async function preferencesRequest(subscription: PushSubscription, method: "POST" | "PATCH", preferences?: PushPreferences): Promise<PushPreferences> {
+  const response = await fetch("/api/push/preferences", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ subscription: subscription.toJSON(), preferences }) });
+  if (!response.ok) throw new Error(await response.text());
+  return (await response.json()).preferences;
+}
+
+const categories: { key: PushCategory; label: string }[] = [
+  { key: "announcement", label: "Daily announcements" }, { key: "event", label: "Events" },
+  { key: "reminder", label: "Reminders" }, { key: "human", label: "Human posts" },
+];
 
 export function LiveNotifications() {
   const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
@@ -12,6 +24,7 @@ export function LiveNotifications() {
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(true);
   const [status, setStatus] = useState("");
+  const [preferences, setPreferences] = useState<PushPreferences>(defaultPushPreferences);
   useEffect(() => {
     let cancelled = false;
     async function init() {
@@ -29,7 +42,7 @@ export function LiveNotifications() {
         setRegistration(reg); setSubscription(existing); setKey(config.publicKey || "");
         if (!config.publicKey) setStatus("Notifications are not configured yet.");
         else if (Notification.permission === "denied") setStatus("Notifications are blocked. Allow them in browser settings.");
-        else if (existing) await save(existing, "POST");
+        else if (existing) { await save(existing, "POST"); const loaded = await preferencesRequest(existing, "POST"); if (!cancelled) setPreferences(loaded); }
       } catch (error) { if (!cancelled) setStatus(error instanceof Error ? error.message : "Could not load notifications."); }
       finally { if (!cancelled) setBusy(false); }
     }
@@ -54,15 +67,29 @@ export function LiveNotifications() {
         const created = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: bytes });
         try { await save(created, "POST"); }
         catch (error) { await created.unsubscribe(); throw error; }
-        setSubscription(created); setStatus("Notifications on—even when this tab is closed.");
+        setSubscription(created); setPreferences(await preferencesRequest(created, "POST")); setStatus("Notifications on—even when this tab is closed.");
       }
     } catch (error) { setStatus(error instanceof Error ? error.message : "Could not change notifications. Try again."); }
+    finally { setBusy(false); }
+  }
+  async function changePreference(category: PushCategory, enabled: boolean) {
+    if (!subscription) return;
+    const previous = preferences;
+    const next = { ...previous, [category]: enabled };
+    setPreferences(next); setBusy(true); setStatus("");
+    try { setPreferences(await preferencesRequest(subscription, "PATCH", next)); setStatus("Notification preferences saved."); }
+    catch (error) { setPreferences(previous); setStatus(error instanceof Error ? error.message : "Could not save preferences."); }
     finally { setBusy(false); }
   }
   return <div className="live-notifications">
     <button type="button" disabled={busy || !registration || (!key && !subscription)} onClick={toggle} aria-pressed={Boolean(subscription)}>
       {busy ? "Checking…" : subscription ? "Disable notifications" : "Enable notifications"}
     </button>
+    <details className="live-notification-preferences"><summary>Notification preferences</summary>
+      <p>Choose what this browser notifies you about. Existing subscriptions start with everything on.</p>
+      {categories.map(({ key: category, label }) => <label key={category}><input type="checkbox" checked={preferences[category]} disabled={!subscription || busy} onChange={event => void changePreference(category, event.target.checked)} /> {label}</label>)}
+      {!subscription && <small>Enable notifications to change these settings.</small>}
+    </details>
     {status && <small role="status">{status}</small>}
   </div>;
 }

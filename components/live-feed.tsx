@@ -247,6 +247,7 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
             <summary className="live-pill">More <span aria-hidden="true">▾</span></summary>
             <div className="live-more-panel">
               <LiveNotifications />
+              <a href="/live/timetable" className="live-pill">My timetable</a>
               <LiveInstall />
               <a href="/live/report" className="live-pill">Report an issue</a>
               <a href="/live/suggest" className="live-pill">Suggest a feature</a>
