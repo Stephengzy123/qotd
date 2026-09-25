@@ -5,6 +5,7 @@ import { dbReady } from "@/lib/db";
 import { getWebhookDetails } from "@/lib/webhook-details";
 import { liveMessageText } from "@/lib/live-text";
 import { validPushEndpoint } from "@/lib/push-validation";
+import { normalizePushPreferences, pushCategory } from "@/lib/push-preferences";
 
 export function pushConfigured() {
   return Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY && process.env.VAPID_SUBJECT);
@@ -20,7 +21,7 @@ export function scheduleLivePush(dispatchId: string) {
 
 async function deliverLivePush(dispatchId: string) {
   const sql = await dbReady();
-  const message = (await sql`select message, created_at, sender_name, sender_avatar_url from dispatches where id = ${dispatchId} and success = true and hidden_from_live = false`)[0];
+  const message = (await sql`select message, created_at, sender_name, sender_avatar_url, question_type from dispatches where id = ${dispatchId} and success = true and hidden_from_live = false`)[0];
   if (!message) return;
   const settings = (await sql`select webhook_url_encrypted from settings where singleton = true`)[0];
   const profile = await getWebhookDetails(settings?.webhook_url_encrypted);
@@ -30,15 +31,17 @@ async function deliverLivePush(dispatchId: string) {
     icon: message.sender_avatar_url || (profile.status === "connected" ? profile.avatarUrl : null),
     tag: `announcement-${dispatchId}`,
   });
+  const category = pushCategory(message.question_type, message.sender_name);
   // Page through subscriptions; bounded concurrency avoids opening a socket per visitor.
   let cursor = "";
   for (;;) {
-    const rows = await sql<{ endpoint: string; p256dh: string; auth: string }[]>`
-      select endpoint, p256dh, auth from push_subscriptions
+    const rows = await sql<{ endpoint: string; p256dh: string; auth: string; preferences: unknown }[]>`
+      select endpoint, p256dh, auth, preferences from push_subscriptions
       where endpoint > ${cursor} and created_at <= ${message.created_at}
       order by endpoint limit 20`;
     if (!rows.length) break;
     await Promise.all(rows.map(async row => {
+      if (!normalizePushPreferences(row.preferences)[category]) return;
       if (!validPushEndpoint(row.endpoint)) return;
       try {
         await webpush.sendNotification({ endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } }, payload, {

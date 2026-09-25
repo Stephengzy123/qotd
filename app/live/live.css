@@ -68,6 +68,7 @@
 /* Stream */
 .live-feedback { --paper: var(--live-bg); --surface: var(--live-surface); --text: var(--live-text); --muted: var(--live-muted); --faint: var(--live-muted); --border: var(--live-border); --border-strong: var(--live-border); --accent: var(--live-accent); --accent-soft: var(--live-accent-soft); height: auto; min-height: 100dvh; padding: 1.5rem 1rem; }
 .live-feedback-inner { width: 100%; max-width: 660px; margin: 0 auto; }
+.live-timetable-inner { max-width: 1100px; }
 .live-feedback .panel { padding: clamp(1rem, 3vw, 1.5rem); }
 .live-feedback a { color: var(--live-accent); }
 .live-feedback .primary { background: var(--live-accent); color: white; }
@@ -146,6 +147,11 @@
 .live-notifications button:hover, .live-install button:hover { border-color: var(--live-accent); }
 .live-notifications button:disabled, .live-install button:disabled { opacity: .55; cursor: default; }
 .live-notifications small, .live-install small { font-size: .74rem; line-height: 1.4; color: var(--live-muted); }
+.live-notification-preferences { width: 100%; border-top: 1px solid var(--live-border); padding: .5rem 0; }
+.live-notification-preferences summary { cursor: pointer; font-size: .82rem; font-weight: 700; }
+.live-notification-preferences p { margin: .4rem 0; color: var(--live-muted); font-size: .75rem; line-height: 1.4; }
+.live-notification-preferences label { display: flex; align-items: center; gap: .45rem; min-height: 32px; font-size: .8rem; }
+.live-notification-preferences input { accent-color: var(--live-accent); }
 .live-install { max-width: 22rem; font-size: .8rem; }
 .live-install summary { cursor: pointer; font-weight: 700; }
 .live-install p { line-height: 1.5; }

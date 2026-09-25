@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { escapeText, fold } from "@/lib/calendar-subscription";
 import { rotationForDate, scheduleForDate, type TimetableConfig } from "@/lib/timetable";
+export { personalizeSchedule } from "@/lib/timetable-personalization";
 
 export type PersonalizedPeriod = ReturnType<typeof scheduleForDate>[number];
 
@@ -29,15 +30,6 @@ export function validateClasses(input: unknown): Record<string, string> {
 // Older writes encoded JSON twice. Recover them without changing the token/UIDs.
 export function restoreClasses(input: unknown) {
   return validateClasses(typeof input === "string" ? JSON.parse(input) : input);
-}
-
-export function personalizeSchedule(periods: PersonalizedPeriod[], classes: Record<string, string>) {
-  return periods.map(period => {
-    if (!period.letter) return period;
-    const course = classes[period.letter] || `Block ${period.letter}`;
-    const room = classes[`room:${period.letter}`] || "";
-    return { ...period, label: room && !course.endsWith(`(${room})`) ? `${course} (${room})` : course };
-  });
 }
 
 // Resolve Vancouver wall time per date, rather than using today's UTC offset.

@@ -490,6 +490,14 @@ const migrations = [
       )`,
     ],
   },
+  {
+    version: 30,
+    statements: [
+      `alter table push_subscriptions add column if not exists preferences jsonb not null default '{"announcement":true,"event":true,"reminder":true,"human":true}'::jsonb`,
+      `alter table personal_timetables add column if not exists address_hash text`,
+      `create index if not exists personal_timetables_address_idx on personal_timetables(address_hash, updated_at)`,
+    ],
+  },
 ] as const;
 
 export function db() {

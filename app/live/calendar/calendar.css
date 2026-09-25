@@ -1,6 +1,7 @@
 .public-calendar-page { min-height: 100dvh; padding: clamp(1rem, 3vw, 2.5rem); background: var(--paper); color: var(--text); }
 .public-calendar-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
 .public-calendar-heading h1 { margin: 0; }
+.public-calendar-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
 .calendar-subscriptions { margin-top: 1rem; padding: 1rem; }
 .calendar-subscriptions summary { cursor: pointer; font-weight: 700; }
 .calendar-subscriptions p { color: var(--muted); }
