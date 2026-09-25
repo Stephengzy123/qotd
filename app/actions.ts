@@ -249,6 +249,29 @@ export async function saveSettingsAction(formData: FormData) {
   redirect(messageUrl("/admin/settings", "ok", "Delivery settings saved."));
 }
 
+export async function publishLiveUpdateAction(formData: FormData) {
+  const session = await requireRole("admin");
+  const title = String(formData.get("title") || "").trim();
+  const body = String(formData.get("body") || "").trim();
+  if (!title || title.length > 80 || !body || body.length > 1000) {
+    await fail("/admin/settings", session, "publish_live_update", "Add a title (up to 80 characters) and description (up to 1,000 characters).", { titleLength: title.length, bodyLength: body.length });
+  }
+  const sql = await dbReady();
+  await sql`update settings set live_update_id = gen_random_uuid(), live_update_title = ${title}, live_update_body = ${body}, live_update_published_at = now() where singleton = true`;
+  await logEvent({ action: "publish_live_update", actor: session.username, role: session.role, details: { title } });
+  revalidatePath("/admin/settings");
+  redirect(messageUrl("/admin/settings", "ok", "Live update published. Visitors will see it when they open or return to Live Announcements."));
+}
+
+export async function clearLiveUpdateAction() {
+  const session = await requireRole("admin");
+  const sql = await dbReady();
+  await sql`update settings set live_update_id = null, live_update_title = null, live_update_body = null, live_update_published_at = null where singleton = true`;
+  await logEvent({ action: "clear_live_update", actor: session.username, role: session.role });
+  revalidatePath("/admin/settings");
+  redirect(messageUrl("/admin/settings", "ok", "Live update removed."));
+}
+
 export async function sendQuestionAction(formData: FormData) {
   const session = await requireRole("admin");
   const id = String(formData.get("id") || "");
