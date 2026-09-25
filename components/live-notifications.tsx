@@ -87,7 +87,7 @@ export function LiveNotifications() {
     </button>
     <details className="live-notification-preferences"><summary>Notification preferences</summary>
       <p>Choose what this browser notifies you about. Existing subscriptions start with everything on.</p>
-      {categories.map(({ key: category, label }) => <label key={category}><input type="checkbox" checked={preferences[category]} disabled={!subscription || busy} onChange={event => void changePreference(category, event.target.checked)} /> {label}</label>)}
+      {categories.map(({ key: category, label }) => <label key={category}><input type="checkbox" checked={preferences[category]} disabled={!subscription || busy} onChange={event => void changePreference(category, event.target.checked)} /><span>{label}</span></label>)}
       {!subscription && <small>Enable notifications to change these settings.</small>}
     </details>
     {status && <small role="status">{status}</small>}
