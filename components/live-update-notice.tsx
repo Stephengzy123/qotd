@@ -47,6 +47,7 @@ export function LiveUpdateNotice() {
       <span className="live-update-eyebrow">What’s new</span>
       <h2 id="live-update-title">{update.title}</h2>
       <div className="discord-preview live-update-description"><DiscordMarkdown value={update.body} /></div>
+      <a className="live-update-history-link" href="/update-history">See full update history here.</a>
     </div>
     <button type="button" className="live-pill" onClick={() => {
       seenThisSession.current = update.id;

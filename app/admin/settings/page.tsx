@@ -56,6 +56,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       <section className="section-block"><div className="section-title"><h2>Live update announcement</h2></div>
         <div className="panel settings-form">
           <p className="hint">Tell visitors what changed. The newest published update appears once per browser when someone opens or returns to <code>/live</code>. Publishing again gives it a new notice ID, even if the wording is unchanged.</p>
+          <p className="hint">For a separate, longer list of changes, <a href="/update-history">manage update history</a>.</p>
           {settings.live_update_published_at && <p className="hint">Currently published: <strong>{settings.live_update_title}</strong> · {settings.live_update_published_at.toLocaleString("en-CA", { timeZone: "America/Vancouver", dateStyle: "medium", timeStyle: "short" })} Pacific</p>}
           <form action={publishLiveUpdateAction} className="live-update-form">
             <div><label htmlFor="liveUpdateTitle">Update title</label><input id="liveUpdateTitle" name="title" defaultValue={settings.live_update_title || ""} maxLength={80} required placeholder="What’s new" /></div>

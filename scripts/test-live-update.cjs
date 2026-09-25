@@ -39,3 +39,45 @@ new Function('require', 'exports', compiled)(name => {
   assert.equal(response.headers.get('cache-control'), 'no-store');
   console.log('Live update checks passed: published-only response, no-store caching, and graceful failure.');
 })().catch(error => { console.error(error); process.exitCode = 1; });
+
+let admin = false;
+let inserted = [];
+let revalidated = [];
+const actionExports = {};
+const actionCompiled = ts.transpileModule(fs.readFileSync('app/update-history/actions.ts', 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText;
+new Function('require', 'exports', actionCompiled)(name => {
+  if (name === 'next/cache') return { revalidatePath: path => revalidated.push(path) };
+  if (name === 'next/navigation') return { redirect: path => { throw Error(`redirect:${path}`); } };
+  if (name === '@/lib/auth') return { requireRole: async () => {
+    if (!admin) throw Error('Forbidden');
+    return { username: 'admin', role: 'admin' };
+  } };
+  if (name === '@/lib/db') return { dbReady: async () => (parts, ...values) => {
+    inserted.push({ query: parts.join('?'), values });
+    return Promise.resolve([]);
+  } };
+  if (name === '@/lib/log') return { logEvent: async () => {} };
+  throw Error(`Unexpected import ${name}`);
+}, actionExports);
+
+(async () => {
+  const form = new FormData();
+  form.set('title', 'Calendar improvements');
+  form.set('body', '**Long-form** update\n'.repeat(400));
+  await assert.rejects(actionExports.publishHistoryEntry(form), /Forbidden/);
+  assert.equal(inserted.length, 0);
+  admin = true;
+  await assert.rejects(actionExports.publishHistoryEntry(form), /redirect:\/update-history\?ok=/);
+  assert.equal(inserted.length, 1);
+  assert.match(inserted[0].query, /insert into update_history_entries/);
+  assert.doesNotMatch(inserted[0].query, /update settings/);
+  assert.equal(inserted[0].values[1], form.get('body').trim());
+  assert.deepEqual(revalidated, ['/update-history']);
+  const empty = new FormData();
+  empty.set('title', 'Title');
+  await assert.rejects(actionExports.publishHistoryEntry(empty), /redirect:\/update-history\?error=/);
+  assert.equal(inserted.length, 1);
+  console.log('Update history checks passed: admin-only publishing, long Markdown, independent storage, and validation.');
+})().catch(error => { console.error(error); process.exitCode = 1; });

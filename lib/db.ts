@@ -514,6 +514,19 @@ const migrations = [
       `alter table settings add column if not exists live_update_published_at timestamptz`,
     ],
   },
+  {
+    version: 33,
+    statements: [
+      `create table if not exists update_history_entries (
+        id uuid primary key default gen_random_uuid(),
+        title text not null check (char_length(title) between 1 and 120),
+        body text not null check (char_length(body) > 0),
+        published_at timestamptz not null default now(),
+        published_by text not null
+      )`,
+      `create index if not exists update_history_entries_published_idx on update_history_entries(published_at desc, id desc)`,
+    ],
+  },
 ] as const;
 
 export function db() {
