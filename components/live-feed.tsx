@@ -41,12 +41,12 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
   const [showHidden, setShowHidden] = useState(false), [changing, setChanging] = useState<string | null>(null);
   const [filter, setFilter] = useState("all"), [theme, setTheme] = useState("system"), [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
   const [messages, setMessages] = useState<Message[]>([]), [hasOlder, setHasOlder] = useState(false);
-  const [searchInput, setSearchInput] = useState(""), [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false), [searchInput, setSearchInput] = useState(""), [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Message[]>([]), [searchHasMore, setSearchHasMore] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false), [searchError, setSearchError] = useState("");
   const [loading, setLoading] = useState(true), [error, setError] = useState(""), [newMessages, setNewMessages] = useState(false);
   const [replyingTo, setReplyingTo] = useState<QuickReplyTarget | null>(null), [highlighted, setHighlighted] = useState<string | null>(null);
-  const viewport = useRef<HTMLDivElement>(null), content = useRef<HTMLDivElement>(null);
+  const viewport = useRef<HTMLDivElement>(null), content = useRef<HTMLDivElement>(null), searchField = useRef<HTMLInputElement>(null), searchToggle = useRef<HTMLButtonElement>(null);
   const records = useRef<Message[]>([]), busy = useRef(false), generation = useRef(0), stickBottom = useRef(true);
   const searchRecords = useRef<Message[]>([]), searchBusy = useRef(false), searchGeneration = useRef(0);
   const scrollChange = useRef<{ height: number; top: number } | "bottom" | null>(null);
@@ -70,6 +70,7 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
   }, []);
 
   useEffect(() => { try { const saved = localStorage.getItem("announcement-live-theme"); if (saved && ["system", "light", "dark"].includes(saved)) setTheme(saved); } catch {} }, []);
+  useEffect(() => { if (searchOpen) searchField.current?.focus(); }, [searchOpen]);
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const applyTheme = () => setResolvedTheme(theme === "system" ? (mediaQuery.matches ? "dark" : "light") : theme as "light" | "dark");
@@ -192,6 +193,12 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
     if (query === searchQuery && query) { searchGeneration.current++; searchBusy.current = false; searchRecords.current = []; setSearchResults([]); void loadSearch(); }
     else setSearchQuery(query);
   }
+  function closeSearch() {
+    setSearchOpen(false);
+    setSearchInput("");
+    setSearchQuery("");
+    searchToggle.current?.focus();
+  }
 
   const revealMessage = useCallback(async (id: string) => {
     const existing = document.getElementById(`live-message-${id}`);
@@ -234,6 +241,7 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
           {FILTERS.map(item => <button key={item.value} type="button" role="radio" aria-checked={filter === item.value} className={filter === item.value ? "active" : undefined} onClick={() => setFilter(item.value)}>{item.label}</button>)}
         </div>
         <div className="live-toolbar-right">
+          <button ref={searchToggle} type="button" className={`live-pill live-search-toggle${searchOpen ? " active" : ""}`} title={searchOpen ? "Close search" : "Search announcements"} aria-label={searchOpen ? "Close search" : "Search announcements"} aria-expanded={searchOpen} aria-controls={searchOpen ? "live-search-form" : undefined} onClick={() => searchOpen ? closeSearch() : setSearchOpen(true)}><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8" /><path d="m16 16 5 5" /></svg></button>
           <a href="/live/calendar" className="live-pill live-pill-link">Calendar</a>
           <details className="live-more" ref={moreMenu}>
             <summary className="live-pill">More <span aria-hidden="true">▾</span></summary>
@@ -251,12 +259,11 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
           </div>}
         </div>
       </div>
-      <form className="live-search" role="search" onSubmit={submitSearch}>
-        <label htmlFor="live-search-input">Search announcements</label>
-        <input id="live-search-input" type="search" value={searchInput} maxLength={100} placeholder="Search any sent announcement or phrase" onChange={event => setSearchInput(event.target.value)} />
+      {searchOpen && <form id="live-search-form" className="live-search" role="search" onSubmit={submitSearch} onKeyDown={event => { if (event.key === "Escape") closeSearch(); }}>
+        <input ref={searchField} id="live-search-input" aria-label="Search announcements" type="search" value={searchInput} maxLength={100} placeholder="Search announcements" onChange={event => setSearchInput(event.target.value)} />
         <button type="submit" className="live-pill">Search</button>
         {searching && <button type="button" className="live-pill" onClick={() => { setSearchInput(""); setSearchQuery(""); }}>Clear</button>}
-      </form>
+      </form>}
     </header>
     <div ref={viewport} className="live-scroll" tabIndex={0} aria-label={searching ? "Announcement search results" : "Sent messages, oldest first"} onScroll={() => {
       const el = viewport.current!; stickBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
