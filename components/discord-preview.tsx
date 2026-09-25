@@ -1,6 +1,32 @@
 "use client";
 
-import { Fragment, type ReactNode } from "react";
+import { Fragment, cloneElement, isValidElement, type ReactElement, type ReactNode } from "react";
+
+function highlightText(value: string, phrase: string): ReactNode {
+  const lower = value.toLocaleLowerCase();
+  const needle = phrase.toLocaleLowerCase();
+  const parts: ReactNode[] = [];
+  let start = 0;
+  while (start < value.length) {
+    const at = lower.indexOf(needle, start);
+    if (at < 0) break;
+    if (at > start) parts.push(value.slice(start, at));
+    parts.push(<mark className="discord-search-match" key={at}>{value.slice(at, at + phrase.length)}</mark>);
+    start = at + phrase.length;
+  }
+  if (!parts.length) return value;
+  if (start < value.length) parts.push(value.slice(start));
+  return parts;
+}
+
+function highlightRendered(node: ReactNode, phrase: string): ReactNode {
+  if (typeof node === "string") return highlightText(node, phrase);
+  if (Array.isArray(node)) return node.map((child, index) => <Fragment key={index}>{highlightRendered(child, phrase)}</Fragment>);
+  if (!isValidElement(node)) return node;
+  const element = node as ReactElement<{ children?: ReactNode }>;
+  if (element.type === "mark" || element.type === "img" || element.props.children === undefined) return node;
+  return cloneElement(element, {}, highlightRendered(element.props.children, phrase));
+}
 
 const escapedCharacters: Record<string, string> = {
   "\\": "\uE000", _: "\uE001", "*": "\uE002", "|": "\uE003", "`": "\uE004", "#": "\uE005", "-": "\uE006", "~": "\uE007", ">": "\uE008", "[": "\uE009", "]": "\uE00A", "(": "\uE00B", ")": "\uE00C",
@@ -69,13 +95,13 @@ function renderInline(text: string, keyPrefix = "inline"): ReactNode[] {
   });
 }
 
-export function DiscordMarkdown({ value }: { value: string }) {
+export function DiscordMarkdown({ value, highlight = "" }: { value: string; highlight?: string }) {
   // Saved form values can use CRLF, while textarea edits use LF. Normalize
   // before parsing so both previews recognize block syntax on the first render.
   const normalizedValue = value.replace(/\r\n?/g, "\n");
   const blocks = protectEscapes(normalizedValue).split(/(```(?:[^\n`]*)\n?[\s\S]*?```)/g);
   let multilineQuote = false;
-  return blocks.flatMap((block, blockIndex) => {
+  const rendered = blocks.flatMap((block, blockIndex) => {
     if (block.startsWith("```") && block.endsWith("```")) {
       const inner = restoreEscapes(block.slice(3, -3));
       const newline = inner.indexOf("\n");
@@ -105,4 +131,5 @@ export function DiscordMarkdown({ value }: { value: string }) {
       return <div className="discord-line" key={key}>{line ? renderInline(line, key) : <br />}</div>;
     });
   });
+  return highlight.trim() ? highlightRendered(rendered, highlight.trim()) : rendered;
 }

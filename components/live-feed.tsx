@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { DiscordMarkdown } from "@/components/discord-preview";
 import { setLiveMessageHidden } from "@/app/live/actions";
 import { LiveNotifications } from "@/components/live-notifications";
@@ -41,10 +41,14 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
   const [showHidden, setShowHidden] = useState(false), [changing, setChanging] = useState<string | null>(null);
   const [filter, setFilter] = useState("all"), [theme, setTheme] = useState("system"), [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
   const [messages, setMessages] = useState<Message[]>([]), [hasOlder, setHasOlder] = useState(false);
+  const [searchInput, setSearchInput] = useState(""), [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Message[]>([]), [searchHasMore, setSearchHasMore] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false), [searchError, setSearchError] = useState("");
   const [loading, setLoading] = useState(true), [error, setError] = useState(""), [newMessages, setNewMessages] = useState(false);
   const [replyingTo, setReplyingTo] = useState<QuickReplyTarget | null>(null), [highlighted, setHighlighted] = useState<string | null>(null);
   const viewport = useRef<HTMLDivElement>(null), content = useRef<HTMLDivElement>(null);
   const records = useRef<Message[]>([]), busy = useRef(false), generation = useRef(0), stickBottom = useRef(true);
+  const searchRecords = useRef<Message[]>([]), searchBusy = useRef(false), searchGeneration = useRef(0);
   const scrollChange = useRef<{ height: number; top: number } | "bottom" | null>(null);
   const revealAfterRender = useRef<string | null>(null);
   const retryDirection = useRef<"initial" | "older" | "newer">("initial");
@@ -111,11 +115,50 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
     const timer = window.setInterval(() => { if (!document.hidden) void load("newer"); }, 15000);
     return () => { generation.current++; window.clearInterval(timer); };
   }, [load]);
+  const loadSearch = useCallback(async (older = false) => {
+    if (!searchQuery || searchBusy.current) return;
+    searchBusy.current = true;
+    const version = searchGeneration.current;
+    setSearchLoading(true);
+    try {
+      const params = new URLSearchParams({ type: filter, search: searchQuery });
+      if (isAdmin && showHidden) params.set("hidden", "true");
+      if (older && searchRecords.current.length) params.set("before", searchRecords.current[searchRecords.current.length - 1].cursor);
+      const response = await fetch(`/api/live?${params}`, { cache: "no-store" });
+      if (!response.ok) throw new Error("Search is unavailable. Please try again.");
+      const page: Page = await response.json();
+      if (version !== searchGeneration.current) return;
+      searchRecords.current = older ? [...searchRecords.current, ...page.messages] : page.messages;
+      setSearchResults(searchRecords.current);
+      setSearchHasMore(page.hasMore);
+      setSearchError("");
+    } catch (err) {
+      if (version === searchGeneration.current) setSearchError(err instanceof Error ? err.message : "Search is unavailable.");
+    } finally {
+      if (version === searchGeneration.current) { searchBusy.current = false; setSearchLoading(false); }
+    }
+  }, [filter, isAdmin, searchQuery, showHidden]);
+  useEffect(() => {
+    searchGeneration.current++;
+    searchBusy.current = false;
+    searchRecords.current = [];
+    setSearchResults([]);
+    setSearchHasMore(false);
+    setSearchError("");
+    if (searchQuery) {
+      stickBottom.current = false;
+      scrollChange.current = null;
+      if (viewport.current) viewport.current.scrollTop = 0;
+      void loadSearch();
+    }
+    return () => { searchGeneration.current++; };
+  }, [loadSearch, searchQuery]);
   useLayoutEffect(() => {
+    if (searchQuery) return;
     const el = viewport.current, change = scrollChange.current;
     if (el && change) el.scrollTop = change === "bottom" ? el.scrollHeight : change.top + el.scrollHeight - change.height;
     scrollChange.current = null;
-  }, [messages]);
+  }, [messages, searchQuery]);
   useLayoutEffect(() => {
     const id = revealAfterRender.current;
     if (!id) return;
@@ -128,18 +171,27 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
   }, [messages]);
   useEffect(() => {
     if (!content.current) return;
-    const observer = new ResizeObserver(() => { if (stickBottom.current && viewport.current) viewport.current.scrollTop = viewport.current.scrollHeight; });
+    const observer = new ResizeObserver(() => { if (!searchQuery && stickBottom.current && viewport.current) viewport.current.scrollTop = viewport.current.scrollHeight; });
     observer.observe(content.current);
     return () => observer.disconnect();
-  }, []);
+  }, [searchQuery]);
 
+  const searching = Boolean(searchQuery);
+  const visibleMessages = searching ? searchResults : messages;
   const todayCount = messages.filter(message => dayOf(message.sentAt) === "Today").length;
-  const groups = messages.reduce<{ day: string; items: Message[] }[]>((list, message) => {
+  const groups = visibleMessages.reduce<{ day: string; items: Message[] }[]>((list, message) => {
     const day = dayOf(message.sentAt);
     const last = list[list.length - 1];
     if (last && last.day === day) last.items.push(message); else list.push({ day, items: [message] });
     return list;
   }, []);
+
+  function submitSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const query = searchInput.trim();
+    if (query === searchQuery && query) { searchGeneration.current++; searchBusy.current = false; searchRecords.current = []; setSearchResults([]); void loadSearch(); }
+    else setSearchQuery(query);
+  }
 
   const revealMessage = useCallback(async (id: string) => {
     const existing = document.getElementById(`live-message-${id}`);
@@ -157,8 +209,9 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
       records.current = [...new Map(combined.map(message => [message.id, message])).values()];
       revealAfterRender.current = id;
       setMessages(records.current);
+      if (searchQuery) { setSearchInput(""); setSearchQuery(""); }
     } catch { setError("The original announcement could not be opened."); }
-  }, []);
+  }, [searchQuery]);
 
   return <main className="live-shell" data-theme={resolvedTheme}>
     {canRunScheduledBackup && <ScheduledDeliveryCheck intervalMs={15_000} showError={false} />}
@@ -198,16 +251,23 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
           </div>}
         </div>
       </div>
+      <form className="live-search" role="search" onSubmit={submitSearch}>
+        <label htmlFor="live-search-input">Search announcements</label>
+        <input id="live-search-input" type="search" value={searchInput} maxLength={100} placeholder="Search any sent announcement or phrase" onChange={event => setSearchInput(event.target.value)} />
+        <button type="submit" className="live-pill">Search</button>
+        {searching && <button type="button" className="live-pill" onClick={() => { setSearchInput(""); setSearchQuery(""); }}>Clear</button>}
+      </form>
     </header>
-    <div ref={viewport} className="live-scroll" tabIndex={0} aria-label="Sent messages, oldest first" onScroll={() => {
+    <div ref={viewport} className="live-scroll" tabIndex={0} aria-label={searching ? "Announcement search results" : "Sent messages, oldest first"} onScroll={() => {
       const el = viewport.current!; stickBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
       if (stickBottom.current) setNewMessages(false);
-      if (el.scrollTop < 100 && hasOlder && !busy.current) void load("older");
+      if (!searching && el.scrollTop < 100 && hasOlder && !busy.current) void load("older");
     }}><div ref={content} className="live-content">
-      {hasOlder && <button type="button" className="live-load live-pill" disabled={loading} onClick={() => void load("older")}>Load older messages</button>}
-      {loading && !messages.length && <div className="live-skeleton" role="status" aria-label="Loading messages">{[0, 1, 2].map(index => <div key={index}><span /><div><i /><i /><i /></div></div>)}</div>}
-      {error && <p className="live-status" role="alert">{error} <button type="button" className="live-pill" onClick={() => void load(retryDirection.current)}>Retry</button></p>}
-      {!loading && !error && !messages.length && <div className="live-empty"><strong>Nothing here yet</strong><p>{filter === "all" ? "Announcements appear the moment they’re sent." : "No messages in this category yet. Try Everything."}</p></div>}
+      {!searching && hasOlder && <button type="button" className="live-load live-pill" disabled={loading} onClick={() => void load("older")}>Load older messages</button>}
+      {searching && !searchError && <p className="live-search-summary" role="status">{searchLoading && !searchResults.length ? "Searching…" : `${searchResults.length} ${searchResults.length === 1 ? "result" : "results"}${searchHasMore ? " so far" : ""} for “${searchQuery}”`}</p>}
+      {!searching && loading && !messages.length && <div className="live-skeleton" role="status" aria-label="Loading messages">{[0, 1, 2].map(index => <div key={index}><span /><div><i /><i /><i /></div></div>)}</div>}
+      {searching ? searchError && <p className="live-status" role="alert">{searchError} <button type="button" className="live-pill" onClick={() => void loadSearch(Boolean(searchResults.length))}>Retry</button></p> : error && <p className="live-status" role="alert">{error} <button type="button" className="live-pill" onClick={() => void load(retryDirection.current)}>Retry</button></p>}
+      {searching ? !searchLoading && !searchError && !searchResults.length && <div className="live-empty"><strong>No matches found</strong><p>Try a different word or choose Everything.</p></div> : !loading && !error && !messages.length && <div className="live-empty"><strong>Nothing here yet</strong><p>{filter === "all" ? "Announcements appear the moment they’re sent." : "No messages in this category yet. Try Everything."}</p></div>}
       {groups.map(group => <section key={group.day} className="live-day">
         <div className="live-day-divider"><span>{group.day}</span></div>
         {group.items.map(message => <article id={`live-message-${message.id}`} className={`live-message${message.hidden ? " is-hidden" : ""}${highlighted === message.id ? " is-highlighted" : ""}`} key={message.id}>
@@ -227,14 +287,15 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
                 catch { setError("Could not change message visibility. Please try again."); }
                 finally { setChanging(null); }
               }}>{changing === message.id ? "Saving…" : message.hidden ? "Restore" : "Hide"}</button>}</div>
-            <div className="discord-preview"><DiscordMarkdown value={message.message} /></div>
+            <div className="discord-preview"><DiscordMarkdown value={message.message} highlight={searching ? searchQuery : ""} /></div>
             <a className="live-report-flag" title="Report an issue" aria-label="Report an issue with this message" href={`/live/report?category=announcement&context=${encodeURIComponent(`Announcement ${message.id}: ${message.message.slice(0, 300)}`)}`}><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 21V3m0 1c5-4 9 4 14 0v10c-5 4-9-4-14 0" /></svg></a>
             {message.calendarDate && <div className="live-calendar-cta"><a className="live-pill live-pill-link" href="/live/calendar">View Whole Calendar</a></div>}
           </div>
         </article>)}
       </section>)}
+      {searching && searchHasMore && <button type="button" className="live-load live-pill" disabled={searchLoading} onClick={() => void loadSearch(true)}>{searchLoading ? "Loading…" : "More results"}</button>}
     </div></div>
-    {newMessages && <button type="button" className="live-jump" onClick={() => { stickBottom.current = true; if (viewport.current) viewport.current.scrollTop = viewport.current.scrollHeight; setNewMessages(false); }}>New messages ↓</button>}
+    {!searching && newMessages && <button type="button" className="live-jump" onClick={() => { stickBottom.current = true; if (viewport.current) viewport.current.scrollTop = viewport.current.scrollHeight; setNewMessages(false); }}>New messages ↓</button>}
     {isAdmin && <QuickAnnouncement destinations={destinations} compact roleId={roleId} avatarUrl={avatarUrl} replyTo={replyingTo} onCancelReply={() => setReplyingTo(null)} onSent={() => { setReplyingTo(null); setFilter("all"); setShowHidden(false); stickBottom.current = true; if (filter === "all" && !showHidden) void load("newer"); }} />}
   </main>;
 }

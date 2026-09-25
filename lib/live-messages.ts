@@ -40,7 +40,7 @@ export function parseLiveCursor(value: string | null): { time: string; id: strin
 
 export type LiveFilter = "all" | "announcement" | "event" | "reminder" | "human";
 
-export async function getLiveMessages(type: LiveFilter, before: ReturnType<typeof parseLiveCursor>, after: ReturnType<typeof parseLiveCursor>, hidden = false) {
+export async function getLiveMessages(type: LiveFilter, before: ReturnType<typeof parseLiveCursor>, after: ReturnType<typeof parseLiveCursor>, hidden = false, search = "") {
   const sql = await dbReady();
   const rows = await sql<Row[]>`select d.id, d.message, d.question_type, d.hidden_from_live, d.sender_name, d.sender_avatar_url,
       d.calendar_fallback_date::text, d.reply_to_dispatch_id, d.created_at::text as sent_time, r.message as reply_message,
@@ -49,11 +49,12 @@ export async function getLiveMessages(type: LiveFilter, before: ReturnType<typeo
     left join dispatches r on r.id = d.reply_to_dispatch_id and r.success = true and r.hidden_from_live = false
     where d.success = true and d.hidden_from_live = ${hidden}
     ${type === "all" ? sql`` : type === "human" ? sql`and d.sender_name is not null` : sql`and d.question_type = ${type}`}
+    ${search ? sql`and strpos(lower(d.message), lower(${search})) > 0` : sql``}
     ${before ? sql`and (d.created_at, d.id) < (${before.time}::timestamptz, ${before.id}::uuid)` : sql``}
     ${after ? sql`and (d.created_at, d.id) > (${after.time}::timestamptz, ${after.id}::uuid)` : sql``}
     order by ${after ? sql`d.created_at asc, d.id asc` : sql`d.created_at desc, d.id desc`} limit 11`;
   const selected = rows.slice(0, 10);
-  if (!after) selected.reverse();
+  if (!after && !search) selected.reverse();
   return {
     messages: selected.map(serializeLiveMessage),
     hasMore: rows.length > 10,

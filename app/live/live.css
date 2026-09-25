@@ -39,6 +39,13 @@
 .live-calendar-agenda details > div { display: grid; gap: .4rem; padding: 0 .75rem .75rem; }
 .live-calendar-agenda details p { margin: 0; padding: .55rem .65rem; border: 1px solid var(--live-border); border-radius: 7px; background: var(--live-calendar-item-bg); color: var(--live-calendar-item); font-size: .82rem; font-weight: 700; }
 .live-toolbar { padding-top: .1rem; }
+.live-search { display: flex; align-items: center; gap: .55rem; }
+.live-search label { flex-shrink: 0; color: var(--live-muted); font-size: .78rem; font-weight: 700; }
+.live-search input { flex: 1; min-width: 0; min-height: 36px; padding: .45rem .7rem; border: 1px solid var(--live-border); border-radius: 8px; background: var(--live-bg); color: var(--live-text); font: inherit; font-size: .85rem; }
+.live-search input::placeholder { color: var(--live-faint); }
+.live-search-summary { margin: .3rem 0 1rem; color: var(--live-muted); font-size: .82rem; }
+.live-shell .discord-search-match { padding: .03rem .08rem; border-radius: 3px; background: #ffe29a; color: #332000; box-decoration-break: clone; }
+.live-shell[data-theme="dark"] .discord-search-match { background: #665017; color: #fff0b8; }
 .live-toolbar-right { display: flex; gap: .5rem; flex-wrap: wrap; }
 .live-filter-select { display: none; }
 .live-theme-cycle { gap: .35rem; flex-shrink: 0; }
@@ -167,6 +174,9 @@
 .live-shell[data-theme="dark"] .live-compose button { color: #0d1330; }
 .live-shell:has(.live-compose) .live-jump { bottom: auto; top: 8rem; }
 @media (max-width: 600px) {
+  .live-search { flex-wrap: wrap; }
+  .live-search label { flex-basis: 100%; }
+  .live-search input { min-height: 44px; }
   .live-header { padding: .7rem .9rem; }
   .live-content { padding: .75rem .6rem 2rem; }
   .live-message { grid-template-columns: 32px minmax(0, 1fr); column-gap: .6rem; padding: .75rem .8rem; }
