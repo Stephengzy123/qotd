@@ -8,6 +8,7 @@ import { LiveInstall } from "@/components/live-install";
 import { QuickAnnouncement, type QuickReplyTarget } from "@/components/quick-announcement";
 import { ScheduledDeliveryCheck } from "@/components/scheduled-delivery-check";
 import { LiveChannelName } from "@/components/live-channel-name";
+import { LiveUpdateNotice } from "@/components/live-update-notice";
 import type { WebhookOption } from "@/lib/webhook-destinations";
 import type { CalendarEvent } from "@/lib/calendar";
 
@@ -221,6 +222,7 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
   }, [searchQuery]);
 
   return <main className="live-shell" data-theme={resolvedTheme}>
+    <LiveUpdateNotice />
     {canRunScheduledBackup && <ScheduledDeliveryCheck intervalMs={15_000} showError={false} />}
     <header className="live-header">
       <div className="live-header-row">

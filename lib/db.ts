@@ -505,6 +505,15 @@ const migrations = [
       `create unique index if not exists personal_timetables_public_edit_hash_idx on personal_timetables(public_edit_hash) where public_edit_hash is not null`,
     ],
   },
+  {
+    version: 32,
+    statements: [
+      `alter table settings add column if not exists live_update_id uuid`,
+      `alter table settings add column if not exists live_update_title text`,
+      `alter table settings add column if not exists live_update_body text`,
+      `alter table settings add column if not exists live_update_published_at timestamptz`,
+    ],
+  },
 ] as const;
 
 export function db() {

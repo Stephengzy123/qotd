@@ -580,6 +580,7 @@ body.dialog-open { overflow: hidden; }
 .audience-chart time { overflow: hidden; color: var(--faint); font-size: .63rem; font-weight: 600; white-space: nowrap; text-align: center; }
 .audience-chart-note { margin: .6rem 0 0; }
 .settings-pages { display: block; }
+.live-update-form { display: grid; gap: 1rem; }
 .settings-save { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 0 -2.5rem; padding: .9rem 2.5rem; border-top: 1px solid var(--border); background: rgb(243 245 249 / 92%); backdrop-filter: blur(6px); }
 .quick-announcement { margin-bottom: 1.5rem; padding: 1.25rem 1.4rem; }
 .quick-announcement h2 { margin-bottom: .75rem; }

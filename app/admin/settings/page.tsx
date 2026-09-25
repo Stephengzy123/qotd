@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { saveSettingsAction } from "@/app/actions";
+import { clearLiveUpdateAction, publishLiveUpdateAction, saveSettingsAction } from "@/app/actions";
 import { requireRole } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
 import { DEFAULT_ANNOUNCEMENT_TEMPLATE, DEFAULT_EVENT_TEMPLATE } from "@/lib/qotd";
@@ -8,7 +8,7 @@ import { AnnouncementTemplateEditor } from "@/components/announcement-template-e
 import { PendingButton } from "@/components/pending-button";
 import { WebhookProfile } from "@/components/webhook-profile";
 
-type Settings = { message_template: string | null; event_message_template: string | null; mention_role_id: string | null; webhook_url_encrypted: string | null; notification_webhook_url_encrypted: string | null; has_webhook: boolean; notification_user_id: string | null; has_notification_webhook: boolean; has_calendar_feed: boolean; live_channel_name: string | null };
+type Settings = { message_template: string | null; event_message_template: string | null; mention_role_id: string | null; webhook_url_encrypted: string | null; notification_webhook_url_encrypted: string | null; has_webhook: boolean; notification_user_id: string | null; has_notification_webhook: boolean; has_calendar_feed: boolean; live_channel_name: string | null; live_update_title: string | null; live_update_body: string | null; live_update_published_at: Date | null };
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
   const session = await requireRole("admin");
@@ -16,9 +16,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const sql = await dbReady();
   const rows = await sql<Settings[]>`select message_template, event_message_template, mention_role_id, webhook_url_encrypted, notification_webhook_url_encrypted, webhook_url_encrypted is not null as has_webhook,
     notification_user_id, notification_webhook_url_encrypted is not null as has_notification_webhook,
-    calendar_feed_url_encrypted is not null as has_calendar_feed, live_channel_name
+    calendar_feed_url_encrypted is not null as has_calendar_feed, live_channel_name,
+    live_update_title, live_update_body, live_update_published_at
     from settings where singleton = true`;
-  const settings: Settings = rows[0] || { message_template: null, event_message_template: null, mention_role_id: null, webhook_url_encrypted: null, notification_webhook_url_encrypted: null, has_webhook: false, notification_user_id: null, has_notification_webhook: false, has_calendar_feed: false, live_channel_name: null };
+  const settings: Settings = rows[0] || { message_template: null, event_message_template: null, mention_role_id: null, webhook_url_encrypted: null, notification_webhook_url_encrypted: null, has_webhook: false, notification_user_id: null, has_notification_webhook: false, has_calendar_feed: false, live_channel_name: null, live_update_title: null, live_update_body: null, live_update_published_at: null };
   const ready = Boolean(settings.has_webhook && settings.mention_role_id);
 
   return (
@@ -50,8 +51,20 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <div><label htmlFor="liveChannelName">Channel name</label><input id="liveChannelName" name="liveChannelName" defaultValue={settings.live_channel_name || "Announcements"} minLength={1} maxLength={60} required /><p className="hint">Shown at the top of <code>/live</code>. It does not change message author names.</p></div>
           </div>
         </section>
-        <div className="settings-save"><p className="hint">One save covers all three sections.</p><PendingButton className="primary" pendingText="Saving…">Save settings</PendingButton></div>
+        <div className="settings-save"><p className="hint">Save delivery and message settings separately from Live updates.</p><PendingButton className="primary" pendingText="Saving…">Save settings</PendingButton></div>
       </form>
+      <section className="section-block"><div className="section-title"><h2>Live update announcement</h2></div>
+        <div className="panel settings-form">
+          <p className="hint">Tell visitors what changed. The newest published update appears once per browser when someone opens or returns to <code>/live</code>. Publishing again gives it a new notice ID, even if the wording is unchanged.</p>
+          {settings.live_update_published_at && <p className="hint">Currently published: <strong>{settings.live_update_title}</strong> · {settings.live_update_published_at.toLocaleString("en-CA", { timeZone: "America/Vancouver", dateStyle: "medium", timeStyle: "short" })} Pacific</p>}
+          <form action={publishLiveUpdateAction} className="live-update-form">
+            <div><label htmlFor="liveUpdateTitle">Update title</label><input id="liveUpdateTitle" name="title" defaultValue={settings.live_update_title || ""} maxLength={80} required placeholder="What’s new" /></div>
+            <div><label htmlFor="liveUpdateBody">What changed?</label><textarea id="liveUpdateBody" name="body" defaultValue={settings.live_update_body || ""} maxLength={1000} rows={4} required placeholder="Briefly explain the changes people should know about." /><p className="hint">Discord Markdown is supported (bold, links, lists, etc.). Up to 1,000 characters; only the latest published update is shown.</p></div>
+            <PendingButton className="primary" pendingText="Publishing…">Publish update</PendingButton>
+          </form>
+          {settings.live_update_published_at && <form action={clearLiveUpdateAction}><PendingButton className="secondary" pendingText="Removing…" confirmMessage="Remove the current Live update announcement?">Remove current update</PendingButton></form>}
+        </div>
+      </section>
     </AdminShell>
   );
 }
