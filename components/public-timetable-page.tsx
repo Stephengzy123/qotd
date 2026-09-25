@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { PersonalTimetableExport, PUBLIC_TIMETABLE_STORAGE_KEY } from "@/components/personal-timetable-export";
 
-export function PublicTimetablePage() {
+export function PublicTimetablePage({ adminStorageKey, adminClasses }: { adminStorageKey?: string; adminClasses?: Record<string, string> }) {
   const [theme, setTheme] = useState<"light" | "dark" | undefined>();
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -20,6 +20,6 @@ export function PublicTimetablePage() {
     <h1>My timetable</h1>
     <p>Add your classes for blocks A–H. The school rotation determines their order each day; school templates supply times, including Wednesdays and Flex Days.</p>
     <p><a href="/live/calendar">View your daily schedule on the calendar</a></p>
-    <PersonalTimetableExport storageKey={PUBLIC_TIMETABLE_STORAGE_KEY} publicMode />
+    <PersonalTimetableExport storageKey={PUBLIC_TIMETABLE_STORAGE_KEY} publicMode adminStorageKey={adminStorageKey} adminClasses={adminClasses} />
   </div></main>;
 }

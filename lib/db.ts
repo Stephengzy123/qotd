@@ -498,6 +498,13 @@ const migrations = [
       `create index if not exists personal_timetables_address_idx on personal_timetables(address_hash, updated_at)`,
     ],
   },
+  {
+    version: 31,
+    statements: [
+      `alter table personal_timetables add column if not exists public_edit_hash text`,
+      `create unique index if not exists personal_timetables_public_edit_hash_idx on personal_timetables(public_edit_hash) where public_edit_hash is not null`,
+    ],
+  },
 ] as const;
 
 export function db() {
