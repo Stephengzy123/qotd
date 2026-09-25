@@ -150,8 +150,9 @@
 .live-notification-preferences { width: 100%; border-top: 1px solid var(--live-border); padding: .5rem 0; }
 .live-notification-preferences summary { cursor: pointer; font-size: .82rem; font-weight: 700; }
 .live-notification-preferences p { margin: .4rem 0; color: var(--live-muted); font-size: .75rem; line-height: 1.4; }
-.live-notification-preferences label { display: flex; align-items: center; gap: .45rem; min-height: 32px; font-size: .8rem; }
-.live-notification-preferences input { accent-color: var(--live-accent); }
+.live-notification-preferences label { display: grid; grid-template-columns: 1rem minmax(0, 1fr); align-items: center; gap: .65rem; min-height: 40px; margin: 0; padding: .35rem .2rem; color: var(--live-text); font-size: .82rem; font-weight: 600; line-height: 1.35; cursor: pointer; }
+.live-notification-preferences label span { min-width: 0; }
+.live-notification-preferences input[type="checkbox"] { width: 1rem; height: 1rem; margin: 0; padding: 0; flex: none; border-color: var(--live-border); background: var(--live-surface); accent-color: var(--live-accent); cursor: inherit; }
 .live-install { max-width: 22rem; font-size: .8rem; }
 .live-install summary { cursor: pointer; font-weight: 700; }
 .live-install p { line-height: 1.5; }
