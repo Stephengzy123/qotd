@@ -6,6 +6,7 @@
 .live-update-notice h2 { margin: .15rem 0 .35rem; font-size: 1rem; line-height: 1.25; }
 .live-shell .discord-preview.live-update-description { max-height: min(44dvh, 18rem); overflow-y: auto; color: var(--live-muted); font-size: .82rem; line-height: 1.5; }
 .live-update-description .discord-heading { font-size: 1rem; }
+.live-update-history-link { display: inline-block; margin-top: .7rem; color: var(--live-accent); font-size: .78rem; font-weight: 700; }
 .live-update-notice .live-pill { flex-shrink: 0; }
 @media (max-width: 500px) { .live-update-notice { bottom: max(1rem, env(safe-area-inset-bottom)); align-items: stretch; flex-direction: column; } .live-update-notice .live-pill { align-self: flex-end; } }
 /* Header */
