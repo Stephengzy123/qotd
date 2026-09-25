@@ -527,6 +527,13 @@ const migrations = [
       `create index if not exists update_history_entries_published_idx on update_history_entries(published_at desc, id desc)`,
     ],
   },
+  {
+    version: 34,
+    statements: [
+      `alter table update_history_entries add column if not exists edited_at timestamptz`,
+      `alter table update_history_entries add column if not exists edited_by text`,
+    ],
+  },
 ] as const;
 
 export function db() {

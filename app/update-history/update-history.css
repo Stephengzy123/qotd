@@ -6,17 +6,20 @@
 .live-history-editor { margin-bottom: 2rem; }
 .live-history-editor h2 { margin-bottom: .45rem; }
 .live-history-editor .hint { color: var(--live-muted); }
-.live-history-editor label { color: var(--live-text); }
-.live-history-editor input, .live-history-editor textarea { background: var(--live-bg); border-color: var(--live-border); color: var(--live-text); }
-.live-history-editor input:focus, .live-history-editor textarea:focus { border-color: var(--live-accent); box-shadow: 0 0 0 3px var(--live-accent-soft); }
-.live-history-editor input::placeholder, .live-history-editor textarea::placeholder { color: var(--live-faint); }
-.live-history-editor .primary { justify-self: start; background: var(--live-accent); color: white; }
-.live-history-editor .primary:hover { background: var(--live-accent); filter: brightness(.92); }
-.live-history[data-theme="dark"] .live-history-editor .primary { color: #0d1330; }
+.live-history label { color: var(--live-text); }
+.live-history input, .live-history textarea { background: var(--live-bg); border-color: var(--live-border); color: var(--live-text); }
+.live-history input:focus, .live-history textarea:focus { border-color: var(--live-accent); box-shadow: 0 0 0 3px var(--live-accent-soft); }
+.live-history input::placeholder, .live-history textarea::placeholder { color: var(--live-faint); }
+.live-history .live-update-form .primary { justify-self: start; background: var(--live-accent); color: white; }
+.live-history .live-update-form .primary:hover { background: var(--live-accent); filter: brightness(.92); }
+.live-history[data-theme="dark"] .live-update-form .primary { color: #0d1330; }
 .live-history-list { display: grid; gap: .85rem; }
-.live-history-entry time { display: block; margin-bottom: .35rem; color: var(--live-muted); font-size: .75rem; font-weight: 700; }
+.live-history-dates { display: flex; flex-wrap: wrap; gap: .25rem .8rem; margin-bottom: .35rem; color: var(--live-muted); font-size: .75rem; font-weight: 700; }
 .live-history-entry h2 { margin-bottom: .75rem; font-size: 1.1rem; }
 .live-history-entry .discord-preview { font-size: .9rem; line-height: 1.6; }
+.live-history-edit { margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--live-border); }
+.live-history-edit summary { width: fit-content; color: var(--live-accent); font-size: .82rem; font-weight: 700; cursor: pointer; }
+.live-history-edit form { padding-top: 1rem; }
 .live-history-empty { color: var(--live-muted); }
 .live-history-empty h2 { margin-bottom: .35rem; color: var(--live-text); }
 .live-history-empty p { margin: 0; }

@@ -43,6 +43,7 @@ new Function('require', 'exports', compiled)(name => {
 let admin = false;
 let inserted = [];
 let revalidated = [];
+let entryExists = true;
 const actionExports = {};
 const actionCompiled = ts.transpileModule(fs.readFileSync('app/update-history/actions.ts', 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
@@ -55,8 +56,9 @@ new Function('require', 'exports', actionCompiled)(name => {
     return { username: 'admin', role: 'admin' };
   } };
   if (name === '@/lib/db') return { dbReady: async () => (parts, ...values) => {
-    inserted.push({ query: parts.join('?'), values });
-    return Promise.resolve([]);
+    const query = parts.join('?');
+    inserted.push({ query, values });
+    return Promise.resolve(query.includes('update update_history_entries') && entryExists ? [{ id: values.at(-1) }] : []);
   } };
   if (name === '@/lib/log') return { logEvent: async () => {} };
   throw Error(`Unexpected import ${name}`);
@@ -79,5 +81,26 @@ new Function('require', 'exports', actionCompiled)(name => {
   empty.set('title', 'Title');
   await assert.rejects(actionExports.publishHistoryEntry(empty), /redirect:\/update-history\?error=/);
   assert.equal(inserted.length, 1);
-  console.log('Update history checks passed: admin-only publishing, long Markdown, independent storage, and validation.');
+  const edit = new FormData();
+  edit.set('id', '12345678-1234-1234-1234-123456789abc');
+  edit.set('title', 'Edited calendar improvements');
+  edit.set('body', '**Revised** notes\n'.repeat(400));
+  admin = false;
+  await assert.rejects(actionExports.editHistoryEntry(edit), /Forbidden/);
+  assert.equal(inserted.length, 1);
+  admin = true;
+  await assert.rejects(actionExports.editHistoryEntry(edit), /redirect:\/update-history\?ok=/);
+  assert.equal(inserted.length, 2);
+  assert.match(inserted[1].query, /update update_history_entries/);
+  assert.match(inserted[1].query, /edited_at = now\(\)/);
+  assert.doesNotMatch(inserted[1].query, /published_at\s*=/);
+  assert.equal(inserted[1].values[1], edit.get('body').trim());
+  assert.deepEqual(revalidated, ['/update-history', '/update-history']);
+  edit.set('id', 'not-an-id');
+  await assert.rejects(actionExports.editHistoryEntry(edit), /redirect:\/update-history\?error=/);
+  assert.equal(inserted.length, 2);
+  edit.set('id', '12345678-1234-1234-1234-123456789abc');
+  entryExists = false;
+  await assert.rejects(actionExports.editHistoryEntry(edit), /redirect:\/update-history\?error=/);
+  console.log('Update history checks passed: admin-only publishing and editing, long Markdown, unchanged publish dates, and validation.');
 })().catch(error => { console.error(error); process.exitCode = 1; });
