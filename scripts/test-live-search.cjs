@@ -33,6 +33,7 @@ const row = (id, time, message) => ({ id, sent_time: time, message, question_typ
 const recent = row('11111111-1111-4111-8111-111111111111', '2026-09-24T17:00:00Z', 'Photo day');
 const older = row('22222222-2222-4222-8222-222222222222', '2026-09-23T17:00:00Z', 'Photo day reminder');
 let queries = [];
+let cachedReads = 0;
 const sql = (parts, ...values) => {
   const query = { text: parts.join('?'), values };
   if (query.text.includes('select d.id')) { queries.push(query); return Promise.resolve([recent, older]); }
@@ -40,6 +41,7 @@ const sql = (parts, ...values) => {
 };
 const { getLiveMessages, parseLiveCursor } = load('lib/live-messages.ts', {
   '@/lib/db': { dbReady: async () => sql }, '@/lib/live-text': { liveMessageText: value => value },
+  '@/lib/shared-cache': { cachedRead: (_name, load) => { cachedReads++; return load(); } },
 });
 (async () => {
   const searched = await getLiveMessages('all', null, null, false, 'photo day');
@@ -53,5 +55,8 @@ const { getLiveMessages, parseLiveCursor } = load('lib/live-messages.ts', {
   assert.ok(queries.at(-1).values.some(value => value?.text?.includes('d.question_type')));
   const regular = await getLiveMessages('all', null, null);
   assert.deepEqual(regular.messages.map(item => item.id), [older.id, recent.id]);
+  assert.equal(cachedReads, 1, 'Search must bypass the public cache');
+  await getLiveMessages('all', null, null, true);
+  assert.equal(cachedReads, 1, 'Admin hidden records must never enter the public cache');
   console.log('Live search checks passed: paged database query, sent/visible scope, and formatted highlights.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

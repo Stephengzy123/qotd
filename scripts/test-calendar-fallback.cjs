@@ -69,7 +69,7 @@ async function run(now, { trigger = 'cron', fails = false } = {}) {
   assert.deepEqual(summer.pushes, ['fallback']);
   const winter = await run('2026-12-02T02:30:00Z', { trigger: 'page_load' });
   assert.deepEqual(winter.calls, [['2026-12-02', '2026-12-01']]);
-  assert.equal((await run('2026-09-18T01:01:00Z')).calls.length, 0);
+  assert.equal((await run('2026-09-18T01:10:00Z')).calls.length, 1, 'A late cron invocation must recover the 6 PM fallback');
   assert.equal((await run('2026-09-18T01:00:00Z', { fails: true })).result.success, false);
   console.log('Calendar fallback checks passed: formatting, suppression, no events/feed, duplicate claim, no pings, failures, Pacific window, page-load fallback.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

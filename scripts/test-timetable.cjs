@@ -74,7 +74,7 @@ const actions = load('app/admin/timetable/actions.ts', {
   '@/lib/db': { dbReady: async () => sql },
   '@/lib/timetable': timetable,
   '@/lib/log': {logEvent: async () => {}},
-  'next/cache': {revalidatePath: path => { assert.ok(['/admin/timetable', '/admin/calendar'].includes(path)); revalidated = true; }},
+  '@/lib/revalidate': {revalidatePath: path => { assert.ok(['/admin/timetable', '/admin/calendar'].includes(path)); revalidated = true; }},
 });
 const form = data => { const result = new FormData(); result.set('config', data); return result; };
 (async () => {
