@@ -4,30 +4,40 @@ const ts = require('typescript');
 
 let rows = [];
 let fail = false;
+const publicData = {};
+new Function('require', 'exports', ts.transpileModule(fs.readFileSync('lib/public-data.ts', 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText)(name => {
+  if (name === 'server-only') return {};
+  if (name === '@/lib/shared-cache') return { cachedRead: (_name, load) => load() };
+  if (name === '@/lib/webhook-details' || name === '@/lib/timetable') return {};
+  if (name === '@/lib/db') return { dbReady: async () => {
+    if (fail) throw Error('Database unavailable');
+    return async () => rows;
+  } };
+  throw Error(`Unexpected import ${name}`);
+}, publicData);
 const exportsObject = {};
 const compiled = ts.transpileModule(fs.readFileSync('app/api/live-update/route.ts', 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText;
 new Function('require', 'exports', compiled)(name => {
   if (name === 'next/server') return { NextResponse: { json: (body, options = {}) => Response.json(body, options) } };
-  if (name === '@/lib/db') return { dbReady: async () => {
-    if (fail) throw Error('Database unavailable');
-    return async () => rows;
-  } };
+  if (name === '@/lib/public-data') return publicData;
   throw Error(`Unexpected import ${name}`);
 }, exportsObject);
 
 (async () => {
   let response = await exportsObject.GET();
   assert.deepEqual(await response.json(), { update: null });
-  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.match(response.headers.get('cache-control'), /s-maxage=30/);
 
   rows = [{ id: 'notice-1', title: 'New calendar', body: 'Try the daily view.', published_at: new Date('2026-09-24T12:00:00Z') }];
   response = await exportsObject.GET();
   assert.deepEqual(await response.json(), { update: {
     id: 'notice-1', title: 'New calendar', body: 'Try the daily view.', publishedAt: '2026-09-24T12:00:00.000Z',
   } });
-  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.match(response.headers.get('cache-control'), /s-maxage=30/);
 
   rows = [{ id: null, title: 'Unpublished draft', body: 'Private', published_at: null }];
   response = await exportsObject.GET();
@@ -37,7 +47,7 @@ new Function('require', 'exports', compiled)(name => {
   response = await exportsObject.GET();
   assert.equal(response.status, 503);
   assert.equal(response.headers.get('cache-control'), 'no-store');
-  console.log('Live update checks passed: published-only response, no-store caching, and graceful failure.');
+  console.log('Live update checks passed: published-only response, public cache headers, and graceful failure.');
 })().catch(error => { console.error(error); process.exitCode = 1; });
 
 let admin = false;
@@ -49,7 +59,7 @@ const actionCompiled = ts.transpileModule(fs.readFileSync('app/update-history/ac
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText;
 new Function('require', 'exports', actionCompiled)(name => {
-  if (name === 'next/cache') return { revalidatePath: path => revalidated.push(path) };
+  if (name === '@/lib/revalidate') return { revalidatePath: path => revalidated.push(path) };
   if (name === 'next/navigation') return { redirect: path => { throw Error(`redirect:${path}`); } };
   if (name === '@/lib/auth') return { requireRole: async () => {
     if (!admin) throw Error('Forbidden');

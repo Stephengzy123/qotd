@@ -3,6 +3,7 @@ import { getLiveMessageById, getLiveMessages, parseLiveCursor } from "@/lib/live
 import { getSession } from "@/lib/auth";
 
 export const runtime = "nodejs";
+const publicHeaders = { "Cache-Control": "public, max-age=0, s-maxage=15" };
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const type = params.get("type") || "all";
@@ -17,11 +18,11 @@ export async function GET(request: NextRequest) {
   try {
     if (target) {
       const message = await getLiveMessageById(target);
-      return message ? NextResponse.json({ message }, { headers: { "Cache-Control": "private, no-store" } }) : NextResponse.json({ error: "Message not found" }, { status: 404 });
+      return message ? NextResponse.json({ message }, { headers: publicHeaders }) : NextResponse.json({ error: "Message not found" }, { status: 404, headers: { "Cache-Control": "no-store" } });
     }
     const hidden = params.get("hidden") === "true";
     if (hidden && (await getSession())?.role !== "admin") return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    return NextResponse.json(await getLiveMessages(type as "all" | "announcement" | "event" | "reminder" | "human", before, after, hidden, search), { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json(await getLiveMessages(type as "all" | "announcement" | "event" | "reminder" | "human", before, after, hidden, search), { headers: hidden || search ? { "Cache-Control": "private, no-store" } : publicHeaders });
   } catch {
     return NextResponse.json({ error: "Messages are temporarily unavailable" }, { status: 503 });
   }

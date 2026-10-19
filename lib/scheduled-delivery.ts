@@ -31,9 +31,9 @@ export async function sendDueAnnouncements(now = new Date(), trigger: "cron" | "
       if ("error" in result) failures.push(result.error || "Scheduled delivery failed.");
       else { sent += 1; scheduleLivePush(result.dispatchId); if ("warning" in result && result.warning) failures.push(result.warning); }
     }
-    // The default calendar fallback stays at the normal 6 PM time. A page-load
-    // check may still recover it later in that hour if the scheduled request was missed.
-    if (normalWindow && (trigger === "page_load" || minute === 0)) {
+    // Recover a delayed 6 PM invocation anywhere in that hour. The unique
+    // fallback-date claim prevents duplicate publication.
+    if (normalWindow) {
       try {
         const fallback = await sendCalendarFallback(tomorrow, localDate);
         if (fallback) {

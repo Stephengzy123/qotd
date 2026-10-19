@@ -4,8 +4,8 @@ import { PublicCalendarWithTimetable } from "@/components/public-calendar-with-t
 import { CalendarSubscriptions } from "@/components/calendar-subscriptions";
 import { loadPublicCalendar } from "@/lib/admin-calendar";
 import { pacificParts } from "@/lib/qotd";
-import { dbReady } from "@/lib/db";
-import { normalizeTimetable, rotationForDate, scheduleForDate } from "@/lib/timetable";
+import { rotationForDate, scheduleForDate } from "@/lib/timetable";
+import { publicTimetableConfig } from "@/lib/public-data";
 import "./calendar.css";
 
 export const metadata: Metadata = { title: "School Calendar | Live Announcements" };
@@ -19,9 +19,7 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
   const events = await loadPublicCalendar(start, end);
   let timetable: Record<string, ReturnType<typeof scheduleForDate>> = {};
   if (!embedded) {
-    const sql = await dbReady();
-    const settings = (await sql`select timetable_config from settings where singleton = true`)[0];
-    const config = normalizeTimetable(settings?.timetable_config);
+    const config = await publicTimetableConfig();
     const imported = events.filter(event => event.kind === "imported");
     timetable = Object.fromEntries([...new Set(imported.map(event => event.date))].map(date => [date, scheduleForDate(config, date, rotationForDate(imported, date)?.letters || null)]));
   }

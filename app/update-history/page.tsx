@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getSession } from "@/lib/auth";
-import { dbReady } from "@/lib/db";
+import { publicUpdateHistory } from "@/lib/public-data";
 import { DiscordMarkdown } from "@/components/discord-preview";
 import { LiveThemeShell } from "@/components/live-theme-shell";
 import { PendingButton } from "@/components/pending-button";
@@ -10,11 +10,9 @@ import "./update-history.css";
 
 export const metadata: Metadata = { title: "Update history | Live Announcements", robots: { index: false, follow: false }, manifest: "/live.webmanifest" };
 
-type HistoryEntry = { id: string; title: string; body: string; published_at: Date; edited_at: Date | null };
-
 export default async function UpdateHistoryPage({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
-  const [session, params, sql] = await Promise.all([getSession(), searchParams, dbReady()]);
-  const entries = await sql<HistoryEntry[]>`select id, title, body, published_at, edited_at from update_history_entries order by published_at desc, id desc`;
+  const [session, params, history] = await Promise.all([getSession(), searchParams, publicUpdateHistory()]);
+  const entries = history.map(row => ({ ...row, published_at: new Date(row.published_at), edited_at: row.edited_at ? new Date(row.edited_at) : null }));
   const isAdmin = session?.role === "admin";
   return <LiveThemeShell>
     <div className="live-feedback-inner">

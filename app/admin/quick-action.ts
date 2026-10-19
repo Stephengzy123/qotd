@@ -7,7 +7,7 @@ import { getWebhookDetails } from "@/lib/webhook-details";
 import { quickMessage } from "@/lib/quick-message";
 import { scheduleLivePush } from "@/lib/web-push";
 import { logEvent } from "@/lib/log";
-import { revalidatePath } from "next/cache";
+import { revalidatePath } from "@/lib/revalidate";
 
 type Result = { error?: string; success?: string };
 
@@ -56,6 +56,6 @@ export async function quickAnnounceAction(_previous: Result, form: FormData): Pr
   }
   await logEvent({ action: "quick_announcement", actor: session.username, role: session.role, success: !error, details: { dispatchId: requestId, nickname, destination, replyToId: replyToId || null, ping: false, destinations: results, responseStatus: status } });
   if (published) scheduleLivePush(requestId);
-  revalidatePath("/admin"); revalidatePath("/admin/sends"); revalidatePath("/live"); revalidatePath("/contribute");
+  await revalidatePath("/admin"); await revalidatePath("/admin/sends"); await revalidatePath("/live"); await revalidatePath("/contribute");
   return error ? { error: `${error} Check Recent sends; do not resend to successful destinations.` } : { success: destination === "live" ? "Published to /live." : "Sent to Discord and /live." };
 }

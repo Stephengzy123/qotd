@@ -45,7 +45,7 @@ async function harness({ admin = true, destination = 'discord', ping = true, fai
     '@/lib/quick-message': formatter,
     '@/lib/web-push': { scheduleLivePush: id => notifications.push(id) },
     '@/lib/log': { logEvent: async () => {} },
-    'next/cache': { revalidatePath: () => {} },
+    '@/lib/revalidate': { revalidatePath: () => {} },
   }, async (url, options) => { requests.push({ url: String(url), ...JSON.parse(options.body) }); return { ok: !fail, status: fail ? 400 : 200 }; }).quickAnnounceAction;
   const form = new FormData();
   Object.entries({ nickname, message: body, destination, requestId: '00000000-0000-4000-8000-000000000001', ...(replyToId ? { replyToId } : {}), ...(ping ? { ping: 'on' } : {}) }).forEach(([key, value]) => form.set(key, value));

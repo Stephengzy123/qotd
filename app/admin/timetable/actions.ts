@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath } from "@/lib/revalidate";
 import { requireRole } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
 import { validateTimetable } from "@/lib/timetable";
@@ -17,7 +17,7 @@ export async function saveTimetableAction(_previous: { error?: string; success?:
   const sql = await dbReady();
   await sql`update settings set timetable_config = ${sql.json(config)}, updated_at = now() where singleton = true`;
   await logEvent({ action: "save_timetable", actor: session.username, role: session.role, details: { monday: config.monday.length, tuesday: config.tuesday.length, wednesday: config.wednesday.length, thursday: config.thursday.length, friday: config.friday.length, flex: config.flex.length } });
-  revalidatePath("/admin/timetable");
-  revalidatePath("/admin/calendar");
+  await revalidatePath("/admin/timetable");
+  await revalidatePath("/admin/calendar");
   return { success: "Timetable saved. The daily preview has been updated." };
 }

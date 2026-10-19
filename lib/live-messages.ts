@@ -1,6 +1,7 @@
 import "server-only";
 import { dbReady } from "@/lib/db";
 import { liveMessageText } from "@/lib/live-text";
+import { cachedRead } from "@/lib/shared-cache";
 
 type Row = {
   calendar_fallback_date: string | null;
@@ -41,6 +42,12 @@ export function parseLiveCursor(value: string | null): { time: string; id: strin
 export type LiveFilter = "all" | "announcement" | "event" | "reminder" | "human";
 
 export async function getLiveMessages(type: LiveFilter, before: ReturnType<typeof parseLiveCursor>, after: ReturnType<typeof parseLiveCursor>, hidden = false, search = "") {
+  const load = () => queryLiveMessages(type, before, after, hidden, search);
+  // Hidden/admin and arbitrary search reads never enter the shared public cache.
+  return hidden || search ? load() : cachedRead(`live:${JSON.stringify([type, before, after])}`, load);
+}
+
+async function queryLiveMessages(type: LiveFilter, before: ReturnType<typeof parseLiveCursor>, after: ReturnType<typeof parseLiveCursor>, hidden: boolean, search: string) {
   const sql = await dbReady();
   const rows = await sql<Row[]>`select d.id, d.message, d.question_type, d.hidden_from_live, d.sender_name, d.sender_avatar_url,
       d.calendar_fallback_date::text, d.reply_to_dispatch_id, d.created_at::text as sent_time, r.message as reply_message,
@@ -62,6 +69,10 @@ export async function getLiveMessages(type: LiveFilter, before: ReturnType<typeo
 }
 
 export async function getLiveMessageById(id: string) {
+  return cachedRead(`live-message:${id}`, () => queryLiveMessageById(id));
+}
+
+async function queryLiveMessageById(id: string) {
   const sql = await dbReady();
   const rows = await sql<Row[]>`select d.id, d.message, d.question_type, d.hidden_from_live, d.sender_name, d.sender_avatar_url,
       d.calendar_fallback_date::text, d.reply_to_dispatch_id, d.created_at::text as sent_time, r.message as reply_message,

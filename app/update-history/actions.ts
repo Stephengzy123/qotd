@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath } from "@/lib/revalidate";
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
@@ -17,7 +17,7 @@ export async function publishHistoryEntry(formData: FormData) {
   const sql = await dbReady();
   await sql`insert into update_history_entries (title, body, published_by) values (${title}, ${body}, ${session.username})`;
   await logEvent({ action: "publish_update_history", actor: session.username, role: session.role, details: { title } });
-  revalidatePath("/update-history");
+  await revalidatePath("/update-history");
   redirect("/update-history?ok=Update+added+to+history.");
 }
 
@@ -40,6 +40,6 @@ export async function editHistoryEntry(formData: FormData) {
     redirect("/update-history?error=That+entry+no+longer+exists.");
   }
   await logEvent({ action: "edit_update_history", actor: session.username, role: session.role, details: { id, title } });
-  revalidatePath("/update-history");
+  await revalidatePath("/update-history");
   redirect("/update-history?ok=History+entry+updated.");
 }
