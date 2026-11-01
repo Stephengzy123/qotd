@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { revalidatePath } from "@/lib/revalidate";
 import { requireRole } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
 import { syncLunchMenus } from "@/lib/lunch-menu";
@@ -35,7 +35,7 @@ export async function refreshLunchMenusAction() {
     await logEvent({ action: "refresh_lunch_menu", actor: session.username, role: session.role, success: false, details: { error: message } });
     redirect(calendarUrl("error", message));
   }
-  revalidatePath("/admin/calendar");
+  await revalidatePath("/admin/calendar");
   redirect(calendarUrl("ok", `Lunch menus refreshed: ${result.imported} days checked, ${result.changed} changed.`));
 }
 
@@ -56,7 +56,7 @@ export async function updateEventOccurrenceDateAction(formData: FormData) {
   `;
   await logEvent({ action: "update_event_occurrence", actor: session.username, role: session.role, success: updated.length > 0, details: { id, occurrenceDate, occurrenceEndDate: occurrenceEndDate || null } });
   if (!updated.length) redirect(calendarUrl("error", "That event announcement is no longer available.", continueBackfill, skipped));
-  revalidatePath("/admin/calendar");
+  await revalidatePath("/admin/calendar");
   redirect(calendarUrl("ok", "Event date updated.", continueBackfill, skipped));
 }
 
@@ -77,8 +77,8 @@ export async function markEventAsReminderAction(formData: FormData) {
   });
   await logEvent({ action: "mark_event_as_reminder", actor: session.username, role: session.role, success: updated.length > 0, details: { id, title: updated[0]?.event_title } });
   if (!updated.length) redirect(calendarUrl("error", "That event announcement is no longer available.", continueBackfill, skipped));
-  revalidatePath("/admin/calendar");
-  revalidatePath("/live");
+  await revalidatePath("/admin/calendar");
+  await revalidatePath("/live");
   redirect(calendarUrl("ok", "Moved to Reminders. It will no longer appear on the calendar or in date backfill.", continueBackfill, skipped));
 }
 
@@ -98,7 +98,7 @@ export async function createCalendarEventAction(formData: FormData) {
     values (${eventDate}, ${endDate}, ${title}, ${details || null}, ${session.username}) returning id
   `;
   await logEvent({ action: "create_calendar_event", actor: session.username, role: session.role, details: { id: inserted[0]?.id, title, eventDate, endDate } });
-  revalidatePath("/admin/calendar");
+  await revalidatePath("/admin/calendar");
   redirect(calendarUrl("ok", "Calendar event added."));
 }
 
@@ -109,6 +109,6 @@ export async function deleteCalendarEventAction(formData: FormData) {
   const sql = await dbReady();
   const deleted = await sql<{ title: string }[]>`delete from calendar_events where id = ${id} returning title`;
   await logEvent({ action: "delete_calendar_event", actor: session.username, role: session.role, success: deleted.length > 0, details: { id, title: deleted[0]?.title } });
-  revalidatePath("/admin/calendar");
+  await revalidatePath("/admin/calendar");
   redirect(calendarUrl(deleted.length ? "ok" : "error", deleted.length ? "Calendar event deleted." : "Calendar event not found."));
 }

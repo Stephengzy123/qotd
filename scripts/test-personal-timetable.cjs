@@ -113,8 +113,9 @@ assert.throws(() => personal.validateClasses({ ...classes, 'room:A': 'a'.repeat(
   await action('save', otherToken, classes);
   let feedFailure = false;
   const { GET } = load('app/api/calendar/timetable/[token]/route.ts', {
-    '@/lib/db': { dbReady: async () => sql }, '@/lib/timetable': timetable, '@/lib/personal-timetable': personal,
-    '@/lib/calendar': { getCalendarEvents: async (_, from, to) => { if (feedFailure) throw Error('offline'); return rotations.filter(row => row.date >= from && row.date <= to); } },
+    '@/lib/db': { dbReady: async () => sql }, '@/lib/personal-timetable': personal,
+    '@/lib/public-data': { publicTimetableConfig: async () => config, publicRotationSourceConfigured: async () => true },
+    '@/lib/admin-calendar': { loadPublicCalendar: async (from, to) => { if (feedFailure) throw Error('offline'); return rotations.filter(row => row.date >= from && row.date <= to).map(row => ({ ...row, kind: 'imported' })); } },
   });
   const request = new Request('https://school.example/api/calendar/timetable/test.ics');
   const get = value => GET(request, { params: Promise.resolve({ token: `${value}.ics` }) });

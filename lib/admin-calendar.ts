@@ -3,6 +3,7 @@ import "server-only";
 import { dbReady } from "@/lib/db";
 import { getCalendarEvents } from "@/lib/calendar";
 import type { LunchMenuItem } from "@/lib/lunch-menu";
+import { cachedRead } from "@/lib/shared-cache";
 
 export type AdminCalendarEvent = {
   id: string;
@@ -27,6 +28,17 @@ export type EventDateRow = {
 
 export type ManualCalendarEvent = { id: string; date: string; endDate: string; title: string; details: string | null };
 
+async function importedEvents(encryptedUrl: string | null | undefined, from: string, to: string) {
+  if (Date.parse(to) - Date.parse(from) <= 366 * 86400_000) return getCalendarEvents(encryptedUrl, from, to);
+  // A multi-year subscription can exceed the importer's 500-event cap.
+  const events = [];
+  for (const month = new Date(`${from}T12:00:00Z`); month.toISOString().slice(0, 10) <= to; month.setUTCMonth(month.getUTCMonth() + 1)) {
+    const end = new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth() + 1, 0, 12)).toISOString().slice(0, 10);
+    events.push(...await getCalendarEvents(encryptedUrl, month.toISOString().slice(0, 10), end < to ? end : to));
+  }
+  return events;
+}
+
 export async function loadAdminCalendar(from: string, to: string, publicView = false, strictFeed = false) {
   const sql = await dbReady();
   const [settingsRows, lunchRows, announcementRows, eventDateRows, manualRows] = await Promise.all([
@@ -48,7 +60,7 @@ export async function loadAdminCalendar(from: string, to: string, publicView = f
         and coalesce(event_occurrence_end_date, event_occurrence_date) >= ${from}::date
       order by event_occurrence_date, created_at
     `,
-    sql<{ id: string; event_title: string; question: string; status: "approved" | "sent"; scheduled_date: string; event_occurrence_date: string | null; event_occurrence_end_date: string | null }[]>`
+    publicView ? Promise.resolve([]) : sql<{ id: string; event_title: string; question: string; status: "approved" | "sent"; scheduled_date: string; event_occurrence_date: string | null; event_occurrence_end_date: string | null }[]>`
       select id, event_title, question, status, scheduled_date::text, event_occurrence_date::text, event_occurrence_end_date::text
       from questions
       where question_type = 'event' and status in ('approved', 'sent')
@@ -63,7 +75,7 @@ export async function loadAdminCalendar(from: string, to: string, publicView = f
       order by event_date, created_at
     `,
   ]);
-  const imported = await getCalendarEvents(settingsRows[0]?.calendar_feed_url_encrypted, from, to).catch(error => { if (strictFeed) throw error; return []; });
+  const imported = await importedEvents(settingsRows[0]?.calendar_feed_url_encrypted, from, to).catch(error => { if (strictFeed) throw error; return []; });
   const events: AdminCalendarEvent[] = [
     ...imported.map((event, index) => ({ id: `imported-${event.date}-${index}`, date: event.date, title: event.title, kind: "imported" as const, meta: "Imported calendar" })),
     ...announcementRows.map((event) => ({ id: `announcement-${event.id}`, date: event.occurrence_date, endDate: event.occurrence_end_date || undefined, title: event.title, kind: "announcement" as const, details: event.details, meta: `${event.status === "sent" ? "Sent" : "Approved"} announcement · ${event.occurrence_end_date ? `${event.occurrence_date}–${event.occurrence_end_date} · ` : ""}publishes ${event.scheduled_date}` })),
@@ -86,6 +98,9 @@ export async function loadAdminCalendar(from: string, to: string, publicView = f
 // Only calendar entries cross the public boundary, never backfill records or
 // credentials. Approved events are intentionally visible before announcement day.
 export async function loadPublicCalendar(from: string, to: string, strictFeed = false) {
-  const { events } = await loadAdminCalendar(from, to, true, strictFeed);
-  return events.map(({ meta: _meta, ...event }) => event);
+  return cachedRead(`calendar:${from}:${to}:${strictFeed}`, async () => {
+    // Fail the refresh on source errors so the last complete snapshot survives.
+    const { events } = await loadAdminCalendar(from, to, true, true);
+    return events.map(({ meta: _meta, ...event }) => event);
+  });
 }

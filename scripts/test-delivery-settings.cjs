@@ -8,7 +8,7 @@ function load(file, deps) {
   new Function("require", "exports", code)(name => { if (!(name in deps)) throw Error("Unexpected dependency " + name); return deps[name]; }, exports);
   return exports;
 }
-let authorized = true, editable = true, resolutions = 0;
+let authorized = true, editable = true, resolutions = 0, cacheDown = false;
 const writes = [];
 const delivery = load("lib/delivery-settings.ts", {
   "@/lib/webhook-destinations": { resolveWebhooks: async ids => {
@@ -20,13 +20,14 @@ const delivery = load("lib/delivery-settings.ts", {
 });
 const actions = load("app/actions.ts", {
   "@/lib/delivery-settings": delivery,
+  "@/lib/shared-cache": { prepareScheduleChange: async () => { if (cacheDown) throw Error("Scheduling cache unavailable"); } },
   "@/lib/auth": { requireRole: async role => { assert.equal(role, "admin"); if (!authorized) throw Error("Forbidden"); return { username: "admin", role }; } },
   "@/lib/db": { dbReady: async () => async (parts, ...values) => {
     assert.match(parts.join("?"), /status in \('pending', 'approved'\)/);
     writes.push(values);
     return editable ? [{ id: "item" }] : [];
   } },
-  "next/cache": { revalidatePath: () => {} }, "next/navigation": {}, "next/headers": {},
+  "@/lib/revalidate": { revalidatePath: () => {} }, "next/navigation": {}, "next/headers": {},
   "@/lib/log": { logEvent: async () => {} }, "@/lib/security": {}, "@/lib/calendar": {},
   "@/lib/accounts": {}, "@/lib/clubs": {},
   "@/lib/qotd": { sendAnnouncement: () => { throw Error("Saving must never send"); } },
@@ -55,6 +56,10 @@ const actions = load("app/actions.ts", {
   assert.match((await actions.saveDeliverySettingsAction({}, form)).error, /sent or removed/);
   form.set("destination", "forged");
   assert.match((await actions.saveDeliverySettingsAction({}, form)).error, /valid send destination/);
+  cacheDown = true; form.set("destination", "live"); editable = true;
+  const priorWrites = writes.length;
+  assert.match((await actions.saveDeliverySettingsAction({}, form)).error, /Scheduling cache unavailable/);
+  assert.equal(writes.length, priorWrites, "A schedule must not change if its old wake hint cannot be expired");
   authorized = false;
   await assert.rejects(() => actions.saveDeliverySettingsAction({}, form), /Forbidden/);
   console.log("Saved delivery checks passed: persistence, clearing pings, retaining hidden choices, no send/push, sent-item protection, authorization.");

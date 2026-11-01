@@ -46,7 +46,21 @@ Every action — sign-ins (including failed attempts), sign-outs, submissions, e
 
 ## Deploy
 
-Import the `announcement-bot` branch as a separate Vercel project and add the environment variables above. Two daily UTC cron checks account for daylight saving time; only the check that runs during the 6 PM Pacific hour sends messages. Vercel Hobby may invoke it at any point within that hour.
+Import the `announcement-bot` branch as a separate Vercel project and add the environment variables above. The configured cron checks every 10 minutes. Normal sends happen during the 6 PM Pacific hour, and exact-time overrides are delivered on the next cron invocation (potentially about 10 minutes late). The deployment's Vercel plan must support this cron frequency.
+
+## Reduce database usage with Upstash Redis
+
+1. Add an **Upstash Redis** store to this Vercel project through Storage / Marketplace. Choose its **Free** plan; this app does not require a paid store.
+2. Connect the store to the deployment and provide `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`. The Marketplace aliases `KV_REST_API_URL` and `KV_REST_API_TOKEN` also work. These are server secrets; do not use a `NEXT_PUBLIC_` prefix. Use separate stores for unrelated apps, and keep the same store connected across redeployments.
+3. Redeploy, then use **Admin → Settings → Public cache → Refresh public cache** while Neon is available. Public reads also fill their cache automatically on first access.
+
+Redis holds shared copies of public feed pages, message links, channel identity, update notices/history, school timetable templates, and calendar data used by the page and public iCalendar exports. Hidden messages and search results bypass the shared cache. An unsent announcement's details never enter a public calendar snapshot. Personal timetable exports still verify the private token in Neon on every refresh, preserving revocation and class isolation, while reusing shared school-calendar inputs.
+
+Public-content changes expire the shared copies after the database write. A version in each cache key stops a concurrent old read from overwriting a newer edit. Public HTTP responses can remain on the CDN for 15 seconds (feed), 30 seconds (update notice), or 60 seconds (public ICS). Redis snapshots normally refresh on access after one hour, also catching changes to external rotation feeds. The last good copy is retained for up to 30 days; a failed source refresh keeps that copy and waits five minutes before retrying. A cold failed load waits one minute before retrying. If Redis is unavailable or not configured, the original database reads remain available, but the compute savings will not apply. Failed invalidations are logged; the normal freshness window bounds how long an old copy is used once sources recover.
+
+There are no browser-triggered delivery checks. A visible Live tab polls for new messages every 15 seconds while in use, pauses after two minutes without interaction, and checks again when focused or used. Polls can hit CDN/Redis rather than Neon.
+
+Cron reads its next-check timestamp from Redis before contacting Neon. It wakes the database for the next approved exact send, the daily 6 PM delivery/fallback, or the daily 6 AM menu refresh, all using Pacific time with daylight saving changes. Changes to approvals or delivery settings expire that timestamp before saving and briefly prevent concurrent runs from caching the pre-edit schedule. When Redis is configured but unreachable, schedule changes must be retried rather than silently leaving an old wake time. Missing hints are rebuilt from Neon; database failures set a 15-minute retry delay. The cron schedule itself stays at 10-minute intervals. The initial hint and all snapshots need a working database to be created: **caching cannot recover an exhausted allowance or reconstruct unavailable data**. Existing warm copies can continue serving during a database outage. Monitor the Redis store's own command/bandwidth limits as well.
 
 - An **Announcement date** is the date the message is for. It publishes the previous day during the 6 PM Pacific hour.
 - An **Event publish date** is the day its message publishes during the 6 PM Pacific hour. It does not need to match the date of the event.
@@ -76,8 +90,8 @@ but no approved or sent day announcement, the scheduler publishes a **Block Rota
 for {date}** message to `/live` only, using the SGS emoji and one heading per entry.
 Pending/rejected submissions and event announcements do not suppress this fallback.
 It notifies live subscribers, never calls the Discord webhook, and has no pings.
-A unique database date prevents duplicate fallback posts from overlapping cron or
-page-load checks, including after a fallback is hidden. No calendar entries means
+A unique database date prevents duplicate fallback posts from overlapping cron
+checks, including after a fallback is hidden. No calendar entries means
 no fallback post. Calendar failures are logged and leave the date available to retry.
 # Live browser notifications
 

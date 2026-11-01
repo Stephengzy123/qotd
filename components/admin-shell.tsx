@@ -4,7 +4,6 @@ import { queueCounts } from "@/lib/admin-data";
 import { AdminRail } from "@/components/admin-rail";
 import { Notice } from "@/components/notice";
 import { PendingButton } from "@/components/pending-button";
-import { ScheduledDeliveryCheck } from "@/components/scheduled-delivery-check";
 import { AdminThemeToggle } from "@/components/admin-theme-toggle";
 
 export type AdminPage = "overview" | "calendar" | "timetable" | "analytics" | "pending" | "approved" | "sends" | "clubs" | "settings" | "accounts" | "logs" | "webhooks" | "reports";
@@ -62,7 +61,6 @@ export async function AdminShell({ page, username, title, description, actions, 
         <div className="rail-account"><span title={username}>{username}</span><AdminThemeToggle /><form action={logoutAction}><PendingButton className="text-button" pendingText="…">Sign out</PendingButton></form></div>
       </AdminRail>
       <main className="admin-main">
-        <ScheduledDeliveryCheck />
         <section className="admin-heading"><div><h1>{title}</h1>{description && <p>{description}</p>}</div>{actions && <div className="heading-actions">{actions}</div>}</section>
         {notice && <Notice ok={notice.ok} error={notice.error} />}
         {children}

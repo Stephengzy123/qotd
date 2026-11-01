@@ -87,6 +87,7 @@ const clubs = load('lib/clubs.ts', {
     const action = load(file, {
       'next/navigation': { redirect: () => { throw new Error('redirect'); } },
       'next/cache': { revalidatePath: () => {} },
+      '@/lib/revalidate': { revalidatePath: () => {} },
       '@/lib/auth': { requireRole: async role => { assert.equal(role, file.includes('/club/') ? 'club_leader' : 'admin'); throw new Error('Forbidden'); } },
       '@/lib/clubs': clubs, '@/lib/log': {}, '@/lib/db': { dbReady: () => { throw new Error('Must not access database'); } }, '@/lib/security': {},
     });

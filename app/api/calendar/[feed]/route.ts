@@ -17,7 +17,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ feed
     // discard the previous year's subscribed events.
     const events = await loadPublicCalendar(`${year - 1}-08-01`, `${year + 2}-07-31`, true);
     return new Response(subscriptionCalendar(events, name === "custom" ? categories as SubscriptionCategory[] : name as CalendarFeed, new URL(request.url).origin), {
-      headers: { "Content-Type": "text/calendar; charset=utf-8", "Content-Disposition": `inline; filename="${name}.ics"`, "Cache-Control": "no-cache" },
+      headers: { "Content-Type": "text/calendar; charset=utf-8", "Content-Disposition": `inline; filename="${name}.ics"`, "Cache-Control": "public, max-age=0, s-maxage=60" },
     });
   } catch {
     // Never publish an empty successful snapshot on source/database failure.

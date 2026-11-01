@@ -1,7 +1,6 @@
 import { submitQuestionAction } from "@/app/actions";
 import { AppTopbar } from "@/components/app-topbar";
 import { requireRole } from "@/lib/auth";
-import { ScheduledDeliveryCheck } from "@/components/scheduled-delivery-check";
 import { Notice } from "@/components/notice";
 import { AnnouncementComposer } from "@/components/announcement-composer";
 import { dbReady } from "@/lib/db";
@@ -21,7 +20,6 @@ export default async function ContributePage({ searchParams }: { searchParams: P
   const eventTemplate = (settings?.event_message_template as string) || DEFAULT_EVENT_TEMPLATE;
   return (
     <main className="app-shell">
-      <ScheduledDeliveryCheck />
       <AppTopbar mode="contributor" username={session.username} links={[{ href: "/live", label: "Live feed" }]} />
       <section className="page-heading hero">
         <div><h1>Announcements</h1><p>Write it once, see exactly how it lands in Discord, and send it for review.</p></div>

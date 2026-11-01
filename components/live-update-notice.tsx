@@ -15,7 +15,7 @@ export function LiveUpdateNotice() {
     if (busy.current || document.hidden) return;
     busy.current = true;
     try {
-      const response = await fetch("/api/live-update", { cache: "no-store" });
+      const response = await fetch("/api/live-update");
       if (!response.ok) return;
       const data: { update: LiveUpdate | null } = await response.json();
       const next = data.update;

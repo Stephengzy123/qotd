@@ -6,7 +6,6 @@ import { setLiveMessageHidden } from "@/app/live/actions";
 import { LiveNotifications } from "@/components/live-notifications";
 import { LiveInstall } from "@/components/live-install";
 import { QuickAnnouncement, type QuickReplyTarget } from "@/components/quick-announcement";
-import { ScheduledDeliveryCheck } from "@/components/scheduled-delivery-check";
 import { LiveChannelName } from "@/components/live-channel-name";
 import { LiveUpdateNotice } from "@/components/live-update-notice";
 import type { WebhookOption } from "@/lib/webhook-destinations";
@@ -38,7 +37,7 @@ function replyExcerpt(value: string) {
   return singleLine.length > 170 ? `${singleLine.slice(0, 169)}…` : singleLine;
 }
 
-export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botName = "Announcements", channelName = "Announcements", avatarUrl = null, roleId = null, destinations = [], calendarEvents = [], calendarToday }: { destinations?: WebhookOption[]; isAdmin?: boolean; canRunScheduledBackup?: boolean; botName?: string; channelName?: string; avatarUrl?: string | null; roleId?: string | null; calendarEvents?: CalendarEvent[]; calendarToday: string }) {
+export function LiveFeed({ isAdmin = false, botName = "Announcements", channelName = "Announcements", avatarUrl = null, roleId = null, destinations = [], calendarEvents = [], calendarToday }: { destinations?: WebhookOption[]; isAdmin?: boolean; botName?: string; channelName?: string; avatarUrl?: string | null; roleId?: string | null; calendarEvents?: CalendarEvent[]; calendarToday: string }) {
   const [showHidden, setShowHidden] = useState(false), [changing, setChanging] = useState<string | null>(null);
   const [filter, setFilter] = useState("all"), [theme, setTheme] = useState("system"), [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
   const [messages, setMessages] = useState<Message[]>([]), [hasOlder, setHasOlder] = useState(false);
@@ -90,7 +89,7 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
       const existing = records.current;
       if (direction === "older" && existing.length) params.set("before", existing[0].cursor);
       if (direction === "newer" && existing.length) params.set("after", existing[existing.length - 1].cursor);
-      const response = await fetch(`/api/live?${params}`, { cache: "no-store" });
+      const response = await fetch(`/api/live?${params}`, { cache: isAdmin && showHidden ? "no-store" : "default" });
       if (!response.ok) throw new Error("Could not load messages. Please try again.");
       const page: Page = await response.json();
       if (version !== generation.current) return;
@@ -114,8 +113,27 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
     busy.current = false; records.current = []; stickBottom.current = true;
     setMessages([]); setHasOlder(false); setNewMessages(false);
     void load("initial");
-    const timer = window.setInterval(() => { if (!document.hidden) void load("newer"); }, 15000);
-    return () => { generation.current++; window.clearInterval(timer); };
+    let lastActivity = Date.now();
+    const activity = () => {
+      const wasIdle = Date.now() - lastActivity > 120_000;
+      lastActivity = Date.now();
+      if (wasIdle && !document.hidden) void load("newer");
+    };
+    const resume = () => { if (!document.hidden) { lastActivity = Date.now(); void load("newer"); } };
+    const timer = window.setInterval(() => { if (!document.hidden && Date.now() - lastActivity < 120_000) void load("newer"); }, 15000);
+    window.addEventListener("pointerdown", activity, { passive: true });
+    window.addEventListener("keydown", activity);
+    window.addEventListener("wheel", activity, { passive: true });
+    window.addEventListener("focus", resume);
+    document.addEventListener("visibilitychange", resume);
+    return () => {
+      generation.current++; window.clearInterval(timer);
+      window.removeEventListener("pointerdown", activity);
+      window.removeEventListener("keydown", activity);
+      window.removeEventListener("wheel", activity);
+      window.removeEventListener("focus", resume);
+      document.removeEventListener("visibilitychange", resume);
+    };
   }, [load]);
   const loadSearch = useCallback(async (older = false) => {
     if (!searchQuery || searchBusy.current) return;
@@ -223,7 +241,6 @@ export function LiveFeed({ isAdmin = false, canRunScheduledBackup = false, botNa
 
   return <main className="live-shell" data-theme={resolvedTheme}>
     <LiveUpdateNotice />
-    {canRunScheduledBackup && <ScheduledDeliveryCheck intervalMs={15_000} showError={false} />}
     <header className="live-header">
       <div className="live-header-row">
         <div className="live-identity">

@@ -7,6 +7,8 @@ import { AdminShell } from "@/components/admin-shell";
 import { AnnouncementTemplateEditor } from "@/components/announcement-template-editor";
 import { PendingButton } from "@/components/pending-button";
 import { WebhookProfile } from "@/components/webhook-profile";
+import { sharedCacheConfigured } from "@/lib/shared-cache";
+import { refreshPublicCacheAction } from "./cache-actions";
 
 type Settings = { message_template: string | null; event_message_template: string | null; mention_role_id: string | null; webhook_url_encrypted: string | null; notification_webhook_url_encrypted: string | null; has_webhook: boolean; notification_user_id: string | null; has_notification_webhook: boolean; has_calendar_feed: boolean; live_channel_name: string | null; live_update_title: string | null; live_update_body: string | null; live_update_published_at: Date | null };
 
@@ -24,6 +26,13 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
   return (
     <AdminShell page="settings" username={session.username} title="Settings" description="Where announcements go, who gets mentioned, and how each message is formatted." notice={params} actions={<span className={`status ${ready ? "ready" : "pending"}`}>{ready ? "Ready to send" : "Setup needed"}</span>}>
+      <section className="section-block"><div className="section-title"><h2>Public cache</h2></div>
+        <div className="panel settings-form">
+          <p className="hint">{sharedCacheConfigured() ? "Redis is configured. Public content is reused between visits, and idle delivery checks can skip the database." : "Connect an Upstash Redis store to this Vercel project to reduce database usage. Until then, pages and cron use the database directly."}</p>
+          <form action={refreshPublicCacheAction}><PendingButton className="secondary" pendingText="Refreshing…" disabled={!sharedCacheConfigured()}>Refresh public cache</PendingButton></form>
+          <p className="hint">Refresh after setup to save the first snapshots. This requires Neon to be available; it cannot recover data from an exhausted database.</p>
+        </div>
+      </section>
       <form action={saveSettingsAction} className="settings-pages">
         <section className="section-block"><div className="section-title"><h2>Delivery</h2></div>
           <div className="panel settings-form">

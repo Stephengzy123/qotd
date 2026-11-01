@@ -1,6 +1,6 @@
 "use server";
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { revalidatePath } from "@/lib/revalidate";
 import { requireRole } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
 import { encryptSecret, validateDiscordWebhook } from "@/lib/security";
@@ -33,7 +33,7 @@ export async function saveWebhookAction(form: FormData) {
   });
   if (!result) fail("An account or webhook changed. Reload and try again.");
   await logEvent({ action: "save_webhook_assignments", actor: session.username, role: session.role, details: { webhookId: result, name, primary, accountIds: accounts, urlChanged: Boolean(url) } });
-  revalidatePath("/admin"); revalidatePath("/admin/webhooks"); revalidatePath("/club"); revalidatePath("/live");
+  await revalidatePath("/admin"); await revalidatePath("/admin/webhooks"); await revalidatePath("/club"); await revalidatePath("/live");
   redirect("/admin/webhooks?ok=Webhook%20saved.");
 }
 
@@ -46,6 +46,6 @@ export async function deleteWebhookAction(form: FormData) {
   const rows = await sql<{ name: string }[]>`delete from saved_webhooks where id = ${id} returning name`;
   if (!rows[0]) redirect("/admin/webhooks?error=That+webhook+no+longer+exists.");
   await logEvent({ action: "delete_webhook", actor: session.username, role: session.role, details: { webhookId: id, name: rows[0].name } });
-  revalidatePath("/admin"); revalidatePath("/admin/webhooks"); revalidatePath("/club"); revalidatePath("/live");
+  await revalidatePath("/admin"); await revalidatePath("/admin/webhooks"); await revalidatePath("/club"); await revalidatePath("/live");
   redirect("/admin/webhooks?ok=Webhook%20deleted.");
 }

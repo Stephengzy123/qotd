@@ -3,7 +3,8 @@ import { scheduleLivePush } from "@/lib/web-push";
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { revalidatePath } from "@/lib/revalidate";
+import { prepareScheduleChange } from "@/lib/shared-cache";
 import { clearSession, createSession, getSession, homePath, requireRole, verifyCredentials } from "@/lib/auth";
 import { dbReady } from "@/lib/db";
 import { encryptSecret, hashAddress, validateDiscordWebhook } from "@/lib/security";
@@ -109,7 +110,7 @@ export async function submitQuestionAction(formData: FormData) {
   const inserted = await sql<{ id: string }[]>`insert into questions (question, contributor_note, scheduled_date, question_type, event_title, event_occurrence_date, event_occurrence_end_date, submitter_ip_hash) values (${announcement}, ${note || null}, ${scheduledDate}, ${type}, ${type !== "announcement" ? eventTitle : null}, ${occurrenceDate}, ${occurrenceEndDate}, ${ipHash}) returning id`;
   await logEvent({ action, actor: session.username, role: session.role, details: { ...details, id: inserted[0]?.id, hasNote: Boolean(note) } });
   await sendPendingNotification(announcement, scheduledDate, type, type !== "announcement" ? eventTitle : null);
-  revalidatePath("/admin", "layout");
+  await revalidatePath("/admin", "layout");
   redirect(messageUrl("/contribute", "ok", "Your announcement is ready for review."));
 }
 
@@ -132,6 +133,7 @@ export async function reviewQuestionAction(formData: FormData) {
   const delivery = status !== "rejected" ? await readDeliverySettings(formData).catch(error => fail("/admin/pending", session, action, error.message)) : null;
   let updated: { id: string }[];
   if (status === "rejected") {
+    await prepareScheduleChange();
     updated = await sql<{ id: string }[]>`update questions set question = ${announcement}, status = 'rejected', updated_at = now() where id = ${id} and status <> 'sent' returning id`;
   } else {
     const daysEarly = type === "announcement" ? (requestedDaysEarly ?? await fail("/admin/pending", session, action, "Days early must be between 0 and 365.", details)) : 0;
@@ -140,10 +142,11 @@ export async function reviewQuestionAction(formData: FormData) {
     if (type !== "announcement" && (eventTitle.length < 1 || eventTitle.length > 200)) await fail("/admin/pending", session, action, "Event and reminder titles must be between 1 and 200 characters.", details);
     if (type === "event" && (!occurrenceDate || !isValidFuturePacificDate(occurrenceDate) || occurrenceDate < scheduledDate)) await fail("/admin/pending", session, action, "Choose an event occurrence date on or after its publish date.", details);
     if (type === "event" && invalidOccurrenceRange(occurrenceDate, occurrenceEndDate)) await fail("/admin/pending", session, action, "Choose an end date on or after the event start date, or leave it blank for a single-day event.", details);
+    await prepareScheduleChange();
     updated = await sql<{ id: string }[]>`update questions set question = ${announcement}, scheduled_date = ${scheduledDate}, question_type = ${type}, event_title = ${type !== "announcement" ? eventTitle : null}, event_occurrence_date = ${occurrenceDate}, event_occurrence_end_date = ${occurrenceEndDate}, days_early = ${daysEarly}, delivery_destination = ${delivery!.destination}, remove_pings = ${delivery!.removePings}, discord_webhook_ids = ${delivery!.webhookIds}::text[], status = ${status}, updated_at = now() where id = ${id} and status <> 'sent' returning id`;
   }
   await logEvent({ action, actor: session.username, role: session.role, success: updated.length > 0, details: { ...details, updated: updated.length > 0 } });
-  revalidatePath("/admin", "layout");
+  await revalidatePath("/admin", "layout");
   redirect(messageUrl("/admin/pending", "ok", status === "approved" ? "Announcement approved." : status === "rejected" ? "Announcement rejected." : "Changes saved."));
 }
 
@@ -168,6 +171,7 @@ export async function addApprovedQuestionAction(formData: FormData) {
   if (type !== "announcement" && (eventTitle.length < 1 || eventTitle.length > 200)) await fail("/admin/approved", session, action, "Event and reminder titles must be between 1 and 200 characters.", details);
   if (type === "event" && (!occurrenceDate || !isValidFuturePacificDate(occurrenceDate) || occurrenceDate < scheduledDate)) await fail("/admin/approved", session, action, "Choose an event occurrence date on or after its publish date.", details);
   if (type === "event" && invalidOccurrenceRange(occurrenceDate, occurrenceEndDate)) await fail("/admin/approved", session, action, "Choose an end date on or after the event start date, or leave it blank for a single-day event.", details);
+  await prepareScheduleChange();
   const sql = await dbReady();
   const inserted = await sql<{ id: string }[]>`
     insert into questions (question, scheduled_date, question_type, event_title, event_occurrence_date, event_occurrence_end_date, days_early, status, submitter_ip_hash, delivery_destination, remove_pings, discord_webhook_ids)
@@ -175,7 +179,7 @@ export async function addApprovedQuestionAction(formData: FormData) {
     returning id
   `;
   await logEvent({ action, actor: session.username, role: session.role, details: { ...details, id: inserted[0]?.id } });
-  revalidatePath("/admin", "layout");
+  await revalidatePath("/admin", "layout");
   redirect(messageUrl("/admin/approved", "ok", "Announcement added to Approved."));
 }
 
@@ -183,10 +187,11 @@ export async function unapproveQuestionAction(formData: FormData) {
   const session = await requireRole("admin");
   const id = String(formData.get("id") || "");
   if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin/approved", session, "unapprove_announcement", "Invalid announcement.", { id });
+  await prepareScheduleChange();
   const sql = await dbReady();
   const updated = await sql`update questions set status = 'pending', updated_at = now() where id = ${id} and status = 'approved' returning id`;
   await logEvent({ action: "unapprove_announcement", actor: session.username, role: session.role, success: updated.length > 0, details: { id, updated: updated.length > 0 } });
-  revalidatePath("/admin", "layout");
+  await revalidatePath("/admin", "layout");
   redirect(messageUrl("/admin/approved", "ok", "Announcement moved back to Pending."));
 }
 
@@ -194,10 +199,11 @@ export async function deleteApprovedQuestionAction(formData: FormData) {
   const session = await requireRole("admin");
   const id = String(formData.get("id") || "");
   if (!/^[0-9a-f-]{36}$/i.test(id)) await fail("/admin/approved", session, "delete_announcement", "Invalid announcement.", { id });
+  await prepareScheduleChange();
   const sql = await dbReady();
   const deleted = await sql<{ question: string }[]>`delete from questions where id = ${id} and status = 'approved' returning question`;
   await logEvent({ action: "delete_announcement", actor: session.username, role: session.role, success: deleted.length > 0, details: { id, deleted: deleted.length > 0, excerpt: deleted[0]?.question.slice(0, 120) } });
-  revalidatePath("/admin", "layout");
+  await revalidatePath("/admin", "layout");
   redirect(messageUrl("/admin/approved", "ok", "Announcement deleted."));
 }
 
@@ -245,7 +251,7 @@ export async function saveSettingsAction(formData: FormData) {
     updated_at = now()
     where singleton = true`;
   await logEvent({ action, actor: session.username, role: session.role, details });
-  revalidatePath("/admin", "layout");
+  await revalidatePath("/admin", "layout");
   redirect(messageUrl("/admin/settings", "ok", "Delivery settings saved."));
 }
 
@@ -259,7 +265,7 @@ export async function publishLiveUpdateAction(formData: FormData) {
   const sql = await dbReady();
   await sql`update settings set live_update_id = gen_random_uuid(), live_update_title = ${title}, live_update_body = ${body}, live_update_published_at = now() where singleton = true`;
   await logEvent({ action: "publish_live_update", actor: session.username, role: session.role, details: { title } });
-  revalidatePath("/admin/settings");
+  await revalidatePath("/admin/settings");
   redirect(messageUrl("/admin/settings", "ok", "Live update published. Visitors will see it when they open or return to Live Announcements."));
 }
 
@@ -268,7 +274,7 @@ export async function clearLiveUpdateAction() {
   const sql = await dbReady();
   await sql`update settings set live_update_id = null, live_update_title = null, live_update_body = null, live_update_published_at = null where singleton = true`;
   await logEvent({ action: "clear_live_update", actor: session.username, role: session.role });
-  revalidatePath("/admin/settings");
+  await revalidatePath("/admin/settings");
   redirect(messageUrl("/admin/settings", "ok", "Live update removed."));
 }
 
@@ -281,9 +287,9 @@ export async function sendQuestionAction(formData: FormData) {
   const result = await sendAnnouncement(id, "manual_selected", undefined, session.username);
   if (result.dispatchId) scheduleLivePush(result.dispatchId);
   await logEvent({ action: "send_announcement", actor: session.username, role: session.role, success: !("error" in result), details: { id, mode: "manual_selected", error: "error" in result ? result.error : undefined } });
-  revalidatePath("/admin", "layout");
-  revalidatePath("/live");
-  revalidatePath("/contribute");
+  await revalidatePath("/admin", "layout");
+  await revalidatePath("/live");
+  await revalidatePath("/contribute");
   redirect(messageUrl("/admin/approved", "error" in result ? "error" : "ok", "error" in result ? (result.error || "Send failed.") : "warning" in result && result.warning ? `Partially sent. ${result.warning}` : "Announcement sent using its saved delivery settings."));
 }
 
@@ -294,9 +300,9 @@ export async function forceSendQuestionAction(formData: FormData) {
   const result = await sendAnnouncement(id, "manual_force", undefined, session.username, { force: true });
   if (result.dispatchId) scheduleLivePush(result.dispatchId);
   await logEvent({ action: "force_send_announcement", actor: session.username, role: session.role, success: !("error" in result), details: { id, mode: "manual_force", error: "error" in result ? result.error : undefined } });
-  revalidatePath("/admin", "layout");
-  revalidatePath("/live");
-  revalidatePath("/contribute");
+  await revalidatePath("/admin", "layout");
+  await revalidatePath("/live");
+  await revalidatePath("/contribute");
   redirect(messageUrl("/admin/approved", "error" in result ? "error" : "ok", "error" in result ? (result.error || "Force send failed.") : "Announcement force-sent using its saved delivery settings."));
 }
 
@@ -336,7 +342,7 @@ export async function createAccountAction(formData: FormData) {
   // The person chooses their own password through the setup link.
   await createSetupLink(accountId, session.username);
   await logEvent({ action: "create_setup_link", actor: session.username, role: session.role, details: { id: accountId, username } });
-  revalidatePath("/admin", "layout");
+  await revalidatePath("/admin", "layout");
   if (createdClub) redirect(messageUrl(`/admin/clubs/${clubId}`, "ok", `“${clubName}” created with ${username} as leader. Connect the channel webhook, then share the setup link from the account page.`));
   redirect(messageUrl(`/admin/accounts/${accountId}`, "ok", `Account “${username}” created as ${ROLE_LABELS[role].toLowerCase()}. Share the setup link below.`));
 }
@@ -349,7 +355,7 @@ export async function deleteAccountAction(formData: FormData) {
   if (target.role === "admin" && session.username !== process.env.ADMIN_USERNAME) await fail("/admin/accounts", session, "delete_account", "Only the original configured admin can delete an admin account.", { id });
   const deleted = (await deleteAccount(id)) ?? await fail("/admin/accounts", session, "delete_account", "That account no longer exists.", { id });
   await logEvent({ action: "delete_account", actor: session.username, role: session.role, details: { id, username: deleted.username, accountRole: deleted.role } });
-  revalidatePath("/admin", "layout");
+  await revalidatePath("/admin", "layout");
   redirect(messageUrl("/admin/accounts", "ok", `Account “${deleted.username}” deleted.`));
 }
 
@@ -362,8 +368,8 @@ export async function updateAccountAction(formData: FormData) {
   if (target.role === "admin" && session.username !== process.env.ADMIN_USERNAME) await fail("/admin/accounts", session, "update_account", "Only the original configured admin can change another admin account.", { id });
   const username = (await updateAccountRole(id, role)) ?? await fail("/admin/accounts", session, "update_account", "That account no longer exists.", { id, role });
   await logEvent({ action: "update_account", actor: session.username, role: session.role, details: { id, username, accountRole: role } });
-  revalidatePath("/admin", "layout");
-  revalidatePath(`/admin/accounts/${id}`);
+  await revalidatePath("/admin", "layout");
+  await revalidatePath(`/admin/accounts/${id}`);
   redirect(messageUrl("/admin/accounts", "ok", `Account “${username}” is now a ${ROLE_LABELS[role].toLowerCase()}.`));
 }
 
@@ -376,13 +382,14 @@ export async function regenerateSetupLinkAction(formData: FormData) {
   const account = (await getAccount(id)) ?? await fail("/admin/accounts", session, "create_setup_link", "That account no longer exists.", { id });
   await createSetupLink(account.id, session.username);
   await logEvent({ action: "create_setup_link", actor: session.username, role: session.role, details: { id, username: account.username, replacesPassword: account.has_password } });
-  revalidatePath(`/admin/accounts/${id}`);
+  await revalidatePath(`/admin/accounts/${id}`);
   redirect(messageUrl(`/admin/accounts/${id}`, "ok", "New setup link ready. Earlier links no longer work."));
 }
 
 async function persistDeliverySettings(id: string, form: FormData) {
   try {
     const [settings, schedule] = await Promise.all([readDeliverySettings(form), Promise.resolve(readSendScheduleSettings(form))]);
+    await prepareScheduleChange();
     const sql = await dbReady();
     const rows = await sql`update questions set delivery_destination = ${settings.destination}, remove_pings = ${settings.removePings}, discord_webhook_ids = ${settings.webhookIds}::text[], send_schedule_mode = ${schedule.mode}, send_at = ${schedule.sendAt}, updated_at = now() where id = ${id} and status in ('pending', 'approved') returning id`;
     return rows.length ? { success: "Delivery settings saved." } : { error: "This item has already been sent or removed." };
@@ -395,6 +402,6 @@ export async function saveDeliverySettingsAction(_previous: { success?: string; 
   if (!/^[0-9a-f-]{36}$/i.test(id)) return { error: "Invalid announcement." };
   const result = await persistDeliverySettings(id, form);
   await logEvent({ action: "save_delivery_settings", actor: session.username, role: session.role, success: !result.error, details: { id } });
-  revalidatePath("/admin", "layout");
+  await revalidatePath("/admin", "layout");
   return result;
 }
